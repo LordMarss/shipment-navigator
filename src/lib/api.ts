@@ -27,7 +27,125 @@ export type ShipmentDocument = {
   shipment_id: string;
   name: string;
   done: boolean;
+  is_standard: boolean;
+  file_path: string | null;
+  file_url: string | null;
+  file_name: string | null;
+  file_type: string | null;
+  uploaded_at: string | null;
 };
+
+export const DOCS_BUCKET = "shipment-documents";
+export const MAX_FILE_BYTES = 10 * 1024 * 1024;
+export const ACCEPTED_FILE_TYPES = ".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png";
+
+function fileKind(file: File) {
+  if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) return "pdf";
+  if (file.type.startsWith("image/")) return "image";
+  return "file";
+}
+
+export function formatBytes(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+export function formatDate(value: string | null) {
+  if (!value) return "—";
+  return new Date(value).toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+async function removeStoredFile(path: string | null) {
+  if (!path) return;
+  await supabase.storage.from(DOCS_BUCKET).remove([path]);
+}
+
+export async function uploadDocumentFile(doc: ShipmentDocument, file: File) {
+  if (file.size > MAX_FILE_BYTES) {
+    throw new Error(`${file.name} is ${formatBytes(file.size)} — the limit is 10 MB per file.`);
+  }
+  const kind = fileKind(file);
+  if (kind === "file") {
+    throw new Error("Only PDF, JPG and PNG files are supported.");
+  }
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const path = `${doc.shipment_id}/${doc.id}-${Date.now()}-${safeName}`;
+  const { error: uploadError } = await supabase.storage
+    .from(DOCS_BUCKET)
+    .upload(path, file, { contentType: file.type || undefined, upsert: false });
+  if (uploadError) throw uploadError;
+
+  const previousPath = doc.file_path;
+  const { error } = await supabase
+    .from("documents")
+    .update({
+      file_path: path,
+      file_url: path,
+      file_name: file.name,
+      file_type: kind,
+      uploaded_at: new Date().toISOString(),
+      done: true,
+    })
+    .eq("id", doc.id);
+  if (error) {
+    await removeStoredFile(path);
+    throw error;
+  }
+  await removeStoredFile(previousPath && previousPath !== path ? previousPath : null);
+}
+
+export async function clearDocumentFile(doc: ShipmentDocument) {
+  const { error } = await supabase
+    .from("documents")
+    .update({
+      file_path: null,
+      file_url: null,
+      file_name: null,
+      file_type: null,
+      uploaded_at: null,
+      done: false,
+    })
+    .eq("id", doc.id);
+  if (error) throw error;
+  await removeStoredFile(doc.file_path);
+}
+
+export async function createOtherDocument(shipmentId: string, file: File) {
+  const { data, error } = await supabase
+    .from("documents")
+    .insert({ shipment_id: shipmentId, name: file.name, done: false, is_standard: false })
+    .select("*")
+    .single();
+  if (error) throw error;
+  try {
+    await uploadDocumentFile(data as ShipmentDocument, file);
+  } catch (e) {
+    await supabase.from("documents").delete().eq("id", (data as ShipmentDocument).id);
+    throw e;
+  }
+}
+
+export async function deleteDocument(doc: ShipmentDocument) {
+  const { error } = await supabase.from("documents").delete().eq("id", doc.id);
+  if (error) throw error;
+  await removeStoredFile(doc.file_path);
+}
+
+export async function getDocumentUrl(doc: ShipmentDocument) {
+  if (!doc.file_path) throw new Error("No file attached.");
+  const { data, error } = await supabase.storage
+    .from(DOCS_BUCKET)
+    .createSignedUrl(doc.file_path, 60 * 10);
+  if (error) throw error;
+  return data.signedUrl;
+}
 
 export type Alert = {
   id: string;
@@ -131,7 +249,14 @@ export async function createShipment(input: {
 
   const { error: docError } = await supabase
     .from("documents")
-    .insert(STANDARD_DOCUMENTS.map((name) => ({ shipment_id: shipment.id, name, done: false })));
+    .insert(
+      STANDARD_DOCUMENTS.map((name) => ({
+        shipment_id: shipment.id,
+        name,
+        done: false,
+        is_standard: true,
+      })),
+    );
   if (docError) throw docError;
 
   await logAlert({
@@ -158,11 +283,6 @@ export async function advanceStatus(shipment: Shipment) {
     from_status: shipment.status,
     to_status: to,
   });
-}
-
-export async function toggleDocument(doc: ShipmentDocument) {
-  const { error } = await supabase.from("documents").update({ done: !doc.done }).eq("id", doc.id);
-  if (error) throw error;
 }
 
 export async function deleteShipment(id: string) {
