@@ -23,7 +23,7 @@ export const Route = createFileRoute("/map")({
       },
     ],
   }),
-  component: FleetMap;
+  component: FleetMap,
 });
 
 // MarineTraffic public embed — no API key or account required.
