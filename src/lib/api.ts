@@ -47,7 +47,7 @@ export const STANDARD_DOCUMENTS = [
 
 export function nextStatus(status: ShipmentStatus): ShipmentStatus | null {
   const i = STATUSES.indexOf(status);
-  return i >= 0 && i < STATUSES.length - 1 ? STATUSES[i + 1] : null;
+  return i >= 0 && i < STATUSES.length - 1 ? (STATUSES[i + 1] as ShipmentStatus) : null;
 }
 
 export function shortId(id: string) {
