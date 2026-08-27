@@ -79,7 +79,7 @@ export async function uploadDocumentFile(doc: ShipmentDocument, file: File) {
   const path = `${doc.shipment_id}/${doc.id}-${Date.now()}-${safeName}`;
   const { error: uploadError } = await supabase.storage
     .from(DOCS_BUCKET)
-    .upload(path, file, { contentType: file.type || undefined, upsert: false });
+    .upload(path, file, { contentType: file.type || "application/octet-stream", upsert: false });
   if (uploadError) throw uploadError;
 
   const previousPath = doc.file_path;

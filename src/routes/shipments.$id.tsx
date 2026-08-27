@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { AppShell, btnDanger, btnGhost, btnPrimary, fieldClass } from "@/components/AppShell";
+import { DocumentFiles } from "@/components/DocumentFiles";
 import { StatusPill } from "@/components/StatusPill";
 import {
   advanceStatus,
@@ -14,10 +15,8 @@ import {
   nextStatus,
   shortId,
   STATUSES,
-  toggleDocument,
   updateShipment,
   type Shipment,
-  type ShipmentDocument,
 } from "@/lib/api";
 
 export const Route = createFileRoute("/shipments/$id")({
@@ -94,12 +93,6 @@ function ShipmentDetail() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const toggleDoc = useMutation({
-    mutationFn: (doc: ShipmentDocument) => toggleDocument(doc),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["documents", id] }),
-    onError: (e: Error) => toast.error(e.message),
-  });
-
   const remove = useMutation({
     mutationFn: () => deleteShipment(id),
     onSuccess: () => {
@@ -134,7 +127,6 @@ function ShipmentDetail() {
 
   const currentIndex = STATUSES.indexOf(shipment.status);
   const next = nextStatus(shipment.status);
-  const doneCount = documents.filter((d) => d.done).length;
 
   return (
     <AppShell
@@ -264,34 +256,7 @@ function ShipmentDetail() {
           </div>
         </form>
 
-        <div className="panel p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-[13px] font-semibold">Documents</h2>
-            <span className="text-[12px] text-muted-foreground">
-              {doneCount}/{documents.length} complete
-            </span>
-          </div>
-          <ul className="divide-y divide-border">
-            {documents.map((doc) => (
-              <li key={doc.id}>
-                <label className="flex cursor-pointer items-center gap-2.5 py-2 text-[13px]">
-                  <input
-                    type="checkbox"
-                    checked={doc.done}
-                    onChange={() => toggleDoc.mutate(doc)}
-                    className="size-3.5 accent-[var(--primary)]"
-                  />
-                  <span className={doc.done ? "text-muted-foreground line-through" : ""}>
-                    {doc.name}
-                  </span>
-                </label>
-              </li>
-            ))}
-            {documents.length === 0 ? (
-              <li className="py-3 text-[13px] text-muted-foreground">No documents.</li>
-            ) : null}
-          </ul>
-        </div>
+        <DocumentFiles shipmentId={id} documents={documents} />
       </div>
     </AppShell>
   );
