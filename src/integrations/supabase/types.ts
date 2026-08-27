@@ -14,7 +14,109 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      alerts: {
+        Row: {
+          created_at: string
+          from_status: Database["public"]["Enums"]["shipment_status"] | null
+          id: string
+          message: string
+          shipment_id: string | null
+          to_status: Database["public"]["Enums"]["shipment_status"] | null
+        }
+        Insert: {
+          created_at?: string
+          from_status?: Database["public"]["Enums"]["shipment_status"] | null
+          id?: string
+          message: string
+          shipment_id?: string | null
+          to_status?: Database["public"]["Enums"]["shipment_status"] | null
+        }
+        Update: {
+          created_at?: string
+          from_status?: Database["public"]["Enums"]["shipment_status"] | null
+          id?: string
+          message?: string
+          shipment_id?: string | null
+          to_status?: Database["public"]["Enums"]["shipment_status"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alerts_shipment_id_fkey"
+            columns: ["shipment_id"]
+            isOneToOne: false
+            referencedRelation: "shipments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      documents: {
+        Row: {
+          created_at: string
+          done: boolean
+          id: string
+          name: string
+          shipment_id: string
+        }
+        Insert: {
+          created_at?: string
+          done?: boolean
+          id?: string
+          name: string
+          shipment_id: string
+        }
+        Update: {
+          created_at?: string
+          done?: boolean
+          id?: string
+          name?: string
+          shipment_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documents_shipment_id_fkey"
+            columns: ["shipment_id"]
+            isOneToOne: false
+            referencedRelation: "shipments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shipments: {
+        Row: {
+          client_name: string
+          created_at: string
+          destination: string
+          id: string
+          landed_cost: number | null
+          origin: string
+          status: Database["public"]["Enums"]["shipment_status"]
+          vessel_mmsi: string | null
+          vessel_name: string | null
+        }
+        Insert: {
+          client_name: string
+          created_at?: string
+          destination: string
+          id?: string
+          landed_cost?: number | null
+          origin: string
+          status?: Database["public"]["Enums"]["shipment_status"]
+          vessel_mmsi?: string | null
+          vessel_name?: string | null
+        }
+        Update: {
+          client_name?: string
+          created_at?: string
+          destination?: string
+          id?: string
+          landed_cost?: number | null
+          origin?: string
+          status?: Database["public"]["Enums"]["shipment_status"]
+          vessel_mmsi?: string | null
+          vessel_name?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +125,12 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      shipment_status:
+        | "Booked"
+        | "In Transit"
+        | "At Port"
+        | "Cleared Customs"
+        | "Delivered"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +257,14 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      shipment_status: [
+        "Booked",
+        "In Transit",
+        "At Port",
+        "Cleared Customs",
+        "Delivered",
+      ],
+    },
   },
 } as const
