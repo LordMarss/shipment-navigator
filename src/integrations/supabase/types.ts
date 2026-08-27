@@ -53,23 +53,41 @@ export type Database = {
         Row: {
           created_at: string
           done: boolean
+          file_name: string | null
+          file_path: string | null
+          file_type: string | null
+          file_url: string | null
           id: string
+          is_standard: boolean
           name: string
           shipment_id: string
+          uploaded_at: string | null
         }
         Insert: {
           created_at?: string
           done?: boolean
+          file_name?: string | null
+          file_path?: string | null
+          file_type?: string | null
+          file_url?: string | null
           id?: string
+          is_standard?: boolean
           name: string
           shipment_id: string
+          uploaded_at?: string | null
         }
         Update: {
           created_at?: string
           done?: boolean
+          file_name?: string | null
+          file_path?: string | null
+          file_type?: string | null
+          file_url?: string | null
           id?: string
+          is_standard?: boolean
           name?: string
           shipment_id?: string
+          uploaded_at?: string | null
         }
         Relationships: [
           {
