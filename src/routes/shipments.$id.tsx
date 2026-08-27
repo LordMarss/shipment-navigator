@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { AppShell, btnDanger, btnGhost, btnPrimary, fieldClass } from "@/components/AppShell";
+import { DocumentFiles } from "@/components/DocumentFiles";
 import { StatusPill } from "@/components/StatusPill";
 import {
   advanceStatus,
@@ -14,10 +15,8 @@ import {
   nextStatus,
   shortId,
   STATUSES,
-  toggleDocument,
   updateShipment,
   type Shipment,
-  type ShipmentDocument,
 } from "@/lib/api";
 
 export const Route = createFileRoute("/shipments/$id")({
