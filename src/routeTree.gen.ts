@@ -11,6 +11,8 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AlertsRouteImport } from './routes/alerts'
+import { Route as MapRouteImport } from './routes/map'
+import { Route as ShipmentsIdRouteImport } from './routes/shipments.$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -22,31 +24,49 @@ const AlertsRoute = AlertsRouteImport.update({
   path: '/alerts',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MapRoute = MapRouteImport.update({
+  id: '/map',
+  path: '/map',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ShipmentsIdRoute = ShipmentsIdRouteImport.update({
+  id: '/shipments/$id',
+  path: '/shipments/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/alerts': typeof AlertsRoute
+  '/map': typeof MapRoute
+  '/shipments/$id': typeof ShipmentsIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/alerts': typeof AlertsRoute
+  '/map': typeof MapRoute
+  '/shipments/$id': typeof ShipmentsIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/alerts': typeof AlertsRoute
+  '/map': typeof MapRoute
+  '/shipments/$id': typeof ShipmentsIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/alerts'
+  fullPaths: '/' | '/alerts' | '/map' | '/shipments/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/alerts'
-  id: '__root__' | '/' | '/alerts'
+  to: '/' | '/alerts' | '/map' | '/shipments/$id'
+  id: '__root__' | '/' | '/alerts' | '/map' | '/shipments/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AlertsRoute: typeof AlertsRoute
+  MapRoute: typeof MapRoute
+  ShipmentsIdRoute: typeof ShipmentsIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -65,12 +85,28 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AlertsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/map': {
+      id: '/map'
+      path: '/map'
+      fullPath: '/map'
+      preLoaderRoute: typeof MapRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/shipments/$id': {
+      id: '/shipments/$id'
+      path: '/shipments/$id'
+      fullPath: '/shipments/$id'
+      preLoaderRoute: typeof ShipmentsIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AlertsRoute: AlertsRoute,
+  MapRoute: MapRoute,
+  ShipmentsIdRoute: ShipmentsIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
