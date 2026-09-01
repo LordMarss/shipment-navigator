@@ -240,10 +240,11 @@ export async function createShipment(input: {
   vessel_name: string | null;
   vessel_mmsi: string | null;
   landed_cost: number | null;
+  eta?: string | null;
 }) {
   const { data, error } = await supabase
     .from("shipments")
-    .insert({ ...input, status: "Booked" })
+    .insert({ ...input, eta: input.eta ?? null, status: "Booked" })
     .select("*")
     .single();
   if (error) throw error;
