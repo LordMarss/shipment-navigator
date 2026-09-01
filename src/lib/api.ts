@@ -19,6 +19,8 @@ export type Shipment = {
   vessel_mmsi: string | null;
   landed_cost: number | null;
   status: ShipmentStatus;
+  eta: string | null;
+  previous_eta: string | null;
   created_at: string;
 };
 
