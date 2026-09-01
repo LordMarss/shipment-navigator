@@ -19,6 +19,8 @@ export type Shipment = {
   vessel_mmsi: string | null;
   landed_cost: number | null;
   status: ShipmentStatus;
+  eta: string | null;
+  previous_eta: string | null;
   created_at: string;
 };
 
@@ -238,10 +240,11 @@ export async function createShipment(input: {
   vessel_name: string | null;
   vessel_mmsi: string | null;
   landed_cost: number | null;
+  eta?: string | null;
 }) {
   const { data, error } = await supabase
     .from("shipments")
-    .insert({ ...input, status: "Booked" })
+    .insert({ ...input, eta: input.eta ?? null, status: "Booked" })
     .select("*")
     .single();
   if (error) throw error;
@@ -288,4 +291,58 @@ export async function advanceStatus(shipment: Shipment) {
 export async function deleteShipment(id: string) {
   const { error } = await supabase.from("shipments").delete().eq("id", id);
   if (error) throw error;
+}
+
+export async function listAllDocuments() {
+  const { data, error } = await supabase
+    .from("documents")
+    .select("*")
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as ShipmentDocument[];
+}
+
+export function formatEta(value: string | null) {
+  if (!value) return "Not set";
+  return new Date(value).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+/**
+ * Saves editable shipment fields. When the ETA changes, the previous value is
+ * retained on the record and the change is logged to the alerts feed.
+ */
+export async function saveShipmentEdits(
+  shipment: Shipment,
+  patch: {
+    client_name: string;
+    origin: string;
+    destination: string;
+    vessel_name: string | null;
+    vessel_mmsi: string | null;
+    landed_cost: number | null;
+    eta: string | null;
+  },
+) {
+  const etaChanged = (patch.eta ?? null) !== (shipment.eta ?? null);
+  await updateShipment(shipment.id, {
+    ...patch,
+    ...(etaChanged ? { previous_eta: shipment.eta } : {}),
+  });
+
+  if (etaChanged && shipment.eta && patch.eta) {
+    const hours = Math.round(
+      (new Date(patch.eta).getTime() - new Date(shipment.eta).getTime()) / 3_600_000,
+    );
+    const direction = hours >= 0 ? "later" : "earlier";
+    await logAlert({
+      shipment_id: shipment.id,
+      message: `ETA changed by ${Math.abs(hours)} hours ${direction}`,
+    });
+  } else if (etaChanged && patch.eta) {
+    await logAlert({ shipment_id: shipment.id, message: `ETA set to ${formatEta(patch.eta)}` });
+  }
 }

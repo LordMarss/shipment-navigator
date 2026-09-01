@@ -1,70 +1,412 @@
-import { Link } from "@tanstack/react-router";
-import type { ReactNode } from "react";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  Activity,
+  Anchor,
+  Bell,
+  BarChart3,
+  ChevronDown,
+  FileText,
+  LayoutDashboard,
+  Map,
+  Menu,
+  Package,
+  Search,
+  Settings,
+  Ship,
+  Siren,
+  X,
+} from "lucide-react";
 
-const NAV = [
-  { to: "/", label: "Dashboard" },
-  { to: "/map", label: "Fleet Map" },
-  { to: "/alerts", label: "Alerts" },
-] as const;
+import { listAlerts, listShipments, shortId } from "@/lib/api";
+import { relativeTime } from "@/lib/insights";
+
+type NavItem = { to: string; label: string; icon: typeof LayoutDashboard };
+
+const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
+  { label: "Overview", items: [{ to: "/", label: "Dashboard", icon: LayoutDashboard }] },
+  {
+    label: "Shipments",
+    items: [
+      { to: "/shipments", label: "All Shipments", icon: Package },
+      { to: "/shipments/active", label: "Active", icon: Activity },
+      { to: "/shipments/completed", label: "Completed", icon: Anchor },
+    ],
+  },
+  {
+    label: "Fleet",
+    items: [
+      { to: "/map", label: "Fleet Map", icon: Map },
+      { to: "/vessels", label: "Vessels", icon: Ship },
+    ],
+  },
+  { label: "Documents", items: [{ to: "/documents", label: "Documents", icon: FileText }] },
+  {
+    label: "Intelligence",
+    items: [
+      { to: "/alerts", label: "Alerts", icon: Siren },
+      { to: "/analytics", label: "Analytics", icon: BarChart3 },
+    ],
+  },
+  { label: "", items: [{ to: "/settings", label: "Settings", icon: Settings }] },
+];
 
 export function AppShell({
   title,
   description,
+  eyebrow,
   actions,
   children,
+  wide = false,
 }: {
   title: string;
   description?: string;
+  eyebrow?: string;
   actions?: ReactNode;
   children: ReactNode;
+  wide?: boolean;
 }) {
+  const [mobileNav, setMobileNav] = useState(false);
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  useEffect(() => {
+    setMobileNav(false);
+  }, [pathname]);
+
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-surface">
-        <div className="mx-auto flex h-12 max-w-6xl items-center gap-6 px-4">
-          <Link to="/" className="text-[13px] font-semibold tracking-tight text-foreground">
-            StimTech Solutions
-          </Link>
-          <nav className="flex items-center gap-1">
-            {NAV.map((item) => (
-              <Link
-                key={item.to}
-                to={item.to}
-                activeOptions={{ exact: item.to === "/" }}
-                className="rounded-sm px-2 py-1 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-subtle hover:text-foreground"
-                activeProps={{ className: "bg-subtle text-foreground" }}
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
-        </div>
-      </header>
+      <Sidebar open={mobileNav} onClose={() => setMobileNav(false)} />
 
-      <main className="mx-auto max-w-6xl px-4 py-6">
-        <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h1 className="text-[17px] font-semibold text-foreground">{title}</h1>
-            {description ? (
-              <p className="mt-0.5 text-[13px] text-muted-foreground">{description}</p>
-            ) : null}
+      <div className="lg:pl-[228px]">
+        <TopBar onMenu={() => setMobileNav(true)} />
+
+        <main
+          className={`mx-auto w-full px-4 py-6 sm:px-6 ${wide ? "max-w-[1600px]" : "max-w-[1280px]"}`}
+        >
+          <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+            <div className="min-w-0">
+              {eyebrow ? <p className="label-xs mb-1">{eyebrow}</p> : null}
+              <h1 className="text-[19px] font-semibold tracking-[-0.015em] text-foreground">
+                {title}
+              </h1>
+              {description ? (
+                <p className="mt-1 text-[13px] text-muted-foreground">{description}</p>
+              ) : null}
+            </div>
+            {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
           </div>
-          {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
+          <div className="animate-in">{children}</div>
+        </main>
+      </div>
+    </div>
+  );
+}
+
+function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  const body = (
+    <div className="flex h-full flex-col">
+      <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border px-4">
+        <span className="grid size-6 place-items-center rounded-sm bg-primary text-primary-foreground">
+          <Ship className="size-3.5" />
+        </span>
+        <span className="text-[12px] font-semibold uppercase tracking-[0.09em] text-foreground">
+          StimTech
+        </span>
+        <button
+          className="focus-ring ml-auto rounded-sm p-1 text-muted-foreground lg:hidden"
+          onClick={onClose}
+          aria-label="Close navigation"
+        >
+          <X className="size-4" />
+        </button>
+      </div>
+
+      <nav className="flex-1 overflow-y-auto px-2 py-3">
+        {NAV_GROUPS.map((group, gi) => (
+          <div key={group.label || `g${gi}`} className={gi === 0 ? "" : "mt-4"}>
+            {group.label ? <p className="label-xs px-2 pb-1.5">{group.label}</p> : null}
+            <ul className="space-y-0.5">
+              {group.items.map((item) => {
+                const active =
+                  item.to === "/" ? pathname === "/" : pathname === item.to;
+                return (
+                  <li key={item.to}>
+                    <Link
+                      to={item.to}
+                      className={`group flex items-center gap-2 rounded-sm px-2 py-1.5 text-[13px] transition-colors ${
+                        active
+                          ? "bg-subtle font-medium text-foreground"
+                          : "text-muted-foreground hover:bg-subtle/70 hover:text-foreground"
+                      }`}
+                    >
+                      <item.icon
+                        className={`size-3.5 shrink-0 ${active ? "text-primary" : "text-muted-foreground/80"}`}
+                      />
+                      <span className="truncate">{item.label}</span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
+      </nav>
+
+      <div className="shrink-0 border-t border-border px-3 py-2.5">
+        <p className="text-[11px] text-muted-foreground">Logistics Intelligence</p>
+        <p className="text-[11px] text-muted-foreground/70">v1.0 · Operations workspace</p>
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[228px] border-r border-border bg-surface lg:block">
+        {body}
+      </aside>
+      {open ? (
+        <div className="fixed inset-0 z-40 lg:hidden">
+          <button
+            className="absolute inset-0 bg-foreground/20"
+            aria-label="Close navigation"
+            onClick={onClose}
+          />
+          <aside className="absolute inset-y-0 left-0 w-[248px] border-r border-border bg-surface">
+            {body}
+          </aside>
         </div>
-        {children}
-      </main>
+      ) : null}
+    </>
+  );
+}
+
+function TopBar({ onMenu }: { onMenu: () => void }) {
+  return (
+    <header className="sticky top-0 z-20 border-b border-border bg-surface/95 backdrop-blur">
+      <div className="flex h-14 items-center gap-2 px-3 sm:px-4">
+        <button
+          className="focus-ring rounded-sm p-1.5 text-muted-foreground hover:bg-subtle lg:hidden"
+          onClick={onMenu}
+          aria-label="Open navigation"
+        >
+          <Menu className="size-4" />
+        </button>
+
+        <GlobalSearch />
+
+        <div className="ml-auto flex items-center gap-1.5">
+          <NotificationsMenu />
+          <WorkspaceMenu />
+        </div>
+      </div>
+    </header>
+  );
+}
+
+function useDismiss(onClose: () => void) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [onClose]);
+  return ref;
+}
+
+function GlobalSearch() {
+  const [q, setQ] = useState("");
+  const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
+  const ref = useDismiss(() => setOpen(false));
+
+  const { data: shipments = [] } = useQuery({ queryKey: ["shipments"], queryFn: listShipments });
+
+  const term = q.trim().toLowerCase();
+  const results = term
+    ? shipments
+        .filter((s) =>
+          [s.client_name, s.origin, s.destination, s.vessel_name ?? "", s.vessel_mmsi ?? "", shortId(s.id)]
+            .join(" ")
+            .toLowerCase()
+            .includes(term),
+        )
+        .slice(0, 6)
+    : [];
+
+  return (
+    <div ref={ref} className="relative w-full max-w-[420px]">
+      <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+      <input
+        value={q}
+        onChange={(e) => {
+          setQ(e.target.value);
+          setOpen(true);
+        }}
+        onFocus={() => setOpen(true)}
+        placeholder="Search shipments, clients, vessels, MMSI…"
+        className="focus-ring h-8 w-full rounded-sm border border-input bg-background pl-8 pr-2 text-[13px] placeholder:text-muted-foreground"
+      />
+      {open && term ? (
+        <div className="panel animate-in absolute left-0 top-9 z-30 w-full overflow-hidden p-1 shadow-[0_8px_24px_-12px_rgba(20,33,61,0.25)]">
+          {results.length === 0 ? (
+            <p className="px-2 py-3 text-[12px] text-muted-foreground">
+              No shipments match “{q.trim()}”.
+            </p>
+          ) : (
+            results.map((s) => (
+              <button
+                key={s.id}
+                className="focus-ring flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] hover:bg-subtle"
+                onClick={() => {
+                  setOpen(false);
+                  setQ("");
+                  navigate({ to: "/shipments/$id", params: { id: s.id } });
+                }}
+              >
+                <span className="font-mono text-[11px] text-muted-foreground">
+                  {shortId(s.id)}
+                </span>
+                <span className="truncate font-medium">{s.client_name}</span>
+                <span className="ml-auto truncate text-[12px] text-muted-foreground">
+                  {s.vessel_name || `${s.origin} → ${s.destination}`}
+                </span>
+              </button>
+            ))
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function NotificationsMenu() {
+  const [open, setOpen] = useState(false);
+  const ref = useDismiss(() => setOpen(false));
+  const { data: alerts = [] } = useQuery({ queryKey: ["alerts"], queryFn: listAlerts });
+  const recent = alerts.slice(0, 6);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        className="focus-ring relative rounded-sm p-1.5 text-muted-foreground transition-colors hover:bg-subtle hover:text-foreground"
+        onClick={() => setOpen((v) => !v)}
+        aria-label="Notifications"
+      >
+        <Bell className="size-4" />
+        {alerts.length > 0 ? (
+          <span className="absolute right-1 top-1 size-1.5 rounded-full bg-risk" />
+        ) : null}
+      </button>
+      {open ? (
+        <div className="panel animate-in absolute right-0 top-10 z-30 w-[320px] overflow-hidden shadow-[0_8px_24px_-12px_rgba(20,33,61,0.25)]">
+          <div className="flex items-center justify-between border-b border-border px-3 py-2">
+            <span className="text-[12px] font-semibold">Notifications</span>
+            <Link to="/alerts" className="text-[12px] text-primary hover:underline">
+              View all
+            </Link>
+          </div>
+          {recent.length === 0 ? (
+            <p className="px-3 py-4 text-[12px] text-muted-foreground">No activity yet.</p>
+          ) : (
+            <ul className="divide-y divide-border">
+              {recent.map((a) => (
+                <li key={a.id} className="px-3 py-2">
+                  <p className="text-[12px] leading-snug text-foreground">{a.message}</p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    {relativeTime(a.created_at)}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function WorkspaceMenu() {
+  const [open, setOpen] = useState(false);
+  const ref = useDismiss(() => setOpen(false));
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        className="focus-ring flex items-center gap-2 rounded-sm border border-border bg-surface px-2 py-1 text-left transition-colors hover:bg-subtle"
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span className="grid size-6 place-items-center rounded-sm bg-primary text-[10px] font-semibold text-primary-foreground">
+          ST
+        </span>
+        <span className="hidden leading-tight sm:block">
+          <span className="block text-[12px] font-medium">StimTech Solutions</span>
+          <span className="block text-[11px] text-muted-foreground">Operations</span>
+        </span>
+        <ChevronDown className="size-3.5 text-muted-foreground" />
+      </button>
+      {open ? (
+        <div className="panel animate-in absolute right-0 top-10 z-30 w-[220px] overflow-hidden p-1 shadow-[0_8px_24px_-12px_rgba(20,33,61,0.25)]">
+          <div className="px-2 py-1.5">
+            <p className="text-[12px] font-medium">StimTech Solutions</p>
+            <p className="text-[11px] text-muted-foreground">Single-user workspace</p>
+          </div>
+          <Link
+            to="/settings"
+            className="flex items-center gap-2 rounded-sm px-2 py-1.5 text-[13px] hover:bg-subtle"
+            onClick={() => setOpen(false)}
+          >
+            <Settings className="size-3.5 text-muted-foreground" /> Settings
+          </Link>
+          <Link
+            to="/analytics"
+            className="flex items-center gap-2 rounded-sm px-2 py-1.5 text-[13px] hover:bg-subtle"
+            onClick={() => setOpen(false)}
+          >
+            <BarChart3 className="size-3.5 text-muted-foreground" /> Analytics
+          </Link>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function Skeleton({ className = "" }: { className?: string }) {
+  return <div className={`animate-pulse rounded-sm bg-subtle ${className}`} />;
+}
+
+export function EmptyState({
+  title,
+  description,
+  action,
+}: {
+  title: string;
+  description?: string;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center px-6 py-14 text-center">
+      <p className="text-[13px] font-medium text-foreground">{title}</p>
+      {description ? (
+        <p className="mt-1 max-w-sm text-[12px] text-muted-foreground">{description}</p>
+      ) : null}
+      {action ? <div className="mt-4">{action}</div> : null}
     </div>
   );
 }
 
 export const btnPrimary =
-  "focus-ring inline-flex h-8 items-center rounded-sm border border-primary bg-primary px-3 text-[13px] font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-45";
+  "focus-ring inline-flex h-8 items-center gap-1.5 rounded-sm border border-primary bg-primary px-3 text-[13px] font-medium text-primary-foreground transition-all hover:opacity-90 active:scale-[0.985] disabled:opacity-45";
 
 export const btnGhost =
-  "focus-ring inline-flex h-8 items-center rounded-sm border border-border bg-surface px-3 text-[13px] font-medium text-foreground transition-colors hover:bg-subtle disabled:opacity-45";
+  "focus-ring inline-flex h-8 items-center gap-1.5 rounded-sm border border-border bg-surface px-3 text-[13px] font-medium text-foreground transition-all hover:bg-subtle active:scale-[0.985] disabled:opacity-45";
 
 export const btnDanger =
-  "focus-ring inline-flex h-8 items-center rounded-sm border border-destructive/30 bg-surface px-3 text-[13px] font-medium text-destructive transition-colors hover:bg-risk-soft";
+  "focus-ring inline-flex h-8 items-center gap-1.5 rounded-sm border border-destructive/30 bg-surface px-3 text-[13px] font-medium text-destructive transition-all hover:bg-risk-soft active:scale-[0.985]";
 
 export const fieldClass =
   "focus-ring h-8 w-full rounded-sm border border-input bg-surface px-2 text-[13px] text-foreground placeholder:text-muted-foreground";
