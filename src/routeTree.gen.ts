@@ -12,7 +12,10 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as MapRouteImport } from './routes/map'
+import { Route as ShipmentsIndexRouteImport } from './routes/shipments.index'
 import { Route as ShipmentsIdRouteImport } from './routes/shipments.$id'
+import { Route as ShipmentsActiveRouteImport } from './routes/shipments.active'
+import { Route as ShipmentsCompletedRouteImport } from './routes/shipments.completed'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -29,9 +32,24 @@ const MapRoute = MapRouteImport.update({
   path: '/map',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ShipmentsIndexRoute = ShipmentsIndexRouteImport.update({
+  id: '/shipments/',
+  path: '/shipments/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ShipmentsIdRoute = ShipmentsIdRouteImport.update({
   id: '/shipments/$id',
   path: '/shipments/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ShipmentsActiveRoute = ShipmentsActiveRouteImport.update({
+  id: '/shipments/active',
+  path: '/shipments/active',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ShipmentsCompletedRoute = ShipmentsCompletedRouteImport.update({
+  id: '/shipments/completed',
+  path: '/shipments/completed',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -40,12 +58,18 @@ export interface FileRoutesByFullPath {
   '/alerts': typeof AlertsRoute
   '/map': typeof MapRoute
   '/shipments/$id': typeof ShipmentsIdRoute
+  '/shipments/active': typeof ShipmentsActiveRoute
+  '/shipments/completed': typeof ShipmentsCompletedRoute
+  '/shipments/': typeof ShipmentsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/alerts': typeof AlertsRoute
   '/map': typeof MapRoute
   '/shipments/$id': typeof ShipmentsIdRoute
+  '/shipments/active': typeof ShipmentsActiveRoute
+  '/shipments/completed': typeof ShipmentsCompletedRoute
+  '/shipments': typeof ShipmentsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -53,13 +77,38 @@ export interface FileRoutesById {
   '/alerts': typeof AlertsRoute
   '/map': typeof MapRoute
   '/shipments/$id': typeof ShipmentsIdRoute
+  '/shipments/active': typeof ShipmentsActiveRoute
+  '/shipments/completed': typeof ShipmentsCompletedRoute
+  '/shipments/': typeof ShipmentsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/alerts' | '/map' | '/shipments/$id'
+  fullPaths:
+    | '/'
+    | '/alerts'
+    | '/map'
+    | '/shipments/$id'
+    | '/shipments/active'
+    | '/shipments/completed'
+    | '/shipments/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/alerts' | '/map' | '/shipments/$id'
-  id: '__root__' | '/' | '/alerts' | '/map' | '/shipments/$id'
+  to:
+    | '/'
+    | '/alerts'
+    | '/map'
+    | '/shipments/$id'
+    | '/shipments/active'
+    | '/shipments/completed'
+    | '/shipments'
+  id:
+    | '__root__'
+    | '/'
+    | '/alerts'
+    | '/map'
+    | '/shipments/$id'
+    | '/shipments/active'
+    | '/shipments/completed'
+    | '/shipments/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -67,6 +116,9 @@ export interface RootRouteChildren {
   AlertsRoute: typeof AlertsRoute
   MapRoute: typeof MapRoute
   ShipmentsIdRoute: typeof ShipmentsIdRoute
+  ShipmentsActiveRoute: typeof ShipmentsActiveRoute
+  ShipmentsCompletedRoute: typeof ShipmentsCompletedRoute
+  ShipmentsIndexRoute: typeof ShipmentsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -92,11 +144,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MapRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/shipments/': {
+      id: '/shipments/'
+      path: '/shipments'
+      fullPath: '/shipments/'
+      preLoaderRoute: typeof ShipmentsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/shipments/$id': {
       id: '/shipments/$id'
       path: '/shipments/$id'
       fullPath: '/shipments/$id'
       preLoaderRoute: typeof ShipmentsIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/shipments/active': {
+      id: '/shipments/active'
+      path: '/shipments/active'
+      fullPath: '/shipments/active'
+      preLoaderRoute: typeof ShipmentsActiveRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/shipments/completed': {
+      id: '/shipments/completed'
+      path: '/shipments/completed'
+      fullPath: '/shipments/completed'
+      preLoaderRoute: typeof ShipmentsCompletedRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -107,6 +180,9 @@ const rootRouteChildren: RootRouteChildren = {
   AlertsRoute: AlertsRoute,
   MapRoute: MapRoute,
   ShipmentsIdRoute: ShipmentsIdRoute,
+  ShipmentsActiveRoute: ShipmentsActiveRoute,
+  ShipmentsCompletedRoute: ShipmentsCompletedRoute,
+  ShipmentsIndexRoute: ShipmentsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
