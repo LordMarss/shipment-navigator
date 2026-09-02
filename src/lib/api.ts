@@ -1,14 +1,35 @@
 import { supabase } from "@/integrations/supabase/client";
 
+/**
+ * Lifecycle position of a shipment. This says WHERE the shipment is — never
+ * how well it is doing (that is `health`, see lib/lifecycle.ts).
+ */
 export const STATUSES = [
+  "Scheduled",
   "Booked",
+  "Departed",
   "In Transit",
+  "Approaching Destination",
+  "Arrived",
   "At Port",
   "Cleared Customs",
   "Delivered",
 ] as const;
 
 export type ShipmentStatus = (typeof STATUSES)[number];
+
+export const HEALTH_LEVELS = ["On Track", "Attention", "At Risk", "Delayed"] as const;
+export type HealthValue = (typeof HEALTH_LEVELS)[number];
+
+export const MONITORING_STATES = [
+  "Scheduled",
+  "Pre-Monitoring",
+  "Active Monitoring",
+  "Completed",
+] as const;
+export type MonitoringState = (typeof MONITORING_STATES)[number];
+
+export type EventSource = "manual" | "ais" | "system";
 
 export type Shipment = {
   id: string;
@@ -17,10 +38,47 @@ export type Shipment = {
   destination: string;
   vessel_name: string | null;
   vessel_mmsi: string | null;
+  vessel_imo: string | null;
   landed_cost: number | null;
   status: ShipmentStatus;
+  /** Current/latest ETA. `planned_eta` holds the original estimate. */
   eta: string | null;
   previous_eta: string | null;
+  planned_etd: string | null;
+  planned_eta: string | null;
+  actual_departure: string | null;
+  actual_arrival: string | null;
+  actual_delivery: string | null;
+  /** Stored health, maintained by backend automation. */
+  health: HealthValue | string;
+  health_reason: string | null;
+  monitoring_state: MonitoringState | string;
+  /** Per-shipment override of the workspace monitoring offset. */
+  monitoring_start_offset_days: number | null;
+  reference: string | null;
+  carrier: string | null;
+  container_number: string | null;
+  customer_reference: string | null;
+  last_synced_at: string | null;
+  updated_at: string;
+  created_at: string;
+};
+
+/** Lifecycle timeline + audit trail record. Never fabricated on the client. */
+export type ShipmentEvent = {
+  id: string;
+  shipment_id: string;
+  event_type: string;
+  /** "event" | "status" | "health" | "eta" | "note" */
+  category: string;
+  occurred_at: string;
+  field: string | null;
+  from_value: string | null;
+  to_value: string | null;
+  source: EventSource | string;
+  automated: boolean;
+  actor: string | null;
+  reason: string | null;
   created_at: string;
 };
 

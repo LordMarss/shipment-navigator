@@ -1,17 +1,25 @@
 import type { ShipmentStatus } from "@/lib/api";
-import type { HealthLevel, Severity } from "@/lib/insights";
+import type { HealthLevel, MonitoringState, Severity } from "@/lib/lifecycle";
 
 const TONE: Record<ShipmentStatus, string> = {
+  Scheduled: "bg-subtle text-muted-foreground border-border",
   Booked: "bg-subtle text-muted-foreground border-border",
+  Departed: "bg-primary/[0.07] text-primary border-primary/20",
   "In Transit": "bg-primary/[0.07] text-primary border-primary/20",
+  "Approaching Destination": "bg-primary/[0.07] text-primary border-primary/20",
+  Arrived: "bg-warning-soft text-warning border-warning/25",
   "At Port": "bg-warning-soft text-warning border-warning/25",
   "Cleared Customs": "bg-positive-soft text-positive border-positive/25",
   Delivered: "bg-positive-soft text-positive border-positive/25",
 };
 
 const DOT: Record<ShipmentStatus, string> = {
+  Scheduled: "bg-muted-foreground/50",
   Booked: "bg-muted-foreground/50",
+  Departed: "bg-primary",
   "In Transit": "bg-primary",
+  "Approaching Destination": "bg-primary",
+  Arrived: "bg-warning",
   "At Port": "bg-warning",
   "Cleared Customs": "bg-positive",
   Delivered: "bg-positive",
@@ -20,9 +28,9 @@ const DOT: Record<ShipmentStatus, string> = {
 export function StatusPill({ status }: { status: ShipmentStatus }) {
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-sm border px-1.5 py-0.5 text-[11px] font-medium whitespace-nowrap ${TONE[status]}`}
+      className={`inline-flex items-center gap-1.5 rounded-sm border px-1.5 py-0.5 text-[11px] font-medium whitespace-nowrap ${TONE[status] ?? TONE.Booked}`}
     >
-      <span className={`size-1.5 rounded-full ${DOT[status]}`} aria-hidden />
+      <span className={`size-1.5 rounded-full ${DOT[status] ?? DOT.Booked}`} aria-hidden />
       {status}
     </span>
   );
@@ -30,15 +38,17 @@ export function StatusPill({ status }: { status: ShipmentStatus }) {
 
 const HEALTH: Record<HealthLevel, string> = {
   "On Track": "bg-positive-soft text-positive border-positive/25",
-  "Attention Required": "bg-warning-soft text-warning border-warning/25",
+  Attention: "bg-warning-soft text-warning border-warning/25",
   "At Risk": "bg-risk-soft text-risk border-risk/25",
+  Delayed: "bg-risk-soft text-risk border-risk/25",
   Delivered: "bg-subtle text-muted-foreground border-border",
 };
 
 const HEALTH_DOT: Record<HealthLevel, string> = {
   "On Track": "bg-positive",
-  "Attention Required": "bg-warning",
+  Attention: "bg-warning",
   "At Risk": "bg-risk",
+  Delayed: "bg-risk",
   Delivered: "bg-muted-foreground/50",
 };
 
@@ -49,6 +59,23 @@ export function HealthBadge({ level }: { level: HealthLevel }) {
     >
       <span className={`size-1.5 rounded-full ${HEALTH_DOT[level]}`} aria-hidden />
       {level}
+    </span>
+  );
+}
+
+const MONITORING: Record<MonitoringState, string> = {
+  Scheduled: "bg-subtle text-muted-foreground border-border",
+  "Pre-Monitoring": "bg-warning-soft text-warning border-warning/25",
+  "Active Monitoring": "bg-primary/[0.07] text-primary border-primary/20",
+  Completed: "bg-positive-soft text-positive border-positive/25",
+};
+
+export function MonitoringBadge({ state }: { state: MonitoringState }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-sm border px-1.5 py-0.5 text-[11px] font-medium whitespace-nowrap ${MONITORING[state]}`}
+    >
+      {state}
     </span>
   );
 }
@@ -65,6 +92,19 @@ export function SeverityBadge({ severity, label }: { severity: Severity; label: 
       className={`inline-flex items-center rounded-sm border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.05em] whitespace-nowrap ${SEVERITY[severity]}`}
     >
       {label}
+    </span>
+  );
+}
+
+export function SourceTag({ source, automated }: { source: string; automated: boolean }) {
+  const label = source === "ais" ? "AIS" : source === "system" ? "System" : "Manual";
+  return (
+    <span className="inline-flex items-center gap-1 whitespace-nowrap text-[11px] text-muted-foreground">
+      <span
+        aria-hidden
+        className={`size-1.5 rounded-full ${automated ? "bg-primary/70" : "bg-muted-foreground/40"}`}
+      />
+      {label} · {automated ? "Automatic" : "Manual entry"}
     </span>
   );
 }

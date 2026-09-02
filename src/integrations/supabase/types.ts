@@ -49,6 +49,27 @@ export type Database = {
           },
         ]
       }
+      app_settings: {
+        Row: {
+          created_at: string
+          key: string
+          updated_at: string
+          value: Json
+        }
+        Insert: {
+          created_at?: string
+          key: string
+          updated_at?: string
+          value: Json
+        }
+        Update: {
+          created_at?: string
+          key?: string
+          updated_at?: string
+          value?: Json
+        }
+        Relationships: []
+      }
       documents: {
         Row: {
           created_at: string
@@ -99,43 +120,147 @@ export type Database = {
           },
         ]
       }
+      shipment_events: {
+        Row: {
+          actor: string | null
+          automated: boolean
+          category: string
+          created_at: string
+          event_type: string
+          field: string | null
+          from_value: string | null
+          id: string
+          occurred_at: string
+          reason: string | null
+          shipment_id: string
+          source: string
+          to_value: string | null
+        }
+        Insert: {
+          actor?: string | null
+          automated?: boolean
+          category?: string
+          created_at?: string
+          event_type: string
+          field?: string | null
+          from_value?: string | null
+          id?: string
+          occurred_at?: string
+          reason?: string | null
+          shipment_id: string
+          source?: string
+          to_value?: string | null
+        }
+        Update: {
+          actor?: string | null
+          automated?: boolean
+          category?: string
+          created_at?: string
+          event_type?: string
+          field?: string | null
+          from_value?: string | null
+          id?: string
+          occurred_at?: string
+          reason?: string | null
+          shipment_id?: string
+          source?: string
+          to_value?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shipment_events_shipment_id_fkey"
+            columns: ["shipment_id"]
+            isOneToOne: false
+            referencedRelation: "shipments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shipments: {
         Row: {
+          actual_arrival: string | null
+          actual_delivery: string | null
+          actual_departure: string | null
+          carrier: string | null
           client_name: string
+          container_number: string | null
           created_at: string
+          customer_reference: string | null
           destination: string
           eta: string | null
+          health: string
+          health_reason: string | null
           id: string
           landed_cost: number | null
+          last_synced_at: string | null
+          monitoring_start_offset_days: number | null
+          monitoring_state: string
           origin: string
+          planned_eta: string | null
+          planned_etd: string | null
           previous_eta: string | null
+          reference: string | null
           status: Database["public"]["Enums"]["shipment_status"]
+          updated_at: string
+          vessel_imo: string | null
           vessel_mmsi: string | null
           vessel_name: string | null
         }
         Insert: {
+          actual_arrival?: string | null
+          actual_delivery?: string | null
+          actual_departure?: string | null
+          carrier?: string | null
           client_name: string
+          container_number?: string | null
           created_at?: string
+          customer_reference?: string | null
           destination: string
           eta?: string | null
+          health?: string
+          health_reason?: string | null
           id?: string
           landed_cost?: number | null
+          last_synced_at?: string | null
+          monitoring_start_offset_days?: number | null
+          monitoring_state?: string
           origin: string
+          planned_eta?: string | null
+          planned_etd?: string | null
           previous_eta?: string | null
+          reference?: string | null
           status?: Database["public"]["Enums"]["shipment_status"]
+          updated_at?: string
+          vessel_imo?: string | null
           vessel_mmsi?: string | null
           vessel_name?: string | null
         }
         Update: {
+          actual_arrival?: string | null
+          actual_delivery?: string | null
+          actual_departure?: string | null
+          carrier?: string | null
           client_name?: string
+          container_number?: string | null
           created_at?: string
+          customer_reference?: string | null
           destination?: string
           eta?: string | null
+          health?: string
+          health_reason?: string | null
           id?: string
           landed_cost?: number | null
+          last_synced_at?: string | null
+          monitoring_start_offset_days?: number | null
+          monitoring_state?: string
           origin?: string
+          planned_eta?: string | null
+          planned_etd?: string | null
           previous_eta?: string | null
+          reference?: string | null
           status?: Database["public"]["Enums"]["shipment_status"]
+          updated_at?: string
+          vessel_imo?: string | null
           vessel_mmsi?: string | null
           vessel_name?: string | null
         }
@@ -150,8 +275,12 @@ export type Database = {
     }
     Enums: {
       shipment_status:
+        | "Scheduled"
         | "Booked"
+        | "Departed"
         | "In Transit"
+        | "Approaching Destination"
+        | "Arrived"
         | "At Port"
         | "Cleared Customs"
         | "Delivered"
@@ -283,8 +412,12 @@ export const Constants = {
   public: {
     Enums: {
       shipment_status: [
+        "Scheduled",
         "Booked",
+        "Departed",
         "In Transit",
+        "Approaching Destination",
+        "Arrived",
         "At Port",
         "Cleared Customs",
         "Delivered",
