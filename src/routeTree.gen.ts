@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as MapRouteImport } from './routes/map'
+import { Route as VesselsRouteImport } from './routes/vessels'
 import { Route as ShipmentsIndexRouteImport } from './routes/shipments.index'
 import { Route as ShipmentsIdRouteImport } from './routes/shipments.$id'
 import { Route as ShipmentsActiveRouteImport } from './routes/shipments.active'
@@ -30,6 +31,11 @@ const AlertsRoute = AlertsRouteImport.update({
 const MapRoute = MapRouteImport.update({
   id: '/map',
   path: '/map',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VesselsRoute = VesselsRouteImport.update({
+  id: '/vessels',
+  path: '/vessels',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ShipmentsIndexRoute = ShipmentsIndexRouteImport.update({
@@ -57,6 +63,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/alerts': typeof AlertsRoute
   '/map': typeof MapRoute
+  '/vessels': typeof VesselsRoute
   '/shipments/$id': typeof ShipmentsIdRoute
   '/shipments/active': typeof ShipmentsActiveRoute
   '/shipments/completed': typeof ShipmentsCompletedRoute
@@ -66,6 +73,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/alerts': typeof AlertsRoute
   '/map': typeof MapRoute
+  '/vessels': typeof VesselsRoute
   '/shipments/$id': typeof ShipmentsIdRoute
   '/shipments/active': typeof ShipmentsActiveRoute
   '/shipments/completed': typeof ShipmentsCompletedRoute
@@ -76,6 +84,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/alerts': typeof AlertsRoute
   '/map': typeof MapRoute
+  '/vessels': typeof VesselsRoute
   '/shipments/$id': typeof ShipmentsIdRoute
   '/shipments/active': typeof ShipmentsActiveRoute
   '/shipments/completed': typeof ShipmentsCompletedRoute
@@ -87,6 +96,7 @@ export interface FileRouteTypes {
     | '/'
     | '/alerts'
     | '/map'
+    | '/vessels'
     | '/shipments/$id'
     | '/shipments/active'
     | '/shipments/completed'
@@ -96,6 +106,7 @@ export interface FileRouteTypes {
     | '/'
     | '/alerts'
     | '/map'
+    | '/vessels'
     | '/shipments/$id'
     | '/shipments/active'
     | '/shipments/completed'
@@ -105,6 +116,7 @@ export interface FileRouteTypes {
     | '/'
     | '/alerts'
     | '/map'
+    | '/vessels'
     | '/shipments/$id'
     | '/shipments/active'
     | '/shipments/completed'
@@ -115,6 +127,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AlertsRoute: typeof AlertsRoute
   MapRoute: typeof MapRoute
+  VesselsRoute: typeof VesselsRoute
   ShipmentsIdRoute: typeof ShipmentsIdRoute
   ShipmentsActiveRoute: typeof ShipmentsActiveRoute
   ShipmentsCompletedRoute: typeof ShipmentsCompletedRoute
@@ -142,6 +155,13 @@ declare module '@tanstack/react-router' {
       path: '/map'
       fullPath: '/map'
       preLoaderRoute: typeof MapRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vessels': {
+      id: '/vessels'
+      path: '/vessels'
+      fullPath: '/vessels'
+      preLoaderRoute: typeof VesselsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/shipments/': {
@@ -179,6 +199,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AlertsRoute: AlertsRoute,
   MapRoute: MapRoute,
+  VesselsRoute: VesselsRoute,
   ShipmentsIdRoute: ShipmentsIdRoute,
   ShipmentsActiveRoute: ShipmentsActiveRoute,
   ShipmentsCompletedRoute: ShipmentsCompletedRoute,
