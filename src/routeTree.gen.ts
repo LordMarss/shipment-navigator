@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AlertsRouteImport } from './routes/alerts'
+import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as DocumentsRouteImport } from './routes/documents'
 import { Route as MapRouteImport } from './routes/map'
 import { Route as VesselsRouteImport } from './routes/vessels'
@@ -27,6 +28,11 @@ const IndexRoute = IndexRouteImport.update({
 const AlertsRoute = AlertsRouteImport.update({
   id: '/alerts',
   path: '/alerts',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AnalyticsRoute = AnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DocumentsRoute = DocumentsRouteImport.update({
@@ -68,6 +74,7 @@ const ShipmentsCompletedRoute = ShipmentsCompletedRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/alerts': typeof AlertsRoute
+  '/analytics': typeof AnalyticsRoute
   '/documents': typeof DocumentsRoute
   '/map': typeof MapRoute
   '/vessels': typeof VesselsRoute
@@ -79,6 +86,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/alerts': typeof AlertsRoute
+  '/analytics': typeof AnalyticsRoute
   '/documents': typeof DocumentsRoute
   '/map': typeof MapRoute
   '/vessels': typeof VesselsRoute
@@ -91,6 +99,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/alerts': typeof AlertsRoute
+  '/analytics': typeof AnalyticsRoute
   '/documents': typeof DocumentsRoute
   '/map': typeof MapRoute
   '/vessels': typeof VesselsRoute
@@ -104,6 +113,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/alerts'
+    | '/analytics'
     | '/documents'
     | '/map'
     | '/vessels'
@@ -115,6 +125,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/alerts'
+    | '/analytics'
     | '/documents'
     | '/map'
     | '/vessels'
@@ -126,6 +137,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/alerts'
+    | '/analytics'
     | '/documents'
     | '/map'
     | '/vessels'
@@ -138,6 +150,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AlertsRoute: typeof AlertsRoute
+  AnalyticsRoute: typeof AnalyticsRoute
   DocumentsRoute: typeof DocumentsRoute
   MapRoute: typeof MapRoute
   VesselsRoute: typeof VesselsRoute
@@ -161,6 +174,13 @@ declare module '@tanstack/react-router' {
       path: '/alerts'
       fullPath: '/alerts'
       preLoaderRoute: typeof AlertsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/analytics': {
+      id: '/analytics'
+      path: '/analytics'
+      fullPath: '/analytics'
+      preLoaderRoute: typeof AnalyticsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/documents': {
@@ -218,6 +238,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AlertsRoute: AlertsRoute,
+  AnalyticsRoute: AnalyticsRoute,
   DocumentsRoute: DocumentsRoute,
   MapRoute: MapRoute,
   VesselsRoute: VesselsRoute,
