@@ -95,7 +95,7 @@ function DocumentsPage() {
                       <td key={i} className="px-3 py-2">
                         {d?.file_path ? (
                           <span className="inline-flex items-center gap-1.5 text-[12px] text-muted-foreground">
-                            <span className="size-1.5 rounded-full bg-ontime" />
+                            <span className="size-1.5 rounded-full bg-positive" />
                             <span className="max-w-[140px] truncate">{d.file_name}</span>
                           </span>
                         ) : (
