@@ -173,3 +173,18 @@
     box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-ring) 14%, transparent);
   }
 }
+
+@utility animate-in {
+  animation: lv-fade-in 160ms ease-out both;
+}
+
+@keyframes lv-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
