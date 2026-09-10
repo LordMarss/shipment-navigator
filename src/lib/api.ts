@@ -404,3 +404,240 @@ export async function saveShipmentEdits(
     await logAlert({ shipment_id: shipment.id, message: `ETA set to ${formatEta(patch.eta)}` });
   }
 }
+
+/* ------------------------------------------------- lifecycle events + audit */
+
+export async function listEvents(shipmentId: string) {
+  const { data, error } = await supabase
+    .from("shipment_events")
+    .select("*")
+    .eq("shipment_id", shipmentId)
+    .order("occurred_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as ShipmentEvent[];
+}
+
+export async function recordEvent(input: {
+  shipment_id: string;
+  event_type: string;
+  category?: string;
+  field?: string | null;
+  from_value?: string | null;
+  to_value?: string | null;
+  source?: EventSource;
+  automated?: boolean;
+  actor?: string | null;
+  reason?: string | null;
+  occurred_at?: string;
+}) {
+  const { error } = await supabase.from("shipment_events").insert({
+    shipment_id: input.shipment_id,
+    event_type: input.event_type,
+    category: input.category ?? "event",
+    field: input.field ?? null,
+    from_value: input.from_value ?? null,
+    to_value: input.to_value ?? null,
+    source: input.source ?? "manual",
+    automated: input.automated ?? false,
+    actor: input.actor ?? "Operator",
+    reason: input.reason ?? null,
+    occurred_at: input.occurred_at ?? new Date().toISOString(),
+  });
+  if (error) throw error;
+}
+
+/* --------------------------------------------------------- workspace config */
+
+export const SETTING_KEYS = [
+  "monitoring_start_offset_days",
+  "pre_monitoring_window_days",
+  "eta_attention_hours",
+  "eta_risk_hours",
+] as const;
+
+export type SettingKey = (typeof SETTING_KEYS)[number];
+
+export async function listSettings() {
+  const { data, error } = await supabase.from("app_settings").select("key, value");
+  if (error) throw error;
+  const out: Record<string, number> = {};
+  for (const row of data ?? []) {
+    const n = Number(row.value as unknown as number);
+    if (!Number.isNaN(n)) out[row.key] = n;
+  }
+  return out;
+}
+
+export async function updateSetting(key: SettingKey, value: number) {
+  const { error } = await supabase
+    .from("app_settings")
+    .upsert({ key, value: value as unknown as never }, { onConflict: "key" });
+  if (error) throw error;
+}
+
+/* ------------------------------------------------------ temporal edit + log */
+
+export type TemporalPatch = {
+  planned_etd: string | null;
+  planned_eta: string | null;
+  eta: string | null;
+  actual_departure: string | null;
+  actual_arrival: string | null;
+  actual_delivery: string | null;
+};
+
+const TEMPORAL_LABELS: Record<keyof TemporalPatch, string> = {
+  planned_etd: "Planned departure",
+  planned_eta: "Planned arrival",
+  eta: "Current ETA",
+  actual_departure: "Actual departure",
+  actual_arrival: "Actual arrival",
+  actual_delivery: "Actual delivery",
+};
+
+/**
+ * Saves the editable shipment fields (details + every date) and records one
+ * audit event per changed field so the change is always attributable.
+ */
+export async function saveShipmentDetails(
+  shipment: Shipment,
+  patch: Partial<Shipment>,
+  reason?: string | null,
+) {
+  const changed = Object.entries(patch).filter(
+    ([k, v]) => (v ?? null) !== ((shipment as Record<string, unknown>)[k] ?? null),
+  );
+  if (changed.length === 0) return;
+
+  const etaChanged = changed.some(([k]) => k === "eta");
+  await updateShipment(shipment.id, {
+    ...patch,
+    ...(etaChanged ? { previous_eta: shipment.eta } : {}),
+  });
+
+  for (const [field, value] of changed) {
+    const label = TEMPORAL_LABELS[field as keyof TemporalPatch] ?? field.replace(/_/g, " ");
+    await recordEvent({
+      shipment_id: shipment.id,
+      event_type: field,
+      category: field in TEMPORAL_LABELS ? "eta" : "event",
+      field: label,
+      from_value: formatEventValue((shipment as Record<string, unknown>)[field]),
+      to_value: formatEventValue(value),
+      source: "manual",
+      automated: false,
+      reason: reason ?? null,
+    });
+  }
+
+  if (etaChanged) {
+    const to = (patch.eta as string | null) ?? null;
+    if (shipment.eta && to) {
+      const hours = Math.round(
+        (new Date(to).getTime() - new Date(shipment.eta).getTime()) / 3_600_000,
+      );
+      await logAlert({
+        shipment_id: shipment.id,
+        message: `ETA changed by ${Math.abs(hours)} hours ${hours >= 0 ? "later" : "earlier"}`,
+      });
+    } else if (to) {
+      await logAlert({ shipment_id: shipment.id, message: `ETA set to ${formatEta(to)}` });
+    }
+  }
+}
+
+function formatEventValue(value: unknown) {
+  if (value == null || value === "") return null;
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}T/.test(value)) {
+    return new Date(value).toISOString();
+  }
+  return String(value);
+}
+
+/** Manual override of the derived health, always with a reason. */
+export async function overrideHealth(shipment: Shipment, health: HealthValue, reason: string) {
+  await updateShipment(shipment.id, { health, health_reason: reason });
+  await recordEvent({
+    shipment_id: shipment.id,
+    event_type: "health_override",
+    category: "health",
+    field: "Health",
+    from_value: String(shipment.health),
+    to_value: health,
+    source: "manual",
+    automated: false,
+    reason,
+  });
+  await logAlert({
+    shipment_id: shipment.id,
+    message: `${shortId(shipment.id)} health set to ${health} — ${reason}`,
+  });
+}
+
+/** Manual override of the monitoring state, always with a reason. */
+export async function overrideMonitoring(
+  shipment: Shipment,
+  state: MonitoringState,
+  reason: string,
+) {
+  await updateShipment(shipment.id, { monitoring_state: state });
+  await recordEvent({
+    shipment_id: shipment.id,
+    event_type: "monitoring_override",
+    category: "monitoring",
+    field: "Monitoring state",
+    from_value: String(shipment.monitoring_state),
+    to_value: state,
+    source: "manual",
+    automated: false,
+    reason,
+  });
+}
+
+/** Bulk insert foundation used by the import wizard. */
+export type ImportRow = {
+  client_name: string;
+  origin: string;
+  destination: string;
+  vessel_name: string | null;
+  vessel_mmsi: string | null;
+  carrier: string | null;
+  reference: string | null;
+  container_number: string | null;
+  planned_etd: string | null;
+  planned_eta: string | null;
+  landed_cost: number | null;
+};
+
+export async function importShipments(rows: ImportRow[]) {
+  const { data, error } = await supabase
+    .from("shipments")
+    .insert(rows.map((r) => ({ ...r, eta: r.planned_eta, status: "Booked" as const })))
+    .select("id, client_name, origin, destination");
+  if (error) throw error;
+  const created = (data ?? []) as { id: string; client_name: string; origin: string; destination: string }[];
+
+  if (created.length) {
+    const docs = created.flatMap((s) =>
+      STANDARD_DOCUMENTS.map((name) => ({
+        shipment_id: s.id,
+        name,
+        done: false,
+        is_standard: true,
+      })),
+    );
+    const { error: docError } = await supabase.from("documents").insert(docs);
+    if (docError) throw docError;
+
+    const { error: alertError } = await supabase.from("alerts").insert(
+      created.map((s) => ({
+        shipment_id: s.id,
+        message: `Imported shipment for ${s.client_name} (${s.origin} → ${s.destination})`,
+        to_status: "Booked" as const,
+      })),
+    );
+    if (alertError) throw alertError;
+  }
+
+  return created.length;
+}
