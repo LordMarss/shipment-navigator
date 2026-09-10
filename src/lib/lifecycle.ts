@@ -317,10 +317,10 @@ export type TimelineEntry = {
   value: string | null;
   kind: TimelineKind;
   complete: boolean;
-  delayed?: boolean;
-  note?: string;
-  source?: string;
-  automated?: boolean;
+  delayed?: boolean | undefined;
+  note?: string | undefined;
+  source?: string | undefined;
+  automated?: boolean | undefined;
 };
 
 /**
