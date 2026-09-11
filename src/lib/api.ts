@@ -299,10 +299,23 @@ export async function createShipment(input: {
   vessel_mmsi: string | null;
   landed_cost: number | null;
   eta?: string | null;
+  planned_etd?: string | null;
+  planned_eta?: string | null;
 }) {
+  const plannedEtd = input.planned_etd ?? null;
+  const plannedEta = input.planned_eta ?? null;
+  // Planned and current values are stored separately so automation can update
+  // the current ETA later without losing the original plan.
   const { data, error } = await supabase
     .from("shipments")
-    .insert({ ...input, eta: input.eta ?? null, status: "Booked" })
+    .insert({
+      ...input,
+      planned_etd: plannedEtd,
+      planned_eta: plannedEta,
+      eta: input.eta ?? plannedEta,
+      status: "Booked",
+      last_synced_at: new Date().toISOString(),
+    })
     .select("*")
     .single();
   if (error) throw error;
@@ -334,10 +347,21 @@ export async function updateShipment(id: string, patch: Partial<Shipment>) {
   if (error) throw error;
 }
 
+/** Manual status advance — preserved as the fallback for the automation. */
 export async function advanceStatus(shipment: Shipment) {
   const to = nextStatus(shipment.status);
   if (!to) return;
   await updateShipment(shipment.id, { status: to });
+  await recordEvent({
+    shipment_id: shipment.id,
+    event_type: "status_manual",
+    category: "status",
+    field: "Status",
+    from_value: shipment.status,
+    to_value: to,
+    source: "manual",
+    automated: false,
+  });
   await logAlert({
     shipment_id: shipment.id,
     message: `${shortId(shipment.id)} · ${shipment.client_name} moved to ${to}`,
@@ -640,4 +664,68 @@ export async function importShipments(rows: ImportRow[]) {
   }
 
   return created.length;
+}
+
+/* ------------------------------------------------ automated status pipeline */
+
+/**
+ * Persists an automated status / monitoring transition. Every change is written
+ * as its own append-only event so automated moves stay distinguishable from
+ * manual ones, and previous history is never overwritten.
+ */
+export async function applyAutomation(
+  shipment: Shipment,
+  decision: {
+    status: ShipmentStatus;
+    monitoring_state: MonitoringState;
+    reason: string;
+    source: EventSource;
+    statusChanged: boolean;
+    monitoringChanged: boolean;
+  },
+) {
+  const now = new Date().toISOString();
+  const patch: Partial<Shipment> = { last_synced_at: now };
+  if (decision.statusChanged) patch.status = decision.status;
+  if (decision.monitoringChanged) patch.monitoring_state = decision.monitoring_state;
+
+  await updateShipment(shipment.id, patch);
+
+  if (decision.statusChanged) {
+    await recordEvent({
+      shipment_id: shipment.id,
+      event_type: "status_auto",
+      category: "status",
+      field: "Status",
+      from_value: shipment.status,
+      to_value: decision.status,
+      source: decision.source,
+      automated: true,
+      actor: "Automation",
+      reason: decision.reason,
+      occurred_at: now,
+    });
+    await logAlert({
+      shipment_id: shipment.id,
+      message: `${shortId(shipment.id)} · ${shipment.client_name} automatically moved to ${decision.status} — ${decision.reason}`,
+      from_status: shipment.status,
+      to_status: decision.status,
+    });
+  }
+
+  if (decision.monitoringChanged) {
+    await recordEvent({
+      shipment_id: shipment.id,
+      event_type: "monitoring_auto",
+      category: "monitoring",
+      field: "Monitoring state",
+      from_value: String(shipment.monitoring_state),
+      to_value: decision.monitoring_state,
+      source: "system",
+      automated: true,
+      actor: "Automation",
+      reason: decision.reason,
+      occurred_at: now,
+    });
+  }
 }
