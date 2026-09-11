@@ -14,8 +14,14 @@ const EMPTY = {
   vessel_name: "",
   vessel_mmsi: "",
   landed_cost: "",
-  eta: "",
+  planned_etd: "",
+  planned_eta: "",
 };
+
+/** datetime-local value ("2026-09-11T14:30") → ISO timestamp. */
+function toIso(value: string) {
+  return value ? new Date(value).toISOString() : null;
+}
 
 export function NewShipmentForm({ onClose }: { onClose: () => void }) {
   const navigate = useNavigate();
@@ -34,7 +40,9 @@ export function NewShipmentForm({ onClose }: { onClose: () => void }) {
         vessel_name: form.vessel_name.trim() || null,
         vessel_mmsi: mmsi || null,
         landed_cost: form.landed_cost === "" ? null : Number(form.landed_cost),
-        eta: form.eta ? new Date(form.eta).toISOString() : null,
+        planned_etd: toIso(form.planned_etd),
+        planned_eta: toIso(form.planned_eta),
+        eta: toIso(form.planned_eta),
       }),
     onSuccess: (shipment) => {
       queryClient.invalidateQueries({ queryKey: ["shipments"] });
