@@ -5,19 +5,26 @@ import { toast } from "sonner";
 
 import { AppShell, btnDanger, btnGhost, btnPrimary, fieldClass } from "@/components/AppShell";
 import { DocumentFiles } from "@/components/DocumentFiles";
-import { StatusPill } from "@/components/StatusPill";
+import { ShipmentTimeline } from "@/components/ShipmentTimeline";
+import { StatusHistory } from "@/components/StatusHistory";
+import { HealthBadge, MonitoringBadge, StatusPill } from "@/components/StatusPill";
+import { useLifecycleSync } from "@/hooks/useLifecycleSync";
+import { useMonitoringConfig } from "@/hooks/useMonitoringConfig";
 import {
   advanceStatus,
   deleteShipment,
   formatCost,
   getShipment,
   listDocuments,
+  listEvents,
   nextStatus,
+  saveShipmentDetails,
   shortId,
   STATUSES,
-  updateShipment,
   type Shipment,
 } from "@/lib/api";
+import { deriveAutomation } from "@/lib/autoStatus";
+import { docsFor, formatDayTime, monitoringInfo, shipmentHealth } from "@/lib/lifecycle";
 
 export const Route = createFileRoute("/shipments/$id")({
   head: () => ({
@@ -26,22 +33,58 @@ export const Route = createFileRoute("/shipments/$id")({
       {
         name: "description",
         content:
-          "Edit shipment details, advance the customs pipeline and tick off required trade documents.",
+          "Edit shipment schedule and details, follow the automated status pipeline and tick off required trade documents.",
       },
       { property: "og:title", content: "Shipment Detail — StimTech Solutions" },
       {
         property: "og:description",
-        content: "Pipeline status, document checklist and landed cost for a single shipment.",
+        content:
+          "Planned, current and actual dates, automated status pipeline, document checklist and audit trail.",
       },
+      { property: "og:type", content: "article" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: ShipmentDetail,
 });
 
+/** ISO timestamp → datetime-local input value in the viewer's timezone. */
+function toLocalInput(value: string | null | undefined) {
+  if (!value) return "";
+  const d = new Date(value);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function toIso(value: string) {
+  return value ? new Date(value).toISOString() : null;
+}
+
+type DateDraft = {
+  planned_etd: string;
+  planned_eta: string;
+  eta: string;
+  actual_departure: string;
+  actual_arrival: string;
+  actual_delivery: string;
+};
+
+function dateDraftFrom(s: Shipment): DateDraft {
+  return {
+    planned_etd: toLocalInput(s.planned_etd),
+    planned_eta: toLocalInput(s.planned_eta),
+    eta: toLocalInput(s.eta),
+    actual_departure: toLocalInput(s.actual_departure),
+    actual_arrival: toLocalInput(s.actual_arrival),
+    actual_delivery: toLocalInput(s.actual_delivery),
+  };
+}
+
 function ShipmentDetail() {
   const { id } = Route.useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const config = useMonitoringConfig();
 
   const { data: shipment, isLoading } = useQuery({
     queryKey: ["shipment", id],
@@ -51,28 +94,46 @@ function ShipmentDetail() {
     queryKey: ["documents", id],
     queryFn: () => listDocuments(id),
   });
+  const { data: events = [] } = useQuery({
+    queryKey: ["events", id],
+    queryFn: () => listEvents(id),
+  });
+
+  // Automated pipeline for this shipment (no-op outside the monitoring window).
+  useLifecycleSync(shipment ? [shipment] : [], config);
 
   const [draft, setDraft] = useState<Shipment | null>(null);
+  const [dates, setDates] = useState<DateDraft | null>(null);
   useEffect(() => {
-    if (shipment) setDraft(shipment);
+    if (shipment) {
+      setDraft(shipment);
+      setDates(dateDraftFrom(shipment));
+    }
   }, [shipment]);
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ["shipment", id] });
+    queryClient.invalidateQueries({ queryKey: ["events", id] });
     queryClient.invalidateQueries({ queryKey: ["shipments"] });
     queryClient.invalidateQueries({ queryKey: ["alerts"] });
   };
 
   const save = useMutation({
     mutationFn: async () => {
-      if (!draft) return;
-      await updateShipment(id, {
+      if (!draft || !dates || !shipment) return;
+      await saveShipmentDetails(shipment, {
         client_name: draft.client_name,
         origin: draft.origin,
         destination: draft.destination,
         vessel_name: draft.vessel_name || null,
         vessel_mmsi: draft.vessel_mmsi || null,
         landed_cost: draft.landed_cost == null ? null : Number(draft.landed_cost),
+        planned_etd: toIso(dates.planned_etd),
+        planned_eta: toIso(dates.planned_eta),
+        eta: toIso(dates.eta),
+        actual_departure: toIso(dates.actual_departure),
+        actual_arrival: toIso(dates.actual_arrival),
+        actual_delivery: toIso(dates.actual_delivery),
       });
     },
     onSuccess: () => {
@@ -112,7 +173,7 @@ function ShipmentDetail() {
     );
   }
 
-  if (!shipment || !draft) {
+  if (!shipment || !draft || !dates) {
     return (
       <AppShell title="Shipment not found">
         <div className="panel px-3 py-8 text-center text-[13px] text-muted-foreground">
@@ -127,6 +188,9 @@ function ShipmentDetail() {
 
   const currentIndex = STATUSES.indexOf(shipment.status);
   const next = nextStatus(shipment.status);
+  const monitoring = monitoringInfo(shipment, config);
+  const health = shipmentHealth(shipment, docsFor(documents, shipment.id), config);
+  const decision = deriveAutomation(shipment, config);
 
   return (
     <AppShell
@@ -148,9 +212,13 @@ function ShipmentDetail() {
       }
     >
       <div className="panel mb-4 p-4">
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-3 flex flex-wrap items-center gap-2">
           <h2 className="text-[13px] font-semibold">Status pipeline</h2>
-          <StatusPill status={shipment.status} />
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <StatusPill status={shipment.status} />
+            <HealthBadge level={health.level} />
+            <MonitoringBadge state={monitoring.state} />
+          </div>
         </div>
         <ol className="flex flex-wrap items-stretch gap-1.5">
           {STATUSES.map((s, i) => {
@@ -173,6 +241,18 @@ function ShipmentDetail() {
             );
           })}
         </ol>
+        <div className="mt-3 space-y-1 border-t border-border pt-3 text-[12px] text-muted-foreground">
+          <p>Monitoring: {monitoring.reason}</p>
+          <p>
+            Automation: {decision.status === shipment.status ? "no pending change" : `will move to ${decision.status}`}
+            {" · "}
+            {decision.reason}
+          </p>
+          <p>
+            Last synced {formatDayTime(shipment.last_synced_at)} · last updated{" "}
+            {formatDayTime(shipment.updated_at)} · created {formatDayTime(shipment.created_at)}
+          </p>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_1fr]">
@@ -235,6 +315,63 @@ function ShipmentDetail() {
               />
             </Field>
           </div>
+
+          <h3 className="mt-4 border-t border-border pt-3 text-[13px] font-semibold">Schedule</h3>
+          <p className="mb-3 text-[12px] text-muted-foreground">
+            Planned, current and actual times are stored separately, so automation never overwrites
+            the original plan.
+          </p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Field label="Planned departure (ETD)">
+              <input
+                className={fieldClass}
+                type="datetime-local"
+                value={dates.planned_etd}
+                onChange={(e) => setDates({ ...dates, planned_etd: e.target.value })}
+              />
+            </Field>
+            <Field label="Planned arrival (ETA)">
+              <input
+                className={fieldClass}
+                type="datetime-local"
+                value={dates.planned_eta}
+                onChange={(e) => setDates({ ...dates, planned_eta: e.target.value })}
+              />
+            </Field>
+            <Field label="Current ETA">
+              <input
+                className={fieldClass}
+                type="datetime-local"
+                value={dates.eta}
+                onChange={(e) => setDates({ ...dates, eta: e.target.value })}
+              />
+            </Field>
+            <Field label="Actual departure">
+              <input
+                className={fieldClass}
+                type="datetime-local"
+                value={dates.actual_departure}
+                onChange={(e) => setDates({ ...dates, actual_departure: e.target.value })}
+              />
+            </Field>
+            <Field label="Actual arrival">
+              <input
+                className={fieldClass}
+                type="datetime-local"
+                value={dates.actual_arrival}
+                onChange={(e) => setDates({ ...dates, actual_arrival: e.target.value })}
+              />
+            </Field>
+            <Field label="Actual delivery">
+              <input
+                className={fieldClass}
+                type="datetime-local"
+                value={dates.actual_delivery}
+                onChange={(e) => setDates({ ...dates, actual_delivery: e.target.value })}
+              />
+            </Field>
+          </div>
+
           <div className="mt-4 flex items-center justify-between gap-2 border-t border-border pt-3">
             <div className="flex items-center gap-2">
               <button className={btnPrimary} type="submit" disabled={save.isPending}>
@@ -257,6 +394,11 @@ function ShipmentDetail() {
         </form>
 
         <DocumentFiles shipmentId={id} documents={documents} />
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <ShipmentTimeline shipment={shipment} events={events} />
+        <StatusHistory events={events} />
       </div>
     </AppShell>
   );
