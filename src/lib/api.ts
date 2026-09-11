@@ -299,10 +299,23 @@ export async function createShipment(input: {
   vessel_mmsi: string | null;
   landed_cost: number | null;
   eta?: string | null;
+  planned_etd?: string | null;
+  planned_eta?: string | null;
 }) {
+  const plannedEtd = input.planned_etd ?? null;
+  const plannedEta = input.planned_eta ?? null;
+  // Planned and current values are stored separately so automation can update
+  // the current ETA later without losing the original plan.
   const { data, error } = await supabase
     .from("shipments")
-    .insert({ ...input, eta: input.eta ?? null, status: "Booked" })
+    .insert({
+      ...input,
+      planned_etd: plannedEtd,
+      planned_eta: plannedEta,
+      eta: input.eta ?? plannedEta,
+      status: "Booked",
+      last_synced_at: new Date().toISOString(),
+    })
     .select("*")
     .single();
   if (error) throw error;
