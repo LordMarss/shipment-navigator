@@ -347,10 +347,21 @@ export async function updateShipment(id: string, patch: Partial<Shipment>) {
   if (error) throw error;
 }
 
+/** Manual status advance — preserved as the fallback for the automation. */
 export async function advanceStatus(shipment: Shipment) {
   const to = nextStatus(shipment.status);
   if (!to) return;
   await updateShipment(shipment.id, { status: to });
+  await recordEvent({
+    shipment_id: shipment.id,
+    event_type: "status_manual",
+    category: "status",
+    field: "Status",
+    from_value: shipment.status,
+    to_value: to,
+    source: "manual",
+    automated: false,
+  });
   await logAlert({
     shipment_id: shipment.id,
     message: `${shortId(shipment.id)} · ${shipment.client_name} moved to ${to}`,
