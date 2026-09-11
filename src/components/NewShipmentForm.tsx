@@ -117,12 +117,20 @@ export function NewShipmentForm({ onClose }: { onClose: () => void }) {
             inputMode="numeric"
           />
         </Field>
-        <Field label="ETA">
+        <Field label="Planned departure (ETD)">
           <input
             className={fieldClass}
-            type="date"
-            value={form.eta}
-            onChange={(e) => setForm({ ...form, eta: e.target.value })}
+            type="datetime-local"
+            value={form.planned_etd}
+            onChange={(e) => setForm({ ...form, planned_etd: e.target.value })}
+          />
+        </Field>
+        <Field label="Planned arrival (ETA)">
+          <input
+            className={fieldClass}
+            type="datetime-local"
+            value={form.planned_eta}
+            onChange={(e) => setForm({ ...form, planned_eta: e.target.value })}
           />
         </Field>
         {mmsi ? (
