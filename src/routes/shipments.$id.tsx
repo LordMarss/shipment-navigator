@@ -99,8 +99,7 @@ function ShipmentDetail() {
     queryFn: () => listEvents(id),
   });
 
-  // Automated pipeline for this shipment (no-op outside the monitoring window).
-  useLifecycleSync(shipment ? [shipment] : [], config);
+
 
   const [draft, setDraft] = useState<Shipment | null>(null);
   const [dates, setDates] = useState<DateDraft | null>(null);

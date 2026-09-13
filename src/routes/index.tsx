@@ -5,10 +5,9 @@ import { useState } from "react";
 import { AppShell, btnPrimary } from "@/components/AppShell";
 import { NewShipmentForm } from "@/components/NewShipmentForm";
 import { MonitoringBadge, StatusPill } from "@/components/StatusPill";
-import { useLifecycleSync } from "@/hooks/useLifecycleSync";
 import { useMonitoringConfig } from "@/hooks/useMonitoringConfig";
 import { formatCost, listShipments, shortId } from "@/lib/api";
-import { formatDayTime, monitoringInfo } from "@/lib/lifecycle";
+import { formatDayTime, monitoringInfo, relativeTime } from "@/lib/lifecycle";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -41,14 +40,20 @@ function Dashboard() {
     queryFn: listShipments,
   });
 
-  // Automated status pipeline: runs over loaded shipments, respects the
-  // monitoring window and stops once a shipment is delivered.
-  useLifecycleSync(shipments, config);
+  // The automated status pipeline runs server-side on a schedule, so nothing is
+  // driven from the browser here. This only reports when it last ran.
+  const lastSync = shipments
+    .map((s) => s.last_synced_at)
+    .filter((v): v is string => Boolean(v))
+    .sort()
+    .pop();
 
   return (
     <AppShell
       title="Shipments"
-      description={`${shipments.length} shipment${shipments.length === 1 ? "" : "s"} on record`}
+      description={`${shipments.length} shipment${shipments.length === 1 ? "" : "s"} on record · automated monitoring active${
+        lastSync ? ` · last checked ${relativeTime(lastSync)}` : ""
+      }`}
       actions={
         <button className={btnPrimary} onClick={() => setOpen((v) => !v)}>
           {open ? "Cancel" : "New Shipment"}
