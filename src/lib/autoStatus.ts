@@ -49,7 +49,10 @@ export function deriveAutomation(
   now: number = Date.now(),
 ): AutoDecision {
   const monitoring = monitoringInfo(shipment, config);
-  const source: EventSource = shipment.vessel_mmsi ? "ais" : "system";
+  // This MVP pipeline is date/time based only — it receives no live AIS data,
+  // so every automated move is attributed to the system, never to AIS.
+  const source: EventSource = "system";
+
 
   let status = shipment.status as ShipmentStatus;
   let reason = monitoring.reason;
