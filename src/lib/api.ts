@@ -1,4 +1,14 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
+
+/**
+ * Any Supabase client the shared helpers can write through. The browser client
+ * is the default; the scheduled server-side runner passes the admin client.
+ */
+export type Db = SupabaseClient<Database>;
+
 
 /**
  * Lifecycle position of a shipment. This says WHERE the shipment is — never
