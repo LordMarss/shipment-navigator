@@ -1,4 +1,14 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
+
+/**
+ * Any Supabase client the shared helpers can write through. The browser client
+ * is the default; the scheduled server-side runner passes the admin client.
+ */
+export type Db = SupabaseClient<Database>;
+
 
 /**
  * Lifecycle position of a shipment. This says WHERE the shipment is — never
@@ -276,13 +286,16 @@ export async function listAlerts() {
   return (data ?? []) as Alert[];
 }
 
-export async function logAlert(input: {
-  shipment_id: string;
-  message: string;
-  from_status?: ShipmentStatus | null;
-  to_status?: ShipmentStatus | null;
-}) {
-  const { error } = await supabase.from("alerts").insert({
+export async function logAlert(
+  input: {
+    shipment_id: string;
+    message: string;
+    from_status?: ShipmentStatus | null;
+    to_status?: ShipmentStatus | null;
+  },
+  db: Db = supabase,
+) {
+  const { error } = await db.from("alerts").insert({
     shipment_id: input.shipment_id,
     message: input.message,
     from_status: input.from_status ?? null,
@@ -342,8 +355,8 @@ export async function createShipment(input: {
   return shipment;
 }
 
-export async function updateShipment(id: string, patch: Partial<Shipment>) {
-  const { error } = await supabase.from("shipments").update(patch).eq("id", id);
+export async function updateShipment(id: string, patch: Partial<Shipment>, db: Db = supabase) {
+  const { error } = await db.from("shipments").update(patch).eq("id", id);
   if (error) throw error;
 }
 
@@ -441,20 +454,23 @@ export async function listEvents(shipmentId: string) {
   return (data ?? []) as ShipmentEvent[];
 }
 
-export async function recordEvent(input: {
-  shipment_id: string;
-  event_type: string;
-  category?: string;
-  field?: string | null;
-  from_value?: string | null;
-  to_value?: string | null;
-  source?: EventSource;
-  automated?: boolean;
-  actor?: string | null;
-  reason?: string | null;
-  occurred_at?: string;
-}) {
-  const { error } = await supabase.from("shipment_events").insert({
+export async function recordEvent(
+  input: {
+    shipment_id: string;
+    event_type: string;
+    category?: string;
+    field?: string | null;
+    from_value?: string | null;
+    to_value?: string | null;
+    source?: EventSource;
+    automated?: boolean;
+    actor?: string | null;
+    reason?: string | null;
+    occurred_at?: string;
+  },
+  db: Db = supabase,
+) {
+  const { error } = await db.from("shipment_events").insert({
     shipment_id: input.shipment_id,
     event_type: input.event_type,
     category: input.category ?? "event",
@@ -683,49 +699,59 @@ export async function applyAutomation(
     statusChanged: boolean;
     monitoringChanged: boolean;
   },
+  db: Db = supabase,
 ) {
   const now = new Date().toISOString();
   const patch: Partial<Shipment> = { last_synced_at: now };
   if (decision.statusChanged) patch.status = decision.status;
   if (decision.monitoringChanged) patch.monitoring_state = decision.monitoring_state;
 
-  await updateShipment(shipment.id, patch);
+  await updateShipment(shipment.id, patch, db);
 
   if (decision.statusChanged) {
-    await recordEvent({
-      shipment_id: shipment.id,
-      event_type: "status_auto",
-      category: "status",
-      field: "Status",
-      from_value: shipment.status,
-      to_value: decision.status,
-      source: decision.source,
-      automated: true,
-      actor: "Automation",
-      reason: decision.reason,
-      occurred_at: now,
-    });
-    await logAlert({
-      shipment_id: shipment.id,
-      message: `${shortId(shipment.id)} · ${shipment.client_name} automatically moved to ${decision.status} — ${decision.reason}`,
-      from_status: shipment.status,
-      to_status: decision.status,
-    });
+    await recordEvent(
+      {
+        shipment_id: shipment.id,
+        event_type: "status_auto",
+        category: "status",
+        field: "Status",
+        from_value: shipment.status,
+        to_value: decision.status,
+        source: decision.source,
+        automated: true,
+        actor: "Automation",
+        reason: decision.reason,
+        occurred_at: now,
+      },
+      db,
+    );
+    await logAlert(
+      {
+        shipment_id: shipment.id,
+        message: `${shortId(shipment.id)} · ${shipment.client_name} automatically moved to ${decision.status} — ${decision.reason}`,
+        from_status: shipment.status,
+        to_status: decision.status,
+      },
+      db,
+    );
   }
 
   if (decision.monitoringChanged) {
-    await recordEvent({
-      shipment_id: shipment.id,
-      event_type: "monitoring_auto",
-      category: "monitoring",
-      field: "Monitoring state",
-      from_value: String(shipment.monitoring_state),
-      to_value: decision.monitoring_state,
-      source: "system",
-      automated: true,
-      actor: "Automation",
-      reason: decision.reason,
-      occurred_at: now,
-    });
+    await recordEvent(
+      {
+        shipment_id: shipment.id,
+        event_type: "monitoring_auto",
+        category: "monitoring",
+        field: "Monitoring state",
+        from_value: String(shipment.monitoring_state),
+        to_value: decision.monitoring_state,
+        source: "system",
+        automated: true,
+        actor: "Automation",
+        reason: decision.reason,
+        occurred_at: now,
+      },
+      db,
+    );
   }
 }
