@@ -8,7 +8,6 @@ import { DocumentFiles } from "@/components/DocumentFiles";
 import { ShipmentTimeline } from "@/components/ShipmentTimeline";
 import { StatusHistory } from "@/components/StatusHistory";
 import { HealthBadge, MonitoringBadge, StatusPill } from "@/components/StatusPill";
-import { useLifecycleSync } from "@/hooks/useLifecycleSync";
 import { useMonitoringConfig } from "@/hooks/useMonitoringConfig";
 import {
   advanceStatus,
