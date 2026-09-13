@@ -286,13 +286,16 @@ export async function listAlerts() {
   return (data ?? []) as Alert[];
 }
 
-export async function logAlert(input: {
-  shipment_id: string;
-  message: string;
-  from_status?: ShipmentStatus | null;
-  to_status?: ShipmentStatus | null;
-}) {
-  const { error } = await supabase.from("alerts").insert({
+export async function logAlert(
+  input: {
+    shipment_id: string;
+    message: string;
+    from_status?: ShipmentStatus | null;
+    to_status?: ShipmentStatus | null;
+  },
+  db: Db = supabase,
+) {
+  const { error } = await db.from("alerts").insert({
     shipment_id: input.shipment_id,
     message: input.message,
     from_status: input.from_status ?? null,
@@ -352,8 +355,8 @@ export async function createShipment(input: {
   return shipment;
 }
 
-export async function updateShipment(id: string, patch: Partial<Shipment>) {
-  const { error } = await supabase.from("shipments").update(patch).eq("id", id);
+export async function updateShipment(id: string, patch: Partial<Shipment>, db: Db = supabase) {
+  const { error } = await db.from("shipments").update(patch).eq("id", id);
   if (error) throw error;
 }
 
@@ -451,20 +454,23 @@ export async function listEvents(shipmentId: string) {
   return (data ?? []) as ShipmentEvent[];
 }
 
-export async function recordEvent(input: {
-  shipment_id: string;
-  event_type: string;
-  category?: string;
-  field?: string | null;
-  from_value?: string | null;
-  to_value?: string | null;
-  source?: EventSource;
-  automated?: boolean;
-  actor?: string | null;
-  reason?: string | null;
-  occurred_at?: string;
-}) {
-  const { error } = await supabase.from("shipment_events").insert({
+export async function recordEvent(
+  input: {
+    shipment_id: string;
+    event_type: string;
+    category?: string;
+    field?: string | null;
+    from_value?: string | null;
+    to_value?: string | null;
+    source?: EventSource;
+    automated?: boolean;
+    actor?: string | null;
+    reason?: string | null;
+    occurred_at?: string;
+  },
+  db: Db = supabase,
+) {
+  const { error } = await db.from("shipment_events").insert({
     shipment_id: input.shipment_id,
     event_type: input.event_type,
     category: input.category ?? "event",
