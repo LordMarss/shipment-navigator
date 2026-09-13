@@ -699,49 +699,59 @@ export async function applyAutomation(
     statusChanged: boolean;
     monitoringChanged: boolean;
   },
+  db: Db = supabase,
 ) {
   const now = new Date().toISOString();
   const patch: Partial<Shipment> = { last_synced_at: now };
   if (decision.statusChanged) patch.status = decision.status;
   if (decision.monitoringChanged) patch.monitoring_state = decision.monitoring_state;
 
-  await updateShipment(shipment.id, patch);
+  await updateShipment(shipment.id, patch, db);
 
   if (decision.statusChanged) {
-    await recordEvent({
-      shipment_id: shipment.id,
-      event_type: "status_auto",
-      category: "status",
-      field: "Status",
-      from_value: shipment.status,
-      to_value: decision.status,
-      source: decision.source,
-      automated: true,
-      actor: "Automation",
-      reason: decision.reason,
-      occurred_at: now,
-    });
-    await logAlert({
-      shipment_id: shipment.id,
-      message: `${shortId(shipment.id)} · ${shipment.client_name} automatically moved to ${decision.status} — ${decision.reason}`,
-      from_status: shipment.status,
-      to_status: decision.status,
-    });
+    await recordEvent(
+      {
+        shipment_id: shipment.id,
+        event_type: "status_auto",
+        category: "status",
+        field: "Status",
+        from_value: shipment.status,
+        to_value: decision.status,
+        source: decision.source,
+        automated: true,
+        actor: "Automation",
+        reason: decision.reason,
+        occurred_at: now,
+      },
+      db,
+    );
+    await logAlert(
+      {
+        shipment_id: shipment.id,
+        message: `${shortId(shipment.id)} · ${shipment.client_name} automatically moved to ${decision.status} — ${decision.reason}`,
+        from_status: shipment.status,
+        to_status: decision.status,
+      },
+      db,
+    );
   }
 
   if (decision.monitoringChanged) {
-    await recordEvent({
-      shipment_id: shipment.id,
-      event_type: "monitoring_auto",
-      category: "monitoring",
-      field: "Monitoring state",
-      from_value: String(shipment.monitoring_state),
-      to_value: decision.monitoring_state,
-      source: "system",
-      automated: true,
-      actor: "Automation",
-      reason: decision.reason,
-      occurred_at: now,
-    });
+    await recordEvent(
+      {
+        shipment_id: shipment.id,
+        event_type: "monitoring_auto",
+        category: "monitoring",
+        field: "Monitoring state",
+        from_value: String(shipment.monitoring_state),
+        to_value: decision.monitoring_state,
+        source: "system",
+        automated: true,
+        actor: "Automation",
+        reason: decision.reason,
+        occurred_at: now,
+      },
+      db,
+    );
   }
 }
