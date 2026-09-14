@@ -12,4 +12,9 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  // Explicitly target Vercel instead of this wrapper's Cloudflare fallback
+  // (`defaultPreset: "cloudflare-module"`), now that builds run outside Lovable.
+  nitro: {
+    preset: "vercel",
+  },
 });
