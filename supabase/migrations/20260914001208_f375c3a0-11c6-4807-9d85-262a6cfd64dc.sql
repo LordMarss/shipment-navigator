@@ -1,0 +1,1 @@
+DROP FUNCTION IF EXISTS public.register_automation_cron(text, text);
