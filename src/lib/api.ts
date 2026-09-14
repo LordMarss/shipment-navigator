@@ -755,3 +755,81 @@ export async function applyAutomation(
     );
   }
 }
+
+/* ------------------------------------------------------ manual status override */
+
+/**
+ * Manual status override. This is a correction/exception path: the automated
+ * pipeline stays the primary source of truth, so the event is recorded as
+ * manual (never automated) and is clearly labelled as an override.
+ */
+export async function overrideStatus(
+  shipment: Shipment,
+  status: ShipmentStatus,
+  reason?: string | null,
+) {
+  if (status === shipment.status) return;
+  const now = new Date().toISOString();
+  await updateShipment(shipment.id, { status });
+  await recordEvent({
+    shipment_id: shipment.id,
+    event_type: "status_override",
+    category: "status",
+    field: "Status",
+    from_value: shipment.status,
+    to_value: status,
+    source: "manual",
+    automated: false,
+    actor: "Operator",
+    reason: reason?.trim() ? reason.trim() : "Manual override (correction)",
+    occurred_at: now,
+  });
+  await logAlert({
+    shipment_id: shipment.id,
+    message: `${shortId(shipment.id)} · ${shipment.client_name} manually overridden to ${status}`,
+    from_status: shipment.status,
+    to_status: status,
+  });
+}
+
+/* ------------------------------------------------------------ shipment notes */
+
+export type ShipmentNote = {
+  id: string;
+  shipment_id: string;
+  body: string;
+  author: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export async function listNotes(shipmentId: string) {
+  const { data, error } = await supabase
+    .from("shipment_notes")
+    .select("*")
+    .eq("shipment_id", shipmentId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as ShipmentNote[];
+}
+
+export async function createNote(shipmentId: string, body: string, author?: string | null) {
+  const text = body.trim();
+  if (!text) throw new Error("A note cannot be empty.");
+  const { error } = await supabase
+    .from("shipment_notes")
+    .insert({ shipment_id: shipmentId, body: text, author: author ?? "Operator" });
+  if (error) throw error;
+}
+
+export async function updateNote(id: string, body: string) {
+  const text = body.trim();
+  if (!text) throw new Error("A note cannot be empty.");
+  const { error } = await supabase.from("shipment_notes").update({ body: text }).eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteNote(id: string) {
+  const { error } = await supabase.from("shipment_notes").delete().eq("id", id);
+  if (error) throw error;
+}
