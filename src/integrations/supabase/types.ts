@@ -176,6 +176,41 @@ export type Database = {
           },
         ]
       }
+      shipment_notes: {
+        Row: {
+          author: string | null
+          body: string
+          created_at: string
+          id: string
+          shipment_id: string
+          updated_at: string
+        }
+        Insert: {
+          author?: string | null
+          body: string
+          created_at?: string
+          id?: string
+          shipment_id: string
+          updated_at?: string
+        }
+        Update: {
+          author?: string | null
+          body?: string
+          created_at?: string
+          id?: string
+          shipment_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shipment_notes_shipment_id_fkey"
+            columns: ["shipment_id"]
+            isOneToOne: false
+            referencedRelation: "shipments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shipments: {
         Row: {
           actual_arrival: string | null
