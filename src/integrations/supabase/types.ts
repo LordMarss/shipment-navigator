@@ -271,10 +271,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      register_automation_cron: {
-        Args: { _secret: string }
-        Returns: undefined
-      }
+      [_ in never]: never
     }
     Enums: {
       shipment_status:
