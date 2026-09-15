@@ -10,6 +10,7 @@ import { StatusHistory } from "@/components/StatusHistory";
 import { HealthBadge, MonitoringBadge, StatusPill } from "@/components/StatusPill";
 import { useMonitoringConfig } from "@/hooks/useMonitoringConfig";
 import {
+  ACTIVE_STATUSES,
   advanceStatus,
   deleteShipment,
   formatCost,
@@ -19,7 +20,6 @@ import {
   nextStatus,
   saveShipmentDetails,
   shortId,
-  STATUSES,
   type Shipment,
 } from "@/lib/api";
 import { deriveAutomation } from "@/lib/autoStatus";
@@ -184,7 +184,11 @@ function ShipmentDetail() {
     );
   }
 
-  const currentIndex = STATUSES.indexOf(shipment.status);
+  const currentIndex = ACTIVE_STATUSES.indexOf(shipment.status as (typeof ACTIVE_STATUSES)[number]);
+  // A shipment holding a status retired from the active lifecycle (legacy
+  // At Port / Cleared Customs / Delivered records) has moved past every step
+  // this pipeline tracks.
+  const legacyTerminal = currentIndex === -1;
   const next = nextStatus(shipment.status);
   const monitoring = monitoringInfo(shipment, config);
   const health = shipmentHealth(shipment, docsFor(documents, shipment.id), config);
@@ -204,7 +208,7 @@ function ShipmentDetail() {
             disabled={!next || advance.isPending}
             onClick={() => advance.mutate()}
           >
-            {next ? `Advance to ${next}` : "Delivered"}
+            {next ? `Advance to ${next}` : shipment.status}
           </button>
         </>
       }
@@ -219,9 +223,9 @@ function ShipmentDetail() {
           </div>
         </div>
         <ol className="flex flex-wrap items-stretch gap-1.5">
-          {STATUSES.map((s, i) => {
-            const active = i === currentIndex;
-            const past = i < currentIndex;
+          {ACTIVE_STATUSES.map((s, i) => {
+            const active = !legacyTerminal && i === currentIndex;
+            const past = legacyTerminal || i < currentIndex;
             return (
               <li
                 key={s}

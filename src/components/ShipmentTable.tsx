@@ -5,6 +5,7 @@ import { ArrowDown, ArrowUp, Search } from "lucide-react";
 import { EmptyState, Skeleton, fieldClass } from "@/components/AppShell";
 import { DocsIndicator, StatusPill } from "@/components/StatusPill";
 import {
+  ACTIVE_STATUSES,
   STATUSES,
   formatCost,
   formatEta,
@@ -108,7 +109,7 @@ export function ShipmentTable({
           onChange={(e) => setStatus(e.target.value as ShipmentStatus | "all")}
         >
           <option value="all">All statuses</option>
-          {STATUSES.map((s) => (
+          {ACTIVE_STATUSES.map((s) => (
             <option key={s} value={s}>
               {s}
             </option>

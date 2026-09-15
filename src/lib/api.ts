@@ -13,20 +13,38 @@ export type Db = SupabaseClient<Database>;
 /**
  * Lifecycle position of a shipment. This says WHERE the shipment is — never
  * how well it is doing (that is `health`, see lib/lifecycle.ts).
+ *
+ * MVP scope is AIS-focused: a shipment only ever moves through these six
+ * statuses, driven by vessel movement (actual departure/arrival) and the
+ * monitoring window derived from origin/destination timing. No carrier,
+ * customs or delivery workflow is modeled yet.
  */
-export const STATUSES = [
+export const ACTIVE_STATUSES = [
   "Scheduled",
   "Booked",
   "Departed",
   "In Transit",
   "Approaching Destination",
   "Arrived",
-  "At Port",
-  "Cleared Customs",
-  "Delivered",
 ] as const;
 
+/**
+ * Retired from the active MVP lifecycle. Never assigned to new shipments or
+ * by automation — kept only so existing records and their historical events
+ * (and the `shipment_status` database enum, which cannot drop values in use)
+ * stay valid and correctly typed.
+ */
+export const LEGACY_STATUSES = ["At Port", "Cleared Customs", "Delivered"] as const;
+
+/** Full set, matching the database enum exactly. */
+export const STATUSES = [...ACTIVE_STATUSES, ...LEGACY_STATUSES] as const;
+
+export type ActiveShipmentStatus = (typeof ACTIVE_STATUSES)[number];
 export type ShipmentStatus = (typeof STATUSES)[number];
+
+export function isLegacyStatus(status: ShipmentStatus): boolean {
+  return (LEGACY_STATUSES as readonly string[]).includes(status);
+}
 
 export const HEALTH_LEVELS = ["On Track", "Attention", "At Risk", "Delayed"] as const;
 export type HealthValue = (typeof HEALTH_LEVELS)[number];
@@ -233,9 +251,10 @@ export const STANDARD_DOCUMENTS = [
   "Packing List",
 ];
 
+/** Advances only within the active MVP lifecycle; legacy/terminal statuses never advance. */
 export function nextStatus(status: ShipmentStatus): ShipmentStatus | null {
-  const i = STATUSES.indexOf(status);
-  return i >= 0 && i < STATUSES.length - 1 ? (STATUSES[i + 1] as ShipmentStatus) : null;
+  const i = ACTIVE_STATUSES.indexOf(status as ActiveShipmentStatus);
+  return i >= 0 && i < ACTIVE_STATUSES.length - 1 ? ACTIVE_STATUSES[i + 1]! : null;
 }
 
 export function shortId(id: string) {

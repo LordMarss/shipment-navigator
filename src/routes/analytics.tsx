@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { AppShell, EmptyState, Skeleton } from "@/components/AppShell";
 import { StatusPill } from "@/components/StatusPill";
-import { STATUSES, formatCost, listAllDocuments, listShipments } from "@/lib/api";
+import { ACTIVE_STATUSES, formatCost, listAllDocuments, listShipments } from "@/lib/api";
 import { kpis } from "@/lib/insights";
 
 export const Route = createFileRoute("/analytics")({
@@ -50,7 +50,7 @@ function AnalyticsPage() {
 
   const maxStatus = Math.max(
     1,
-    ...STATUSES.map((st) => shipments.filter((s) => s.status === st).length),
+    ...ACTIVE_STATUSES.map((st) => shipments.filter((s) => s.status === st).length),
   );
 
   if (isLoading) {
@@ -92,7 +92,7 @@ function AnalyticsPage() {
             <section className="panel p-3">
               <p className="label-xs mb-3">Status mix</p>
               <ul className="space-y-2">
-                {STATUSES.map((st) => {
+                {ACTIVE_STATUSES.map((st) => {
                   const count = shipments.filter((s) => s.status === st).length;
                   return (
                     <li key={st} className="flex items-center gap-3">
