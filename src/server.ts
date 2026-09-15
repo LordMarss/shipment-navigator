@@ -44,18 +44,34 @@ function isH3SwallowedErrorBody(body: string): boolean {
   }
 }
 
+// Content-hashed assets (/assets/*) are served straight from Vercel's CDN and
+// never reach this handler, so they keep their own long-lived immutable
+// cache. HTML documents do reach it — without an explicit header here they
+// fall back to Vercel's default `max-age=0, must-revalidate`, which lacks a
+// validator and is not enough to stop Safari's disk cache / bfcache from
+// serving a stale document (and therefore stale asset references) after a
+// deployment. `no-store` removes that ambiguity for the shell only.
+function withDocumentCacheControl(response: Response): Response {
+  if (!(response.headers.get("content-type") ?? "").includes("text/html")) return response;
+  const headers = new Headers(response.headers);
+  headers.set("cache-control", "no-store");
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
-      return await normalizeCatastrophicSsrResponse(response);
+      return withDocumentCacheControl(await normalizeCatastrophicSsrResponse(response));
     } catch (error) {
       console.error(error);
-      return new Response(renderErrorPage(), {
-        status: 500,
-        headers: { "content-type": "text/html; charset=utf-8" },
-      });
+      return withDocumentCacheControl(
+        new Response(renderErrorPage(), {
+          status: 500,
+          headers: { "content-type": "text/html; charset=utf-8" },
+        }),
+      );
     }
   },
 };
