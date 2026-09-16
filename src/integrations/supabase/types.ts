@@ -241,6 +241,10 @@ export type Database = {
           actual_arrival: string | null
           actual_delivery: string | null
           actual_departure: string | null
+          ais_pending_since: string | null
+          ais_pending_status:
+            | Database["public"]["Enums"]["shipment_status"]
+            | null
           carrier: string | null
           client_name: string
           container_number: string | null
@@ -270,6 +274,10 @@ export type Database = {
           actual_arrival?: string | null
           actual_delivery?: string | null
           actual_departure?: string | null
+          ais_pending_since?: string | null
+          ais_pending_status?:
+            | Database["public"]["Enums"]["shipment_status"]
+            | null
           carrier?: string | null
           client_name: string
           container_number?: string | null
@@ -299,6 +307,10 @@ export type Database = {
           actual_arrival?: string | null
           actual_delivery?: string | null
           actual_departure?: string | null
+          ais_pending_since?: string | null
+          ais_pending_status?:
+            | Database["public"]["Enums"]["shipment_status"]
+            | null
           carrier?: string | null
           client_name?: string
           container_number?: string | null

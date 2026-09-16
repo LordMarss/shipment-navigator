@@ -83,6 +83,9 @@ export type Shipment = {
   monitoring_state: MonitoringState | string;
   /** Per-shipment override of the workspace monitoring offset. */
   monitoring_start_offset_days: number | null;
+  /** AIS debounce state (Phase 3) — the status a fresh AIS reading is currently proposing, and since when. */
+  ais_pending_status: ShipmentStatus | null;
+  ais_pending_since: string | null;
   reference: string | null;
   carrier: string | null;
   container_number: string | null;
