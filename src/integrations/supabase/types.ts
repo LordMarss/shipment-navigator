@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       alerts: {
@@ -301,6 +326,51 @@ export type Database = {
         }
         Relationships: []
       }
+      vessel_positions: {
+        Row: {
+          cog: number | null
+          latitude: number
+          longitude: number
+          mmsi: string
+          nav_status: string | null
+          position_timestamp: string | null
+          received_at: string
+          sog: number | null
+          source: string
+          true_heading: number | null
+          updated_at: string
+          vessel_name: string | null
+        }
+        Insert: {
+          cog?: number | null
+          latitude: number
+          longitude: number
+          mmsi: string
+          nav_status?: string | null
+          position_timestamp?: string | null
+          received_at?: string
+          sog?: number | null
+          source?: string
+          true_heading?: number | null
+          updated_at?: string
+          vessel_name?: string | null
+        }
+        Update: {
+          cog?: number | null
+          latitude?: number
+          longitude?: number
+          mmsi?: string
+          nav_status?: string | null
+          position_timestamp?: string | null
+          received_at?: string
+          sog?: number | null
+          source?: string
+          true_heading?: number | null
+          updated_at?: string
+          vessel_name?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -444,6 +514,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       shipment_status: [

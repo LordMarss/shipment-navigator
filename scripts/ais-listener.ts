@@ -1,5 +1,5 @@
 /**
- * Phase 1 AIS ingestion worker — standalone, long-running Node process.
+ * AIS ingestion worker — standalone, long-running Node process.
  *
  * NOT part of the app bundle: nothing under src/ imports this file, and it
  * is never built by Vite, so AISSTREAM_API_KEY can never reach the browser.
@@ -11,12 +11,19 @@
  *
  * It connects to AISStream.io's WebSocket API, subscribes only to the MMSIs
  * of shipments we still care about (anything not in a legacy/retired
- * status), and upserts the latest known position per vessel into
- * `vessel_positions` — one row per MMSI, never an unbounded message log.
+ * status, deduplicated), and upserts the latest known position per vessel
+ * into `vessel_positions` — one row per MMSI, never an unbounded message
+ * log. It periodically re-reads the shipments table and reconnects with a
+ * fresh subscription whenever the monitored MMSI set changes (shipment
+ * added/removed/re-assigned), so it never needs a code change or restart
+ * to pick up normal shipment-list changes. It also reconnects on any
+ * unexpected socket drop.
  */
 import { createClient } from "@supabase/supabase-js";
 
 const AISSTREAM_URL = "wss://stream.aisstream.io/v0/stream";
+const RESYNC_INTERVAL_MS = Number(process.env.AIS_RESYNC_INTERVAL_MS ?? 5 * 60_000);
+const RECONNECT_DELAY_MS = 5_000;
 
 // Mirrors LEGACY_STATUSES in src/lib/api.ts. Duplicated (not imported) so
 // this script has zero dependency on the app's path-aliased module graph —
@@ -137,17 +144,28 @@ async function handleMessage(raw: string): Promise<void> {
   }
 }
 
-async function main() {
-  const mmsis = await monitoredMmsis();
-  if (mmsis.length === 0) {
-    console.error("[ais] no monitored MMSIs found in shipments — nothing to subscribe to. Exiting.");
-    return;
-  }
-  console.log(`[ais] subscribing to ${mmsis.length} MMSI(s): ${mmsis.join(", ")}`);
+/** True when both lists contain exactly the same MMSIs, order ignored. */
+function sameMmsis(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  const sa = [...a].sort();
+  const sb = [...b].sort();
+  return sa.every((v, i) => v === sb[i]);
+}
 
-  const socket = new WebSocket(AISSTREAM_URL);
+// The currently-open socket and the MMSI set it was opened with. Tracked at
+// module scope so the resync loop can detect drift and the close handler
+// can tell a superseded (resync-closed) socket from an unexpected drop.
+let socket: WebSocket | null = null;
+let subscribedMmsis: string[] = [];
 
-  socket.addEventListener("open", () => {
+function openConnection(mmsis: string[]) {
+  subscribedMmsis = mmsis;
+  console.log(`[ais] connecting — subscribing to ${mmsis.length} MMSI(s): ${mmsis.join(", ")}`);
+
+  const ws = new WebSocket(AISSTREAM_URL);
+  socket = ws;
+
+  ws.addEventListener("open", () => {
     const subscription = {
       APIKey: AISSTREAM_API_KEY,
       // Worldwide box — narrowing happens via FiltersShipMMSI, not geography.
@@ -160,21 +178,72 @@ async function main() {
       FiltersShipMMSI: mmsis,
       FilterMessageTypes: ["PositionReport"],
     };
-    socket.send(JSON.stringify(subscription));
+    ws.send(JSON.stringify(subscription));
     console.log("[ais] subscription request sent, waiting for messages...");
   });
 
-  socket.addEventListener("message", (event) => {
+  ws.addEventListener("message", (event) => {
     void decodeMessageData(event.data).then(handleMessage);
   });
 
-  socket.addEventListener("error", (event) => {
+  ws.addEventListener("error", (event) => {
     console.error("[ais] socket error:", event);
   });
 
-  socket.addEventListener("close", (event) => {
+  ws.addEventListener("close", (event) => {
     console.log(`[ais] socket closed: code=${event.code} reason=${event.reason || "(none)"}`);
+    // `socket` already points elsewhere if this close is the tail end of a
+    // resync-triggered reconnect (openConnection reassigns it synchronously
+    // before the old socket's close event fires) — nothing to do then.
+    if (socket !== ws) return;
+    console.log(`[ais] unexpected disconnect — reconnecting in ${RECONNECT_DELAY_MS / 1000}s`);
+    setTimeout(() => {
+      void monitoredMmsis()
+        .then((mmsis) => openConnection(mmsis))
+        .catch((err) => console.error("[ais] failed to reconnect:", err));
+    }, RECONNECT_DELAY_MS);
   });
+}
+
+/** Periodically re-reads the shipments table and reconnects if the monitored MMSI set changed. */
+function startResyncLoop() {
+  setInterval(() => {
+    void (async () => {
+      let latest: string[];
+      try {
+        latest = await monitoredMmsis();
+      } catch (err) {
+        console.error("[ais] failed to refresh monitored MMSIs:", err);
+        return;
+      }
+
+      if (sameMmsis(latest, subscribedMmsis)) return;
+
+      console.log(
+        `[ais] monitored shipment MMSIs changed (was: [${subscribedMmsis.join(", ") || "none"}], now: [${latest.join(", ") || "none"}]) — reconnecting`,
+      );
+      socket?.close();
+      if (latest.length === 0) {
+        console.log("[ais] no monitored MMSIs remain — waiting for a shipment to appear");
+        subscribedMmsis = [];
+        socket = null;
+        return;
+      }
+      openConnection(latest);
+    })();
+  }, RESYNC_INTERVAL_MS);
+}
+
+async function main() {
+  const mmsis = await monitoredMmsis();
+  if (mmsis.length === 0) {
+    console.log(
+      `[ais] no monitored MMSIs found in shipments yet — checking again every ${RESYNC_INTERVAL_MS / 1000}s`,
+    );
+  } else {
+    openConnection(mmsis);
+  }
+  startResyncLoop();
 }
 
 main().catch((err) => {

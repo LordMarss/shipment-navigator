@@ -285,6 +285,41 @@ export async function getShipment(id: string) {
   return (data as Shipment | null) ?? null;
 }
 
+/**
+ * Latest known AIS position for a vessel, written by the standalone AIS
+ * ingestion worker (scripts/ais-listener.ts). Read-only here — this goes
+ * through the same anon-key + RLS path as every other read in this file,
+ * never the service-role key, which stays server-side in the worker.
+ */
+export type VesselPosition = {
+  mmsi: string;
+  vessel_name: string | null;
+  latitude: number;
+  longitude: number;
+  sog: number | null;
+  cog: number | null;
+  true_heading: number | null;
+  nav_status: string | null;
+  position_timestamp: string | null;
+  received_at: string;
+  source: string;
+  updated_at: string;
+};
+
+/** Latest AIS position for a shipment's vessel, or null if it has no MMSI or none has been received yet. */
+export async function getVesselPositionForShipment(
+  shipment: Pick<Shipment, "vessel_mmsi">,
+): Promise<VesselPosition | null> {
+  if (!shipment.vessel_mmsi) return null;
+  const { data, error } = await supabase
+    .from("vessel_positions")
+    .select("*")
+    .eq("mmsi", shipment.vessel_mmsi)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as VesselPosition | null) ?? null;
+}
+
 export async function listDocuments(shipmentId: string) {
   const { data, error } = await supabase
     .from("documents")
