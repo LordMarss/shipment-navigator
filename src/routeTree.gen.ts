@@ -20,6 +20,7 @@ import { Route as ShipmentsIndexRouteImport } from './routes/shipments.index'
 import { Route as ShipmentsIdRouteImport } from './routes/shipments.$id'
 import { Route as ShipmentsActiveRouteImport } from './routes/shipments.active'
 import { Route as ShipmentsCompletedRouteImport } from './routes/shipments.completed'
+import { Route as ApiPublicHooksAisPositionRouteImport } from './routes/api/public/hooks/ais-position'
 import { Route as ApiPublicHooksAutomationRunRouteImport } from './routes/api/public/hooks/automation-run'
 
 const IndexRoute = IndexRouteImport.update({
@@ -77,6 +78,12 @@ const ShipmentsCompletedRoute = ShipmentsCompletedRouteImport.update({
   path: '/shipments/completed',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksAisPositionRoute =
+  ApiPublicHooksAisPositionRouteImport.update({
+    id: '/api/public/hooks/ais-position',
+    path: '/api/public/hooks/ais-position',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksAutomationRunRoute =
   ApiPublicHooksAutomationRunRouteImport.update({
     id: '/api/public/hooks/automation-run',
@@ -96,6 +103,7 @@ export interface FileRoutesByFullPath {
   '/shipments/active': typeof ShipmentsActiveRoute
   '/shipments/completed': typeof ShipmentsCompletedRoute
   '/shipments/': typeof ShipmentsIndexRoute
+  '/api/public/hooks/ais-position': typeof ApiPublicHooksAisPositionRoute
   '/api/public/hooks/automation-run': typeof ApiPublicHooksAutomationRunRoute
 }
 export interface FileRoutesByTo {
@@ -110,6 +118,7 @@ export interface FileRoutesByTo {
   '/shipments/active': typeof ShipmentsActiveRoute
   '/shipments/completed': typeof ShipmentsCompletedRoute
   '/shipments': typeof ShipmentsIndexRoute
+  '/api/public/hooks/ais-position': typeof ApiPublicHooksAisPositionRoute
   '/api/public/hooks/automation-run': typeof ApiPublicHooksAutomationRunRoute
 }
 export interface FileRoutesById {
@@ -125,6 +134,7 @@ export interface FileRoutesById {
   '/shipments/active': typeof ShipmentsActiveRoute
   '/shipments/completed': typeof ShipmentsCompletedRoute
   '/shipments/': typeof ShipmentsIndexRoute
+  '/api/public/hooks/ais-position': typeof ApiPublicHooksAisPositionRoute
   '/api/public/hooks/automation-run': typeof ApiPublicHooksAutomationRunRoute
 }
 export interface FileRouteTypes {
@@ -141,6 +151,7 @@ export interface FileRouteTypes {
     | '/shipments/active'
     | '/shipments/completed'
     | '/shipments/'
+    | '/api/public/hooks/ais-position'
     | '/api/public/hooks/automation-run'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -155,6 +166,7 @@ export interface FileRouteTypes {
     | '/shipments/active'
     | '/shipments/completed'
     | '/shipments'
+    | '/api/public/hooks/ais-position'
     | '/api/public/hooks/automation-run'
   id:
     | '__root__'
@@ -169,6 +181,7 @@ export interface FileRouteTypes {
     | '/shipments/active'
     | '/shipments/completed'
     | '/shipments/'
+    | '/api/public/hooks/ais-position'
     | '/api/public/hooks/automation-run'
   fileRoutesById: FileRoutesById
 }
@@ -184,6 +197,7 @@ export interface RootRouteChildren {
   ShipmentsActiveRoute: typeof ShipmentsActiveRoute
   ShipmentsCompletedRoute: typeof ShipmentsCompletedRoute
   ShipmentsIndexRoute: typeof ShipmentsIndexRoute
+  ApiPublicHooksAisPositionRoute: typeof ApiPublicHooksAisPositionRoute
   ApiPublicHooksAutomationRunRoute: typeof ApiPublicHooksAutomationRunRoute
 }
 
@@ -266,6 +280,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShipmentsCompletedRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/ais-position': {
+      id: '/api/public/hooks/ais-position'
+      path: '/api/public/hooks/ais-position'
+      fullPath: '/api/public/hooks/ais-position'
+      preLoaderRoute: typeof ApiPublicHooksAisPositionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/automation-run': {
       id: '/api/public/hooks/automation-run'
       path: '/api/public/hooks/automation-run'
@@ -288,6 +309,7 @@ const rootRouteChildren: RootRouteChildren = {
   ShipmentsActiveRoute: ShipmentsActiveRoute,
   ShipmentsCompletedRoute: ShipmentsCompletedRoute,
   ShipmentsIndexRoute: ShipmentsIndexRoute,
+  ApiPublicHooksAisPositionRoute: ApiPublicHooksAisPositionRoute,
   ApiPublicHooksAutomationRunRoute: ApiPublicHooksAutomationRunRoute,
 }
 export const routeTree = rootRouteImport

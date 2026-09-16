@@ -309,12 +309,18 @@ export type VesselPosition = {
   updated_at: string;
 };
 
-/** Latest AIS position for a shipment's vessel, or null if it has no MMSI or none has been received yet. */
+/**
+ * Latest AIS position for a shipment's vessel, or null if it has no MMSI or
+ * none has been received yet. Defaults to the browser anon-key client (the
+ * original client-side use case); server code passes the admin client
+ * explicitly, same pattern as `updateShipment`.
+ */
 export async function getVesselPositionForShipment(
   shipment: Pick<Shipment, "vessel_mmsi">,
+  db: Db = supabase,
 ): Promise<VesselPosition | null> {
   if (!shipment.vessel_mmsi) return null;
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from("vessel_positions")
     .select("*")
     .eq("mmsi", shipment.vessel_mmsi)
