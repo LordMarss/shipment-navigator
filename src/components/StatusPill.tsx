@@ -1,5 +1,6 @@
 import { Anchor, BookmarkCheck, CalendarClock, CheckCircle2, MapPin, Ship, type LucideIcon } from "lucide-react";
 
+import type { VesselCondition } from "@/lib/aisAutomation";
 import type { ShipmentStatus } from "@/lib/api";
 import type { HealthLevel, MonitoringState, Severity } from "@/lib/lifecycle";
 
@@ -155,6 +156,33 @@ export function DocsIndicator({ attached, total }: { attached: number; total: nu
       <span className={complete ? "text-positive" : "text-muted-foreground"}>
         {attached}/{total}
       </span>
+    </span>
+  );
+}
+
+const CONDITION_TONE: Record<VesselCondition["kind"], string> = {
+  underway: "bg-primary/[0.07] text-primary border-primary/20",
+  stopped: "bg-warning-soft text-warning border-warning/25",
+  unknown: "bg-subtle text-muted-foreground border-border",
+};
+
+const CONDITION_DOT: Record<VesselCondition["kind"], string> = {
+  underway: "bg-primary",
+  stopped: "bg-warning",
+  unknown: "bg-muted-foreground/50",
+};
+
+/** Derived AIS operational read (Underway / Stopped · likely …) — never a
+ * lifecycle status. Sized and styled like HealthBadge/MonitoringBadge so it
+ * never visually competes with the actual StatusPill. Callers should only
+ * render this when `label` (from `vesselConditionLabel()`) is non-null. */
+export function VesselConditionBadge({ condition, label }: { condition: VesselCondition; label: string }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-sm border px-1.5 py-0.5 text-[11px] font-medium whitespace-nowrap ${CONDITION_TONE[condition.kind]}`}
+    >
+      <span className={`size-1.5 rounded-full ${CONDITION_DOT[condition.kind]}`} aria-hidden />
+      {label}
     </span>
   );
 }

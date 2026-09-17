@@ -10,7 +10,13 @@ import assert from "node:assert/strict";
 
 import { ACTIVE_STATUSES, type ActiveShipmentStatus, type Shipment, type VesselPosition } from "@/lib/api";
 import { DEFAULT_MONITORING_CONFIG } from "@/lib/lifecycle";
-import { AIS_CONFIRMATION_MINUTES, AIS_PENDING_MAX_AGE_MINUTES, deriveAisAutomation } from "@/lib/aisAutomation";
+import {
+  AIS_CONFIRMATION_MINUTES,
+  AIS_PENDING_MAX_AGE_MINUTES,
+  deriveAisAutomation,
+  deriveVesselCondition,
+  vesselConditionLabel,
+} from "@/lib/aisAutomation";
 
 const DAY = 86_400_000;
 const HOUR = 3_600_000;
@@ -292,6 +298,56 @@ test("L: a shipment far from its monitoring window ignores AIS entirely", () => 
   const decision = deriveAisAutomation(shipment, position, config, NOW);
   assert.equal(decision.statusChanged, false);
   assert.equal(decision.pendingStatus, null);
+});
+
+// M. deriveVesselCondition() — the derived, non-lifecycle operational read.
+test("M1: fresh underway position reports Underway", () => {
+  const shipment = makeShipment({ status: "In Transit" });
+  const position = makePosition({ sog: 12, nav_status: "0" });
+  const condition = deriveVesselCondition(shipment, position, NOW);
+  assert.deepEqual(condition, { kind: "underway" });
+  assert.equal(vesselConditionLabel(condition), "Underway");
+});
+
+test("M2: fresh stopped position while In Transit reports a likely-intermediate-stop hedge", () => {
+  const shipment = makeShipment({ status: "In Transit" });
+  const position = makePosition({ sog: 0, nav_status: "5" }); // moored
+  const condition = deriveVesselCondition(shipment, position, NOW);
+  assert.deepEqual(condition, { kind: "stopped", context: "in_transit" });
+  assert.equal(vesselConditionLabel(condition), "Stopped · likely intermediate stop");
+});
+
+test("M3: fresh stopped position while Approaching Destination reports a likely-destination-stop hedge", () => {
+  const shipment = makeShipment({ status: "Approaching Destination" });
+  const position = makePosition({ sog: 0.2, nav_status: "1" }); // at anchor
+  const condition = deriveVesselCondition(shipment, position, NOW);
+  assert.deepEqual(condition, { kind: "stopped", context: "approaching_destination" });
+  assert.equal(vesselConditionLabel(condition), "Stopped · likely destination stop");
+});
+
+test("M4: stale position never reports a condition, even with strong evidence", () => {
+  const shipment = makeShipment({ status: "In Transit" });
+  const stale = makePosition({ sog: 0, nav_status: "5", position_timestamp: new Date(NOW - 48 * HOUR).toISOString() });
+  const condition = deriveVesselCondition(shipment, stale, NOW);
+  assert.deepEqual(condition, { kind: "unknown" });
+  assert.equal(vesselConditionLabel(condition), null, "no badge should be rendered for stale data");
+});
+
+test("M5: no position at all reports unknown, not a default guess", () => {
+  const shipment = makeShipment({ status: "In Transit" });
+  const condition = deriveVesselCondition(shipment, null, NOW);
+  assert.deepEqual(condition, { kind: "unknown" });
+  assert.equal(vesselConditionLabel(condition), null);
+});
+
+test("M6: fresh but ambiguous data (neither underway nor stopped) reports unknown rather than guessing", () => {
+  const shipment = makeShipment({ status: "In Transit" });
+  // SOG below the underway threshold but nav_status isn't in the stopped set
+  // (e.g. "restricted maneuverability") — not enough evidence either way.
+  const position = makePosition({ sog: 1, nav_status: "3" });
+  const condition = deriveVesselCondition(shipment, position, NOW);
+  assert.deepEqual(condition, { kind: "unknown" });
+  assert.equal(vesselConditionLabel(condition), null);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

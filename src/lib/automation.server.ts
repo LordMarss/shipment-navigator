@@ -6,10 +6,17 @@
  * `applyAutomation()` persists it (append-only events, no duplicates because a
  * write only happens when the derived values differ from the stored ones).
  *
- * No AIS data, no prediction. Planned ETD/ETA and the actual timestamps are
- * never overwritten here.
+ * Mostly no AIS data, no prediction — but before deriving, this checks
+ * whether the shipment's vessel has a fresh `vessel_positions` row. If it
+ * does, `deriveAutomation()` is told to stand down on elapsed-time advances
+ * for that shipment (the AIS webhook path, `aisWebhook.server.ts`, is what
+ * actually advances it from there). Planned ETD/ETA and the actual
+ * timestamps are never overwritten here, and this never itself reads or
+ * reasons about SOG/nav_status — it only asks "is there fresh AIS data at
+ * all" via the same `isAisFresh()` the AIS decision layer uses.
  */
-import { applyAutomation, type Db, type Shipment } from "@/lib/api";
+import { applyAutomation, getVesselPositionForShipment, type Db, type Shipment } from "@/lib/api";
+import { isAisFresh } from "@/lib/aisAutomation";
 import { deriveAutomation } from "@/lib/autoStatus";
 import { DEFAULT_MONITORING_CONFIG, type MonitoringConfig } from "@/lib/lifecycle";
 
@@ -38,6 +45,7 @@ export type SweepResult = {
 
 export async function runAutomationSweep(db: Db): Promise<SweepResult> {
   const ranAt = new Date().toISOString();
+  const now = Date.now();
   const config = await loadConfig(db);
 
   // Eligible = not completed. Delivered shipments are never re-evaluated.
@@ -54,7 +62,10 @@ export async function runAutomationSweep(db: Db): Promise<SweepResult> {
 
   for (const shipment of shipments) {
     try {
-      const decision = deriveAutomation(shipment, config);
+      const hasFreshAis = shipment.vessel_mmsi
+        ? isAisFresh(await getVesselPositionForShipment(shipment, db), now)
+        : false;
+      const decision = deriveAutomation(shipment, config, hasFreshAis, now);
       if (!decision.statusChanged && !decision.monitoringChanged) continue;
       await applyAutomation(shipment, decision, db);
       updated += 1;

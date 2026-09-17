@@ -100,7 +100,9 @@ export type AisDecision = {
   pendingSince: string | null;
 };
 
-function isAisFresh(position: VesselPosition | null, now: number): boolean {
+/** Exported so other callers (the date-based automation guard, the UI) use
+ * this exact same freshness definition rather than a second one. */
+export function isAisFresh(position: VesselPosition | null, now: number): boolean {
   if (!position) return false;
   const ts = position.position_timestamp ?? position.received_at;
   if (!ts) return false;
@@ -339,4 +341,72 @@ export async function applyAisDecision(
     },
     db,
   );
+}
+
+/**
+ * A purely derived, read-only operational reading of the vessel's current
+ * movement — NOT a lifecycle status, never persisted, and never fed back
+ * into deriveAisAutomation() or deriveAutomation(). It exists only so the UI
+ * can show "Underway" / "Stopped" next to the shipment's actual status.
+ *
+ * Reuses the exact same isAisFresh() / isUnderway() / isStopped() this
+ * module's own decision logic uses, so this can never disagree with what
+ * the automation itself considers "fresh" or "under way" — there is only
+ * one definition of each, here.
+ *
+ * "stopped" carries a `context` — In Transit vs Approaching Destination vs
+ * other — used only to pick a wording hedge. This is a proxy, not a
+ * geographic fact: there are no port coordinates in this schema (see
+ * isStopped()'s own comment), so "context" never claims to know whether the
+ * vessel is really at the destination.
+ */
+export type VesselCondition =
+  | { kind: "underway" }
+  | { kind: "stopped"; context: "in_transit" | "approaching_destination" | "other" }
+  | { kind: "unknown" };
+
+export function deriveVesselCondition(
+  shipment: Pick<Shipment, "status">,
+  position: VesselPosition | null,
+  now: number = Date.now(),
+): VesselCondition {
+  if (!isAisFresh(position, now)) return { kind: "unknown" };
+  const fresh = position as VesselPosition;
+
+  if (isUnderway(fresh)) return { kind: "underway" };
+
+  if (isStopped(fresh)) {
+    const context =
+      shipment.status === "In Transit"
+        ? "in_transit"
+        : shipment.status === "Approaching Destination"
+          ? "approaching_destination"
+          : "other";
+    return { kind: "stopped", context };
+  }
+
+  // Fresh data that is neither clearly under way nor clearly stopped (e.g. a
+  // restricted-maneuverability nav status, or SOG between the two
+  // thresholds) — there's nothing here strong enough to display without
+  // guessing, so this deliberately reports "unknown" rather than picking one.
+  return { kind: "unknown" };
+}
+
+/**
+ * Label for deriveVesselCondition()'s result, or null when nothing should
+ * be rendered at all — callers must treat null as "show no badge", not fall
+ * back to a default string, so a stale/ambiguous reading never becomes a
+ * claim the data can't support.
+ */
+export function vesselConditionLabel(condition: VesselCondition): string | null {
+  switch (condition.kind) {
+    case "underway":
+      return "Underway";
+    case "stopped":
+      if (condition.context === "in_transit") return "Stopped · likely intermediate stop";
+      if (condition.context === "approaching_destination") return "Stopped · likely destination stop";
+      return "Stopped";
+    case "unknown":
+      return null;
+  }
 }

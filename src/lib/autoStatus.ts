@@ -46,10 +46,22 @@ export type AutoDecision = {
 /**
  * Derives the status and monitoring state a shipment should currently be in.
  * Pure — safe to call on every render.
+ *
+ * `hasFreshAis` is computed by the caller (via `isAisFresh()` from
+ * aisAutomation.ts, applied to that shipment's latest `vessel_positions`
+ * row) rather than imported here directly, so this module keeps its
+ * existing one-way dependency shape (aisAutomation.ts depends on
+ * autoStatus.ts, not the reverse) instead of introducing a cycle. When
+ * true, the elapsed-time advances below are skipped entirely: fresh AIS
+ * data makes `deriveAisAutomation()` authoritative for further lifecycle
+ * progression, so this fallback pipeline must not also advance the status
+ * from an assumption AIS could actively be contradicting (e.g. "in transit
+ * because enough time passed" while AIS shows the vessel stopped).
  */
 export function deriveAutomation(
   shipment: Shipment,
   config: MonitoringConfig,
+  hasFreshAis: boolean = false,
   now: number = Date.now(),
 ): AutoDecision {
   const monitoring = monitoringInfo(shipment, config);
@@ -82,6 +94,12 @@ export function deriveAutomation(
 
   if (shipment.actual_arrival) {
     advanceTo("Arrived", "Actual arrival recorded");
+  } else if (hasFreshAis) {
+    // Fresh AIS data exists for this shipment's vessel — deriveAisAutomation()
+    // is authoritative for further lifecycle progression, so none of the
+    // elapsed-time advances below run. Status is left exactly as stored;
+    // only AIS moves it from here.
+    reason = "Fresh AIS data available — deferring lifecycle decisions to AIS automation";
   } else if (monitoring.state === "Active Monitoring") {
     // Departure: an actual departure, or the planned departure having passed.
     const plannedEtdPassed =

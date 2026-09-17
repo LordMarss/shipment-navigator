@@ -20,7 +20,7 @@ import { DocumentFiles } from "@/components/DocumentFiles";
 import { ShipmentNotes } from "@/components/ShipmentNotes";
 import { ShipmentTimeline } from "@/components/ShipmentTimeline";
 import { StatusHistory } from "@/components/StatusHistory";
-import { SeverityBadge, StatusPill } from "@/components/StatusPill";
+import { SeverityBadge, StatusPill, VesselConditionBadge } from "@/components/StatusPill";
 import { useMonitoringConfig } from "@/hooks/useMonitoringConfig";
 import {
   ACTIVE_STATUSES,
@@ -38,6 +38,7 @@ import {
   type Shipment,
   type ShipmentEvent,
 } from "@/lib/api";
+import { deriveVesselCondition, isAisFresh, vesselConditionLabel } from "@/lib/aisAutomation";
 import { deriveAutomation } from "@/lib/autoStatus";
 import {
   alertSeverity,
@@ -264,7 +265,10 @@ function ShipmentDetail() {
   const next = nextStatus(shipment.status);
   const monitoring = monitoringInfo(shipment, config);
   const health = shipmentHealth(shipment, docsFor(documents, shipment.id), config);
-  const decision = deriveAutomation(shipment, config);
+  const hasFreshAis = isAisFresh(position ?? null, Date.now());
+  const decision = deriveAutomation(shipment, config, hasFreshAis);
+  const vesselCondition = deriveVesselCondition(shipment, position ?? null);
+  const conditionLabel = vesselConditionLabel(vesselCondition);
   const shipmentAlerts = alerts.filter((a) => a.shipment_id === shipment.id);
   const statusEvents = events.filter(isStatusEvent);
   const lastStatusChange = statusEvents[0]?.occurred_at ?? shipment.updated_at;
@@ -326,6 +330,12 @@ function ShipmentDetail() {
             <section className="panel p-4">
               <h2 className="label-xs mb-2">Status</h2>
               <StatusPill status={shipment.status} size="lg" />
+              {conditionLabel ? (
+                <div className="mt-2.5">
+                  <p className="label-xs mb-1">Operational</p>
+                  <VesselConditionBadge condition={vesselCondition} label={conditionLabel} />
+                </div>
+              ) : null}
               <div className="mt-3">
                 <p className="label-xs">Last updated</p>
                 <p className="text-[13px] text-foreground">{formatDayTime(lastStatusChange)}</p>
