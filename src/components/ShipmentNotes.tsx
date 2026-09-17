@@ -42,7 +42,7 @@ export function ShipmentNotes({ shipmentId }: { shipmentId: string }) {
       >
         <textarea
           className={`${fieldClass} min-h-[72px] resize-y`}
-          placeholder="Add a note for this shipment…"
+          placeholder="Add a note about this shipment..."
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
         />

@@ -60,7 +60,9 @@ export function AppShell({
   children,
   wide = false,
 }: {
-  title: string;
+  /** Usually plain text; a page needing a richer header (e.g. an inline back
+   *  button) may pass a small ReactNode instead. */
+  title: ReactNode;
   description?: string;
   eyebrow?: string;
   actions?: ReactNode;

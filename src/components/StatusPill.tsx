@@ -1,3 +1,5 @@
+import { Anchor, BookmarkCheck, CalendarClock, CheckCircle2, MapPin, Ship, type LucideIcon } from "lucide-react";
+
 import type { ShipmentStatus } from "@/lib/api";
 import type { HealthLevel, MonitoringState, Severity } from "@/lib/lifecycle";
 
@@ -25,7 +27,40 @@ const DOT: Record<ShipmentStatus, string> = {
   Delivered: "bg-positive",
 };
 
-export function StatusPill({ status }: { status: ShipmentStatus }) {
+const STATUS_ICON: Partial<Record<ShipmentStatus, LucideIcon>> = {
+  Scheduled: CalendarClock,
+  Booked: BookmarkCheck,
+  Departed: Anchor,
+  "In Transit": Ship,
+  "Approaching Destination": MapPin,
+  Arrived: CheckCircle2,
+};
+
+/** `size="lg"` renders a bigger, rounded-full pill with a status icon
+ * (used for a page's primary status display); `sm` (default) is the
+ * original compact dot pill used everywhere else. Same color tokens. */
+export function StatusPill({
+  status,
+  size = "sm",
+}: {
+  status: ShipmentStatus;
+  size?: "sm" | "lg";
+}) {
+  if (size === "lg") {
+    const Icon = STATUS_ICON[status];
+    return (
+      <span
+        className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] font-medium whitespace-nowrap ${TONE[status] ?? TONE.Booked}`}
+      >
+        {Icon ? (
+          <Icon className="size-3.5" aria-hidden />
+        ) : (
+          <span className={`size-1.5 rounded-full ${DOT[status] ?? DOT.Booked}`} aria-hidden />
+        )}
+        {status}
+      </span>
+    );
+  }
   return (
     <span
       className={`inline-flex items-center gap-1.5 rounded-sm border px-1.5 py-0.5 text-[11px] font-medium whitespace-nowrap ${TONE[status] ?? TONE.Booked}`}

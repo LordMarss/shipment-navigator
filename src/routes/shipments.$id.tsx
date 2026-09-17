@@ -1,21 +1,31 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
-import { Check } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  ArrowUp,
+  ArrowUpRight,
+  Check,
+  ChevronRight,
+  MapPin,
+  MoreHorizontal,
+  RotateCcw,
+  Ship,
+} from "lucide-react";
 import { toast } from "sonner";
 
-import { AppShell, btnDanger, btnGhost, btnPrimary, fieldClass } from "@/components/AppShell";
+import { AppShell, btnGhost, btnPrimary, fieldClass } from "@/components/AppShell";
 import { DocumentFiles } from "@/components/DocumentFiles";
 import { ShipmentNotes } from "@/components/ShipmentNotes";
 import { ShipmentTimeline } from "@/components/ShipmentTimeline";
 import { StatusHistory } from "@/components/StatusHistory";
-import { HealthBadge, MonitoringBadge, SeverityBadge, StatusPill } from "@/components/StatusPill";
+import { SeverityBadge, StatusPill } from "@/components/StatusPill";
 import { useMonitoringConfig } from "@/hooks/useMonitoringConfig";
 import {
   ACTIVE_STATUSES,
   advanceStatus,
   deleteShipment,
-  formatCost,
   getShipment,
   getVesselPositionForShipment,
   listAlerts,
@@ -26,7 +36,7 @@ import {
   shortId,
   type ActiveShipmentStatus,
   type Shipment,
-  type VesselPosition,
+  type ShipmentEvent,
 } from "@/lib/api";
 import { deriveAutomation } from "@/lib/autoStatus";
 import {
@@ -92,6 +102,21 @@ function dateDraftFrom(s: Shipment): DateDraft {
     actual_arrival: toLocalInput(s.actual_arrival),
     actual_delivery: toLocalInput(s.actual_delivery),
   };
+}
+
+/** A status-change event may come from `advanceStatus` (field "Status",
+ * category "status") or from the manual-override path via
+ * `saveShipmentDetails` (field "status", category "event" — its generic
+ * patch mechanism doesn't know "status" is special). Matching on the field
+ * name rather than category catches both, so every status change appears
+ * in the Change History regardless of which existing code path wrote it. */
+function isStatusEvent(e: ShipmentEvent) {
+  return (e.field ?? "").toLowerCase() === "status";
+}
+
+function eventSourceLabel(e: ShipmentEvent) {
+  if (!e.automated) return "Manual";
+  return e.source === "ais" ? "Automated (AIS)" : "Automated (System)";
 }
 
 type TabKey = "overview" | "timeline" | "documents" | "notes" | "alerts";
@@ -241,36 +266,43 @@ function ShipmentDetail() {
   const health = shipmentHealth(shipment, docsFor(documents, shipment.id), config);
   const decision = deriveAutomation(shipment, config);
   const shipmentAlerts = alerts.filter((a) => a.shipment_id === shipment.id);
+  const statusEvents = events.filter(isStatusEvent);
+  const lastStatusChange = statusEvents[0]?.occurred_at ?? shipment.updated_at;
+
+  const openOverride = () => {
+    setOverrideStatus((next ?? shipment.status) as ActiveShipmentStatus);
+    setOverrideOpen((v) => !v);
+  };
 
   return (
     <AppShell
-      title={shortId(shipment.id)}
-      description={`${shipment.client_name} · ${shipment.origin} → ${shipment.destination}${
-        shipment.vessel_name ? ` · ${shipment.vessel_name}` : ""
-      }`}
+      title={
+        <span className="inline-flex items-center gap-2">
+          <Link
+            to="/"
+            aria-label="Back to shipments"
+            className="focus-ring -ml-1 rounded-sm p-1 text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="size-4" />
+          </Link>
+          Shipment #{shipment.reference ?? shortId(shipment.id)}
+        </span>
+      }
       actions={
         <>
-          <Link to="/" className={btnGhost}>
-            Back to Shipments
-          </Link>
-          <button
-            className={btnPrimary}
-            disabled={!next || advance.isPending}
-            onClick={() => advance.mutate()}
-          >
-            {next ? `Advance to ${next}` : shipment.status}
-          </button>
+          <StatusPill status={shipment.status} />
+          <HeaderMenu
+            next={next}
+            advancing={advance.isPending}
+            onAdvance={() => advance.mutate()}
+            onDelete={() => {
+              if (confirm("Delete this shipment and its documents?")) remove.mutate();
+            }}
+          />
         </>
       }
     >
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <StatusPill status={shipment.status} />
-        <HealthBadge level={health.level} />
-        <MonitoringBadge state={monitoring.state} />
-        <span className="text-[12px] text-muted-foreground">{formatCost(shipment.landed_cost)} landed cost</span>
-      </div>
-
-      <div className="mb-4 flex gap-1 border-b border-border">
+      <div className="-mt-2 mb-4 flex gap-1 border-b border-border">
         {TABS.map((t) => (
           <button
             key={t.key}
@@ -278,7 +310,7 @@ function ShipmentDetail() {
             onClick={() => setTab(t.key)}
             className={`-mb-px border-b-2 px-3 py-2 text-[13px] font-medium transition-colors ${
               tab === t.key
-                ? "border-primary text-foreground"
+                ? "border-primary text-primary"
                 : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
@@ -289,50 +321,94 @@ function ShipmentDetail() {
       </div>
 
       {tab === "overview" ? (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_1fr]">
-          <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_1fr]">
             <section className="panel p-4">
-              <h2 className="mb-4 text-[13px] font-semibold">Shipment timeline</h2>
-              <LifecycleStepper status={shipment.status} legacyTerminal={legacyTerminal} currentIndex={currentIndex} />
-              <div className="mt-4 space-y-1 border-t border-border pt-3 text-[12px] text-muted-foreground">
-                <p>Monitoring: {monitoring.reason}</p>
-                <p>
-                  Automation:{" "}
-                  {decision.status === shipment.status ? "no pending change" : `will move to ${decision.status}`}
-                  {" · "}
-                  {decision.reason}
-                </p>
+              <h2 className="label-xs mb-2">Status</h2>
+              <StatusPill status={shipment.status} size="lg" />
+              <div className="mt-3">
+                <p className="label-xs">Last updated</p>
+                <p className="text-[13px] text-foreground">{formatDayTime(lastStatusChange)}</p>
               </div>
-            </section>
 
-            <section className="panel p-4">
-              <div className="mb-3 flex items-center justify-between">
-                <h2 className="text-[13px] font-semibold">Manual override</h2>
-                {!overrideOpen ? (
-                  <button
-                    type="button"
-                    className={btnGhost}
-                    disabled={legacyTerminal}
-                    onClick={() => {
-                      setOverrideStatus((next ?? shipment.status) as ActiveShipmentStatus);
-                      setOverrideOpen(true);
-                    }}
-                  >
-                    Change status
-                  </button>
-                ) : null}
-              </div>
+              <div className="my-4 border-t border-border" />
+
+              <h2 className="label-xs mb-2">Current Vessel</h2>
+              {shipment.vessel_name || shipment.vessel_mmsi ? (
+                <div className="flex items-center gap-3">
+                  <span className="flex size-12 shrink-0 items-center justify-center rounded-sm border border-border bg-subtle text-muted-foreground">
+                    <Ship className="size-5" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate text-[14px] font-semibold text-foreground">
+                      {shipment.vessel_name ?? "Unnamed vessel"}
+                    </p>
+                    <p className="text-[12px] text-muted-foreground">
+                      {shipment.carrier ? `${shipment.carrier} · ` : ""}
+                      MMSI {shipment.vessel_mmsi ?? "—"}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-[12px] text-muted-foreground">No vessel assigned to this shipment yet.</p>
+              )}
+
+              {shipment.vessel_mmsi ? (
+                <div className="mt-3 rounded-[var(--radius)] border border-border bg-subtle/60 p-3">
+                  {position ? (
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="space-y-2.5">
+                        <AisRow
+                          icon={ArrowUp}
+                          label="SOG"
+                          value={position.sog != null ? `${position.sog.toFixed(1)} kn` : "—"}
+                        />
+                        <AisRow
+                          icon={ArrowUpRight}
+                          label="COG"
+                          value={position.cog != null ? `${position.cog}°` : "—"}
+                        />
+                        <AisRow icon={MapPin} label="Nav Status" value={navStatusLabel(position.nav_status)} />
+                      </div>
+                      <Link
+                        to="/map"
+                        className="inline-flex shrink-0 items-center gap-1 self-center text-[12px] font-medium text-primary hover:underline"
+                      >
+                        View on map <ArrowRight className="size-3.5" />
+                      </Link>
+                    </div>
+                  ) : (
+                    <p className="text-[12px] text-muted-foreground">
+                      No AIS position received yet for MMSI {shipment.vessel_mmsi}.
+                    </p>
+                  )}
+                </div>
+              ) : null}
+
+              <button
+                type="button"
+                disabled={legacyTerminal}
+                onClick={openOverride}
+                className="mt-4 flex w-full items-center justify-between gap-2 rounded-[var(--radius)] border border-primary/30 bg-primary/[0.05] px-4 py-3 text-[13px] font-semibold text-primary transition-colors hover:bg-primary/[0.09] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <span className="inline-flex items-center gap-2">
+                  <RotateCcw className="size-4" />
+                  Override Status
+                </span>
+                <ChevronRight className="size-4" />
+              </button>
+
               {legacyTerminal ? (
-                <p className="text-[12px] text-muted-foreground">
+                <p className="mt-2 text-[12px] text-muted-foreground">
                   This shipment holds a legacy status and has moved past the active lifecycle.
                 </p>
-              ) : !overrideOpen ? (
-                <p className="text-[12px] text-muted-foreground">
-                  Automation remains primary. Use this only to correct or fast-forward a shipment's
-                  status outside the normal pipeline — every override is logged as a manual change.
-                </p>
-              ) : (
-                <div className="space-y-3 rounded-sm border border-border bg-subtle/40 p-3">
+              ) : overrideOpen ? (
+                <div className="mt-3 space-y-3 rounded-sm border border-border bg-subtle/40 p-3">
+                  <p className="text-[12px] text-muted-foreground">
+                    Use this if you need to correct a status change, like an accidental update or
+                    incorrect AIS data. This will create a manual timeline event. Automation remains
+                    primary.
+                  </p>
                   <label className="block">
                     <span className="label-xs mb-1 block">New status</span>
                     <select
@@ -377,147 +453,171 @@ function ShipmentDetail() {
                     </button>
                   </div>
                 </div>
-              )}
+              ) : null}
             </section>
 
-            <form
-              className="panel p-4"
-              onSubmit={(e) => {
-                e.preventDefault();
-                save.mutate();
-              }}
-            >
-              <h2 className="mb-3 text-[13px] font-semibold">Shipment information</h2>
-              <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
-                <Field label="Client">
-                  <input
-                    className={fieldClass}
-                    value={draft.client_name}
-                    onChange={(e) => setDraft({ ...draft, client_name: e.target.value })}
-                  />
-                </Field>
-                <Field label="Landed cost (USD)">
-                  <input
-                    className={fieldClass}
-                    type="number"
-                    step="0.01"
-                    value={draft.landed_cost ?? ""}
-                    onChange={(e) =>
-                      setDraft({
-                        ...draft,
-                        landed_cost: e.target.value === "" ? null : Number(e.target.value),
-                      })
-                    }
-                  />
-                </Field>
-                <Field label="Origin">
-                  <input
-                    className={fieldClass}
-                    value={draft.origin}
-                    onChange={(e) => setDraft({ ...draft, origin: e.target.value })}
-                  />
-                </Field>
-                <Field label="Destination">
-                  <input
-                    className={fieldClass}
-                    value={draft.destination}
-                    onChange={(e) => setDraft({ ...draft, destination: e.target.value })}
-                  />
-                </Field>
-                <Field label="Vessel name">
-                  <input
-                    className={fieldClass}
-                    value={draft.vessel_name ?? ""}
-                    onChange={(e) => setDraft({ ...draft, vessel_name: e.target.value })}
-                  />
-                </Field>
-                <Field label="Vessel MMSI">
-                  <input
-                    className={fieldClass}
-                    value={draft.vessel_mmsi ?? ""}
-                    onChange={(e) => setDraft({ ...draft, vessel_mmsi: e.target.value })}
-                  />
-                </Field>
-              </div>
+            <div className="flex flex-col gap-4">
+              <ShipmentNotes shipmentId={id} />
 
-              <h3 className="mt-4 border-t border-border pt-3 text-[13px] font-semibold">Schedule</h3>
-              <p className="mb-3 text-[12px] text-muted-foreground">
-                Planned, current and actual times are stored separately, so automation never overwrites
-                the original plan.
-              </p>
-              <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
-                <Field label="Planned departure (ETD)">
-                  <input
-                    className={fieldClass}
-                    type="datetime-local"
-                    value={dates.planned_etd}
-                    onChange={(e) => setDates({ ...dates, planned_etd: e.target.value })}
-                  />
-                </Field>
-                <Field label="Planned arrival (ETA)">
-                  <input
-                    className={fieldClass}
-                    type="datetime-local"
-                    value={dates.planned_eta}
-                    onChange={(e) => setDates({ ...dates, planned_eta: e.target.value })}
-                  />
-                </Field>
-                <Field label="Current ETA">
-                  <input
-                    className={fieldClass}
-                    type="datetime-local"
-                    value={dates.eta}
-                    onChange={(e) => setDates({ ...dates, eta: e.target.value })}
-                  />
-                </Field>
-                <Field label="Actual departure">
-                  <input
-                    className={fieldClass}
-                    type="datetime-local"
-                    value={dates.actual_departure}
-                    onChange={(e) => setDates({ ...dates, actual_departure: e.target.value })}
-                  />
-                </Field>
-                <Field label="Actual arrival">
-                  <input
-                    className={fieldClass}
-                    type="datetime-local"
-                    value={dates.actual_arrival}
-                    onChange={(e) => setDates({ ...dates, actual_arrival: e.target.value })}
-                  />
-                </Field>
-                <Field label="Actual delivery">
-                  <input
-                    className={fieldClass}
-                    type="datetime-local"
-                    value={dates.actual_delivery}
-                    onChange={(e) => setDates({ ...dates, actual_delivery: e.target.value })}
-                  />
-                </Field>
-                <InfoField
-                  label="Last AIS update"
-                  value={position ? relativeTime(position.position_timestamp ?? position.updated_at) : "No AIS data yet"}
-                />
-              </div>
-
-              <div className="mt-4 flex items-center justify-between gap-2 border-t border-border pt-3">
-                <button className={btnPrimary} type="submit" disabled={save.isPending}>
-                  {save.isPending ? "Saving…" : "Save changes"}
-                </button>
-                <button
-                  type="button"
-                  className={btnDanger}
-                  onClick={() => {
-                    if (confirm("Delete this shipment and its documents?")) remove.mutate();
-                  }}
-                >
-                  Delete
-                </button>
-              </div>
-            </form>
+              <section className="panel p-4">
+                <h2 className="mb-3 text-[13px] font-semibold">Change History</h2>
+                {statusEvents.length === 0 ? (
+                  <p className="text-[12px] text-muted-foreground">No status changes recorded yet.</p>
+                ) : (
+                  <ol>
+                    {statusEvents.map((e, i) => (
+                      <li key={e.id} className="relative flex gap-3 pb-4 last:pb-0">
+                        {i < statusEvents.length - 1 ? (
+                          <span
+                            aria-hidden
+                            className="absolute left-[4px] top-3 h-full w-px bg-border"
+                          />
+                        ) : null}
+                        <span
+                          aria-hidden
+                          className={`mt-1 size-[9px] shrink-0 rounded-full ${i === 0 ? "bg-primary" : "bg-border"}`}
+                        />
+                        <div className="min-w-0">
+                          <p className="text-[13px] font-semibold text-foreground">
+                            {e.to_value ?? e.event_type}
+                          </p>
+                          <p className="text-[12px] text-muted-foreground">{eventSourceLabel(e)}</p>
+                          <p className="text-[11px] text-muted-foreground">{formatDayTime(e.occurred_at)}</p>
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </section>
+            </div>
           </div>
 
-          <VesselAisSection shipment={shipment} position={position} />
+          <section className="panel p-4">
+            <h2 className="mb-3 text-[13px] font-semibold">Lifecycle</h2>
+            <LifecycleStepper status={shipment.status} legacyTerminal={legacyTerminal} currentIndex={currentIndex} />
+            <div className="mt-4 space-y-1 border-t border-border pt-3 text-[12px] text-muted-foreground">
+              <p>Monitoring: {monitoring.reason}</p>
+              <p>
+                Automation:{" "}
+                {decision.status === shipment.status ? "no pending change" : `will move to ${decision.status}`}
+                {" · "}
+                {decision.reason}
+              </p>
+            </div>
+          </section>
+
+          <form
+            className="panel p-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              save.mutate();
+            }}
+          >
+            <h2 className="mb-3 text-[13px] font-semibold">Shipment Information</h2>
+            <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
+              <Field label="Client">
+                <input
+                  className={fieldClass}
+                  value={draft.client_name}
+                  onChange={(e) => setDraft({ ...draft, client_name: e.target.value })}
+                />
+              </Field>
+              <Field label="Landed cost (USD)">
+                <input
+                  className={fieldClass}
+                  type="number"
+                  step="0.01"
+                  value={draft.landed_cost ?? ""}
+                  onChange={(e) =>
+                    setDraft({
+                      ...draft,
+                      landed_cost: e.target.value === "" ? null : Number(e.target.value),
+                    })
+                  }
+                />
+              </Field>
+              <Field label="Origin">
+                <input
+                  className={fieldClass}
+                  value={draft.origin}
+                  onChange={(e) => setDraft({ ...draft, origin: e.target.value })}
+                />
+              </Field>
+              <Field label="Destination">
+                <input
+                  className={fieldClass}
+                  value={draft.destination}
+                  onChange={(e) => setDraft({ ...draft, destination: e.target.value })}
+                />
+              </Field>
+              <Field label="Vessel">
+                <input
+                  className={fieldClass}
+                  value={draft.vessel_name ?? ""}
+                  onChange={(e) => setDraft({ ...draft, vessel_name: e.target.value })}
+                />
+              </Field>
+              <Field label="MMSI">
+                <input
+                  className={fieldClass}
+                  value={draft.vessel_mmsi ?? ""}
+                  onChange={(e) => setDraft({ ...draft, vessel_mmsi: e.target.value })}
+                />
+              </Field>
+              <Field label="Planned ETD">
+                <input
+                  className={fieldClass}
+                  type="datetime-local"
+                  value={dates.planned_etd}
+                  onChange={(e) => setDates({ ...dates, planned_etd: e.target.value })}
+                />
+              </Field>
+              <Field label="Planned ETA">
+                <input
+                  className={fieldClass}
+                  type="datetime-local"
+                  value={dates.planned_eta}
+                  onChange={(e) => setDates({ ...dates, planned_eta: e.target.value })}
+                />
+              </Field>
+              <Field label="Current ETA">
+                <input
+                  className={fieldClass}
+                  type="datetime-local"
+                  value={dates.eta}
+                  onChange={(e) => setDates({ ...dates, eta: e.target.value })}
+                />
+              </Field>
+              <Field label="Actual Departure">
+                <input
+                  className={fieldClass}
+                  type="datetime-local"
+                  value={dates.actual_departure}
+                  onChange={(e) => setDates({ ...dates, actual_departure: e.target.value })}
+                />
+              </Field>
+              <Field label="Actual Arrival">
+                <input
+                  className={fieldClass}
+                  type="datetime-local"
+                  value={dates.actual_arrival}
+                  onChange={(e) => setDates({ ...dates, actual_arrival: e.target.value })}
+                />
+              </Field>
+              <InfoField
+                label="Last AIS Update"
+                value={
+                  position ? relativeTime(position.position_timestamp ?? position.updated_at) : "No AIS data yet"
+                }
+              />
+            </div>
+
+            <div className="mt-4 flex items-center justify-end border-t border-border pt-3">
+              <button className={btnPrimary} type="submit" disabled={save.isPending}>
+                {save.isPending ? "Saving…" : "Save changes"}
+              </button>
+            </div>
+          </form>
         </div>
       ) : null}
 
@@ -562,6 +662,89 @@ function ShipmentDetail() {
         </div>
       ) : null}
     </AppShell>
+  );
+}
+
+function HeaderMenu({
+  next,
+  advancing,
+  onAdvance,
+  onDelete,
+}: {
+  next: string | null;
+  advancing: boolean;
+  onAdvance: () => void;
+  onDelete: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, []);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        className="focus-ring rounded-sm p-1.5 text-muted-foreground hover:bg-subtle hover:text-foreground"
+        aria-label="More actions"
+        onClick={() => setOpen((v) => !v)}
+      >
+        <MoreHorizontal className="size-4" />
+      </button>
+      {open ? (
+        <div className="absolute right-0 z-10 mt-1 w-48 rounded-[var(--radius)] border border-border bg-surface py-1">
+          {next ? (
+            <button
+              type="button"
+              className="block w-full px-3 py-1.5 text-left text-[13px] text-foreground hover:bg-subtle disabled:opacity-50"
+              disabled={advancing}
+              onClick={() => {
+                onAdvance();
+                setOpen(false);
+              }}
+            >
+              Advance to {next}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="block w-full px-3 py-1.5 text-left text-[13px] text-destructive hover:bg-risk-soft"
+            onClick={() => {
+              setOpen(false);
+              onDelete();
+            }}
+          >
+            Delete shipment
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function AisRow({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex items-start gap-2">
+      <Icon className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+      <div>
+        <p className="text-[11px] text-muted-foreground">{label}</p>
+        <p className="text-[13px] font-medium text-foreground">{value}</p>
+      </div>
+    </div>
   );
 }
 
@@ -619,62 +802,10 @@ function LifecycleStepper({
   );
 }
 
-function VesselAisSection({
-  shipment,
-  position,
-}: {
-  shipment: Shipment;
-  position: VesselPosition | null | undefined;
-}) {
-  return (
-    <section className="panel h-fit p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-[13px] font-semibold">Vessel · AIS</h2>
-        <Link to="/map" className="text-[12px] text-primary hover:underline">
-          Fleet map
-        </Link>
-      </div>
-
-      {!shipment.vessel_mmsi ? (
-        <p className="text-[12px] text-muted-foreground">No vessel assigned to this shipment yet.</p>
-      ) : !position ? (
-        <p className="text-[12px] text-muted-foreground">
-          No AIS position received yet for MMSI {shipment.vessel_mmsi}.
-        </p>
-      ) : (
-        <div className="grid grid-cols-2 gap-x-3 gap-y-3">
-          <InfoField label="Vessel" value={position.vessel_name ?? shipment.vessel_name ?? "—"} />
-          <InfoField label="MMSI" value={shipment.vessel_mmsi} />
-          <InfoField label="Speed" value={position.sog != null ? `${position.sog.toFixed(1)} kn` : "—"} />
-          <InfoField
-            label="Heading"
-            value={
-              position.true_heading != null
-                ? `${position.true_heading}°`
-                : position.cog != null
-                  ? `${position.cog}° (COG)`
-                  : "—"
-            }
-          />
-          <InfoField label="Nav status" value={navStatusLabel(position.nav_status)} />
-          <InfoField
-            label="Position"
-            value={`${position.latitude.toFixed(3)}, ${position.longitude.toFixed(3)}`}
-          />
-          <InfoField
-            label="AIS last updated"
-            value={relativeTime(position.position_timestamp ?? position.updated_at)}
-          />
-        </div>
-      )}
-    </section>
-  );
-}
-
 function InfoField({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <span className="label-xs mb-0.5 block">{label}</span>
+      <span className="label-xs mb-1 block">{label}</span>
       <span className="text-[13px] text-foreground">{value}</span>
     </div>
   );
