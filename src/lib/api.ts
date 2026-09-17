@@ -517,6 +517,16 @@ export async function listEvents(shipmentId: string) {
   return (data ?? []) as ShipmentEvent[];
 }
 
+export async function listAllEvents(limit = 20) {
+  const { data, error } = await supabase
+    .from("shipment_events")
+    .select("*")
+    .order("occurred_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return (data ?? []) as ShipmentEvent[];
+}
+
 export async function recordEvent(
   input: {
     shipment_id: string;

@@ -3,24 +3,29 @@ import { useMemo, useState, type ReactNode } from "react";
 import { ArrowDown, ArrowUp, Search } from "lucide-react";
 
 import { EmptyState, Skeleton, fieldClass } from "@/components/AppShell";
-import { DocsIndicator, StatusPill } from "@/components/StatusPill";
+import { DocsIndicator, SeverityBadge, StatusPill } from "@/components/StatusPill";
 import {
   ACTIVE_STATUSES,
   STATUSES,
   formatCost,
   formatEta,
   shortId,
+  type Alert,
   type Shipment,
   type ShipmentDocument,
   type ShipmentStatus,
 } from "@/lib/api";
+import { alertSeverity, SEVERITY_LABEL, type Severity } from "@/lib/lifecycle";
 import { docsFor } from "@/lib/insights";
 
 type SortKey = "created_at" | "client_name" | "eta" | "landed_cost" | "status";
 
+const SEVERITY_RANK: Record<Severity, number> = { critical: 0, attention: 1, informational: 2 };
+
 export function ShipmentTable({
   shipments,
   documents,
+  alerts,
   isLoading,
   emptyTitle = "No shipments yet",
   emptyDescription = "Create your first shipment to start tracking documents, vessels and landed cost.",
@@ -28,6 +33,8 @@ export function ShipmentTable({
 }: {
   shipments: Shipment[];
   documents: ShipmentDocument[];
+  /** Optional — when passed, an "Alerts" column shows each shipment's worst open alert. */
+  alerts?: Alert[];
   isLoading?: boolean;
   emptyTitle?: string;
   emptyDescription?: string;
@@ -46,6 +53,24 @@ export function ShipmentTable({
     () => Array.from(new Set(shipments.map((s) => s.client_name))).sort(),
     [shipments],
   );
+
+  const alertsByShipment = useMemo(() => {
+    const map = new Map<string, { severity: Severity; count: number }>();
+    for (const a of alerts ?? []) {
+      if (!a.shipment_id) continue;
+      const severity = alertSeverity(a);
+      const existing = map.get(a.shipment_id);
+      if (!existing) {
+        map.set(a.shipment_id, { severity, count: 1 });
+      } else {
+        existing.count += 1;
+        if (SEVERITY_RANK[severity] < SEVERITY_RANK[existing.severity]) existing.severity = severity;
+      }
+    }
+    return map;
+  }, [alerts]);
+
+  const columnCount = 8 + (alerts ? 1 : 0);
 
   const rows = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -140,8 +165,7 @@ export function ShipmentTable({
               <Th sortKey="client_name" sort={sort} onSort={toggleSort}>
                 Client
               </Th>
-              <Th>Origin</Th>
-              <Th>Destination</Th>
+              <Th>Route</Th>
               <Th>Vessel</Th>
               <Th sortKey="eta" sort={sort} onSort={toggleSort}>
                 ETA
@@ -149,6 +173,7 @@ export function ShipmentTable({
               <Th sortKey="status" sort={sort} onSort={toggleSort}>
                 Status
               </Th>
+              {alerts ? <Th>Alerts</Th> : null}
               <Th>Documents</Th>
               <Th sortKey="landed_cost" sort={sort} onSort={toggleSort} align="right">
                 Landed Cost
@@ -159,14 +184,14 @@ export function ShipmentTable({
             {isLoading ? (
               Array.from({ length: 4 }).map((_, i) => (
                 <tr key={i} className="border-b border-border last:border-0">
-                  <td colSpan={9} className="px-3 py-2.5">
+                  <td colSpan={columnCount} className="px-3 py-2.5">
                     <Skeleton className="h-4 w-full" />
                   </td>
                 </tr>
               ))
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={9}>
+                <td colSpan={columnCount}>
                   <EmptyState
                     title={shipments.length === 0 ? emptyTitle : "No shipments match your filters"}
                     description={
@@ -181,6 +206,7 @@ export function ShipmentTable({
             ) : (
               rows.map((s) => {
                 const docs = docsFor(documents, s.id);
+                const shipmentAlert = alerts ? alertsByShipment.get(s.id) : undefined;
                 return (
                   <tr
                     key={s.id}
@@ -191,8 +217,9 @@ export function ShipmentTable({
                       {shortId(s.id)}
                     </td>
                     <td className="px-3 py-2.5 font-medium">{s.client_name}</td>
-                    <td className="px-3 py-2.5 text-muted-foreground">{s.origin}</td>
-                    <td className="px-3 py-2.5 text-muted-foreground">{s.destination}</td>
+                    <td className="px-3 py-2.5 text-muted-foreground">
+                      {s.origin} <span className="text-muted-foreground/50">→</span> {s.destination}
+                    </td>
                     <td className="px-3 py-2.5">
                       {s.vessel_name ? (
                         <span className="text-foreground">{s.vessel_name}</span>
@@ -204,6 +231,22 @@ export function ShipmentTable({
                     <td className="px-3 py-2.5">
                       <StatusPill status={s.status} />
                     </td>
+                    {alerts ? (
+                      <td className="px-3 py-2.5">
+                        {shipmentAlert ? (
+                          <SeverityBadge
+                            severity={shipmentAlert.severity}
+                            label={
+                              shipmentAlert.count > 1
+                                ? `${SEVERITY_LABEL[shipmentAlert.severity]} (${shipmentAlert.count})`
+                                : SEVERITY_LABEL[shipmentAlert.severity]
+                            }
+                          />
+                        ) : (
+                          <span className="text-muted-foreground/50">—</span>
+                        )}
+                      </td>
+                    ) : null}
                     <td className="px-3 py-2.5">
                       <DocsIndicator attached={docs.attached} total={docs.total} />
                     </td>
