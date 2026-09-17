@@ -85,6 +85,27 @@ export function relativeTime(value: string) {
   return `${Math.round(hours / 24)}d ago`;
 }
 
+/** ITU-R M.1371 AIS navigational status codes, for display only. */
+const NAV_STATUS_LABEL: Record<string, string> = {
+  "0": "Under way (engine)",
+  "1": "At anchor",
+  "2": "Not under command",
+  "3": "Restricted maneuverability",
+  "4": "Constrained by draught",
+  "5": "Moored",
+  "6": "Aground",
+  "7": "Fishing",
+  "8": "Under way (sailing)",
+  "11": "Towing astern",
+  "12": "Pushing ahead",
+  "15": "Not defined",
+};
+
+export function navStatusLabel(code: string | null | undefined) {
+  if (code == null) return "Unknown";
+  return NAV_STATUS_LABEL[code] ?? "Unknown";
+}
+
 export function daysUntil(value: string | null | undefined) {
   const d = toDate(value);
   if (!d) return null;

@@ -15,7 +15,7 @@ import {
   type ShipmentDocument,
   type ShipmentStatus,
 } from "@/lib/api";
-import { alertSeverity, SEVERITY_LABEL, type Severity } from "@/lib/lifecycle";
+import { alertSeverity, relativeTime, SEVERITY_LABEL, type Severity } from "@/lib/lifecycle";
 import { docsFor } from "@/lib/insights";
 
 type SortKey = "created_at" | "client_name" | "eta" | "landed_cost" | "status";
@@ -27,6 +27,9 @@ export function ShipmentTable({
   documents,
   alerts,
   isLoading,
+  showClient = true,
+  showLandedCost = true,
+  showLastUpdated = false,
   emptyTitle = "No shipments yet",
   emptyDescription = "Create your first shipment to start tracking documents, vessels and landed cost.",
   emptyAction,
@@ -36,6 +39,12 @@ export function ShipmentTable({
   /** Optional — when passed, an "Alerts" column shows each shipment's worst open alert. */
   alerts?: Alert[];
   isLoading?: boolean;
+  /** Default true, matching the existing /shipments/* list pages. */
+  showClient?: boolean;
+  /** Default true, matching the existing /shipments/* list pages. */
+  showLandedCost?: boolean;
+  /** Default false — an operational "last touched" column for the dashboard. */
+  showLastUpdated?: boolean;
   emptyTitle?: string;
   emptyDescription?: string;
   emptyAction?: ReactNode;
@@ -70,7 +79,8 @@ export function ShipmentTable({
     return map;
   }, [alerts]);
 
-  const columnCount = 8 + (alerts ? 1 : 0);
+  const columnCount =
+    6 + (showClient ? 1 : 0) + (alerts ? 1 : 0) + (showLandedCost ? 1 : 0) + (showLastUpdated ? 1 : 0);
 
   const rows = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -161,23 +171,28 @@ export function ShipmentTable({
         <table className="w-full min-w-[980px] border-collapse text-[13px]">
           <thead>
             <tr className="border-b border-border bg-subtle/60">
-              <Th>Shipment ID</Th>
-              <Th sortKey="client_name" sort={sort} onSort={toggleSort}>
-                Client
-              </Th>
+              <Th>Shipment</Th>
+              {showClient ? (
+                <Th sortKey="client_name" sort={sort} onSort={toggleSort}>
+                  Client
+                </Th>
+              ) : null}
               <Th>Route</Th>
               <Th>Vessel</Th>
-              <Th sortKey="eta" sort={sort} onSort={toggleSort}>
-                ETA
-              </Th>
               <Th sortKey="status" sort={sort} onSort={toggleSort}>
                 Status
               </Th>
+              <Th sortKey="eta" sort={sort} onSort={toggleSort}>
+                ETA
+              </Th>
               {alerts ? <Th>Alerts</Th> : null}
               <Th>Documents</Th>
-              <Th sortKey="landed_cost" sort={sort} onSort={toggleSort} align="right">
-                Landed Cost
-              </Th>
+              {showLastUpdated ? <Th>Last Updated</Th> : null}
+              {showLandedCost ? (
+                <Th sortKey="landed_cost" sort={sort} onSort={toggleSort} align="right">
+                  Landed Cost
+                </Th>
+              ) : null}
             </tr>
           </thead>
           <tbody>
@@ -216,7 +231,9 @@ export function ShipmentTable({
                     <td className="px-3 py-2.5 font-mono text-[12px] text-muted-foreground group-hover:text-primary">
                       {shortId(s.id)}
                     </td>
-                    <td className="px-3 py-2.5 font-medium">{s.client_name}</td>
+                    {showClient ? (
+                      <td className="px-3 py-2.5 font-medium">{s.client_name}</td>
+                    ) : null}
                     <td className="px-3 py-2.5 text-muted-foreground">
                       {s.origin} <span className="text-muted-foreground/50">→</span> {s.destination}
                     </td>
@@ -227,10 +244,10 @@ export function ShipmentTable({
                         <span className="text-muted-foreground/70">—</span>
                       )}
                     </td>
-                    <td className="px-3 py-2.5 text-muted-foreground">{formatEta(s.eta)}</td>
                     <td className="px-3 py-2.5">
                       <StatusPill status={s.status} />
                     </td>
+                    <td className="px-3 py-2.5 text-muted-foreground">{formatEta(s.eta)}</td>
                     {alerts ? (
                       <td className="px-3 py-2.5">
                         {shipmentAlert ? (
@@ -250,9 +267,16 @@ export function ShipmentTable({
                     <td className="px-3 py-2.5">
                       <DocsIndicator attached={docs.attached} total={docs.total} />
                     </td>
-                    <td className="px-3 py-2.5 text-right font-medium tabular-nums">
-                      {formatCost(s.landed_cost)}
-                    </td>
+                    {showLastUpdated ? (
+                      <td className="px-3 py-2.5 text-muted-foreground">
+                        {relativeTime(s.updated_at)}
+                      </td>
+                    ) : null}
+                    {showLandedCost ? (
+                      <td className="px-3 py-2.5 text-right font-medium tabular-nums">
+                        {formatCost(s.landed_cost)}
+                      </td>
+                    ) : null}
                   </tr>
                 );
               })

@@ -54,8 +54,11 @@ export function StatusHistory({ events }: { events: ShipmentEvent[] }) {
               {e.reason ? (
                 <p className="mt-1 text-[12px] text-muted-foreground">Reason: {e.reason}</p>
               ) : null}
-              <div className="mt-1">
+              <div className="mt-1 flex items-center gap-2">
                 <SourceTag source={e.source} automated={e.automated} />
+                {e.actor ? (
+                  <span className="text-[11px] text-muted-foreground">· {e.actor}</span>
+                ) : null}
               </div>
             </li>
           ))}
