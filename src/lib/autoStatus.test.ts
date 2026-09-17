@@ -27,6 +27,8 @@ function makeShipment(overrides: Partial<Shipment> = {}): Shipment {
     vessel_name: "Test Vessel",
     vessel_mmsi: "123456789",
     vessel_imo: null,
+    origin_port_id: null,
+    destination_port_id: null,
     landed_cost: null,
     status: "Departed",
     eta: null,

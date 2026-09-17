@@ -17,6 +17,7 @@ import { toast } from "sonner";
 
 import { AppShell, btnGhost, btnPrimary, fieldClass } from "@/components/AppShell";
 import { DocumentFiles } from "@/components/DocumentFiles";
+import { PortAutocomplete } from "@/components/PortAutocomplete";
 import { ShipmentNotes } from "@/components/ShipmentNotes";
 import { ShipmentTimeline } from "@/components/ShipmentTimeline";
 import { StatusHistory } from "@/components/StatusHistory";
@@ -31,6 +32,7 @@ import {
   listAlerts,
   listDocuments,
   listEvents,
+  listPorts,
   nextStatus,
   saveShipmentDetails,
   shortId,
@@ -149,6 +151,7 @@ function ShipmentDetail() {
     queryFn: () => listEvents(id),
   });
   const { data: alerts = [] } = useQuery({ queryKey: ["alerts"], queryFn: listAlerts });
+  const { data: ports = [] } = useQuery({ queryKey: ["ports"], queryFn: () => listPorts() });
   const { data: position } = useQuery({
     queryKey: ["vesselPosition", shipment?.vessel_mmsi ?? null],
     queryFn: () => getVesselPositionForShipment({ vessel_mmsi: shipment?.vessel_mmsi ?? null }),
@@ -181,7 +184,9 @@ function ShipmentDetail() {
       await saveShipmentDetails(shipment, {
         client_name: draft.client_name,
         origin: draft.origin,
+        origin_port_id: draft.origin_port_id,
         destination: draft.destination,
+        destination_port_id: draft.destination_port_id,
         vessel_name: draft.vessel_name || null,
         vessel_mmsi: draft.vessel_mmsi || null,
         landed_cost: draft.landed_cost == null ? null : Number(draft.landed_cost),
@@ -546,20 +551,20 @@ function ShipmentDetail() {
                   }
                 />
               </Field>
-              <Field label="Origin">
-                <input
-                  className={fieldClass}
-                  value={draft.origin}
-                  onChange={(e) => setDraft({ ...draft, origin: e.target.value })}
-                />
-              </Field>
-              <Field label="Destination">
-                <input
-                  className={fieldClass}
-                  value={draft.destination}
-                  onChange={(e) => setDraft({ ...draft, destination: e.target.value })}
-                />
-              </Field>
+              <PortAutocomplete
+                label="Origin"
+                value={draft.origin}
+                portId={draft.origin_port_id}
+                ports={ports}
+                onChange={({ text, portId }) => setDraft({ ...draft, origin: text, origin_port_id: portId })}
+              />
+              <PortAutocomplete
+                label="Destination"
+                value={draft.destination}
+                portId={draft.destination_port_id}
+                ports={ports}
+                onChange={({ text, portId }) => setDraft({ ...draft, destination: text, destination_port_id: portId })}
+              />
               <Field label="Vessel">
                 <input
                   className={fieldClass}

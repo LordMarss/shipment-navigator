@@ -68,6 +68,12 @@ export type Shipment = {
   vessel_mmsi: string | null;
   vessel_imo: string | null;
   landed_cost: number | null;
+  /** Structured port reference, optional — free-text origin/destination
+   * above remain the source of truth for display; these only enable
+   * destination-aware AIS geofencing. Null for any shipment created before
+   * this field existed, or whose port isn't in the seeded dataset. */
+  origin_port_id: string | null;
+  destination_port_id: string | null;
   status: ShipmentStatus;
   /** Current/latest ETA. `planned_eta` holds the original estimate. */
   eta: string | null;
@@ -329,6 +335,34 @@ export async function getVesselPositionForShipment(
   return (data as VesselPosition | null) ?? null;
 }
 
+/**
+ * Structured port reference data (seeded, MVP-accurate coordinates — see
+ * the migration for sourcing notes). Read-only from the client; nothing
+ * here writes to `ports`.
+ */
+export type Port = {
+  id: string;
+  name: string;
+  unlocode: string | null;
+  country: string | null;
+  latitude: number;
+  longitude: number;
+  geofence_radius_km: number;
+  created_at: string;
+};
+
+export async function listPorts(db: Db = supabase) {
+  const { data, error } = await db.from("ports").select("*").order("name");
+  if (error) throw error;
+  return (data ?? []) as Port[];
+}
+
+export async function getPortById(id: string, db: Db = supabase): Promise<Port | null> {
+  const { data, error } = await db.from("ports").select("*").eq("id", id).maybeSingle();
+  if (error) throw error;
+  return (data as Port | null) ?? null;
+}
+
 export async function listDocuments(shipmentId: string) {
   const { data, error } = await supabase
     .from("documents")
@@ -371,6 +405,8 @@ export async function createShipment(input: {
   client_name: string;
   origin: string;
   destination: string;
+  origin_port_id?: string | null;
+  destination_port_id?: string | null;
   vessel_name: string | null;
   vessel_mmsi: string | null;
   landed_cost: number | null;

@@ -8,7 +8,7 @@
  */
 import assert from "node:assert/strict";
 
-import { ACTIVE_STATUSES, type ActiveShipmentStatus, type Shipment, type VesselPosition } from "@/lib/api";
+import { ACTIVE_STATUSES, type ActiveShipmentStatus, type Port, type Shipment, type VesselPosition } from "@/lib/api";
 import { DEFAULT_MONITORING_CONFIG } from "@/lib/lifecycle";
 import {
   AIS_CONFIRMATION_MINUTES,
@@ -34,6 +34,8 @@ function makeShipment(overrides: Partial<Shipment> = {}): Shipment {
     vessel_name: "Test Vessel",
     vessel_mmsi: "123456789",
     vessel_imo: null,
+    origin_port_id: null,
+    destination_port_id: null,
     landed_cost: null,
     status: "Booked",
     eta: null,
@@ -79,7 +81,30 @@ function makePosition(overrides: Partial<VesselPosition> = {}): VesselPosition {
   };
 }
 
+function makePort(overrides: Partial<Port> = {}): Port {
+  return {
+    id: "test-port",
+    name: "Test Port",
+    unlocode: "ZZTST",
+    country: "Testland",
+    latitude: 10,
+    longitude: 10,
+    geofence_radius_km: 20,
+    created_at: new Date(NOW).toISOString(),
+    ...overrides,
+  };
+}
+
 const config = DEFAULT_MONITORING_CONFIG;
+const DESTINATION_PORT = makePort();
+// ~7.8km from DESTINATION_PORT — inside its 20km geofence.
+const INSIDE_GEOFENCE = { latitude: 10.05, longitude: 10.05 };
+// ~78km from DESTINATION_PORT — outside the 20km geofence, but still an
+// "intermediate port" nearby-ish, not on the other side of the planet.
+const OUTSIDE_GEOFENCE = { latitude: 10.5, longitude: 10.5 };
+// ~780km from DESTINATION_PORT — outside even the wide Approaching
+// Destination proximity multiplier (20km * 10 = 200km).
+const FAR_AWAY = { latitude: 15, longitude: 15 };
 
 let passed = 0;
 let failed = 0;
@@ -296,6 +321,116 @@ test("L: a shipment far from its monitoring window ignores AIS entirely", () => 
   const shipment = makeShipment({ status: "Booked", planned_etd: new Date(NOW + 90 * DAY).toISOString() });
   const position = makePosition({ sog: 20, nav_status: "0" });
   const decision = deriveAisAutomation(shipment, position, config, NOW);
+  assert.equal(decision.statusChanged, false);
+  assert.equal(decision.pendingStatus, null);
+});
+
+// N. Destination-aware geofencing — deriveAisAutomation()'s "Arrived" and
+// "Approaching Destination" evidence when a shipment has a destination_port_id.
+test("N1: vessel stopped inside the destination geofence sets a pending Arrived candidate", () => {
+  const shipment = makeShipment({ status: "Approaching Destination", destination_port_id: DESTINATION_PORT.id });
+  const stopped = makePosition({ sog: 0, nav_status: "5", ...INSIDE_GEOFENCE });
+  const decision = deriveAisAutomation(shipment, stopped, config, NOW, DESTINATION_PORT);
+  assert.equal(decision.statusChanged, false, "first observation is only a pending candidate");
+  assert.equal(decision.pendingStatus, "Arrived");
+  assert.match(decision.reason, /inside the Test Port geofence/i);
+});
+
+test("N2: second qualifying observation 15+ minutes later promotes to Arrived", () => {
+  let shipment = makeShipment({ status: "Approaching Destination", destination_port_id: DESTINATION_PORT.id });
+  const stopped = makePosition({ sog: 0, nav_status: "5", ...INSIDE_GEOFENCE });
+
+  const first = deriveAisAutomation(shipment, stopped, config, NOW, DESTINATION_PORT);
+  shipment = { ...shipment, ais_pending_status: first.pendingStatus, ais_pending_since: first.pendingSince };
+
+  const later = NOW + (AIS_CONFIRMATION_MINUTES + 1) * MINUTE;
+  const second = deriveAisAutomation(
+    shipment,
+    { ...stopped, position_timestamp: new Date(later).toISOString() },
+    config,
+    later,
+    DESTINATION_PORT,
+  );
+  assert.equal(second.status, "Arrived");
+  assert.equal(second.statusChanged, true);
+  assert.equal(second.source, "ais");
+});
+
+test("N3: vessel stopped outside the destination geofence remains at the current status", () => {
+  const shipment = makeShipment({ status: "Approaching Destination", destination_port_id: DESTINATION_PORT.id });
+  const stopped = makePosition({ sog: 0, nav_status: "5", ...OUTSIDE_GEOFENCE });
+  const decision = deriveAisAutomation(shipment, stopped, config, NOW, DESTINATION_PORT);
+  assert.equal(decision.status, "Approaching Destination");
+  assert.equal(decision.statusChanged, false);
+  assert.equal(decision.pendingStatus, null, "outside the geofence is not even a pending Arrived candidate");
+  assert.match(decision.reason, /outside its 20 km geofence/i);
+});
+
+test("N4: vessel stopped at an intermediate port (far from destination) remains In Transit", () => {
+  const shipment = makeShipment({
+    status: "In Transit",
+    eta: null,
+    planned_eta: null,
+    destination_port_id: DESTINATION_PORT.id,
+  });
+  const stoppedFarAway = makePosition({ sog: 0, nav_status: "5", ...FAR_AWAY });
+  const decision = deriveAisAutomation(shipment, stoppedFarAway, config, NOW, DESTINATION_PORT);
+  assert.equal(decision.status, "In Transit");
+  assert.equal(decision.statusChanged, false);
+});
+
+test("N5: vessel underway inside the destination geofence does not immediately become Arrived", () => {
+  const shipment = makeShipment({ status: "Approaching Destination", destination_port_id: DESTINATION_PORT.id });
+  const underway = makePosition({ sog: 12, nav_status: "0", ...INSIDE_GEOFENCE });
+  const decision = deriveAisAutomation(shipment, underway, config, NOW, DESTINATION_PORT);
+  assert.equal(decision.statusChanged, false);
+  assert.equal(decision.pendingStatus, null, "under way is never evidence of arrival, regardless of location");
+});
+
+test("N6: stale AIS inside the destination geofence does not trigger Arrived", () => {
+  const shipment = makeShipment({ status: "Approaching Destination", destination_port_id: DESTINATION_PORT.id });
+  const staleStopped = makePosition({
+    sog: 0,
+    nav_status: "5",
+    ...INSIDE_GEOFENCE,
+    position_timestamp: new Date(NOW - 48 * HOUR).toISOString(),
+  });
+  const decision = deriveAisAutomation(shipment, staleStopped, config, NOW, DESTINATION_PORT);
+  assert.equal(decision.statusChanged, false);
+  assert.equal(decision.pendingStatus, null);
+});
+
+test("N7: no destination_port_id preserves the original stop-anywhere-counts-as-arrival behavior", () => {
+  let shipment = makeShipment({ status: "Approaching Destination", destination_port_id: null });
+  // Same coordinates as the FAR_AWAY fixture — would fail a geofence check,
+  // but there is no destination port to check against, so this must behave
+  // exactly as it did before this feature existed.
+  const stopped = makePosition({ sog: 0, nav_status: "5", ...FAR_AWAY });
+
+  const first = deriveAisAutomation(shipment, stopped, config, NOW, null);
+  assert.equal(first.pendingStatus, "Arrived");
+
+  shipment = { ...shipment, ais_pending_status: first.pendingStatus, ais_pending_since: first.pendingSince };
+  const later = NOW + (AIS_CONFIRMATION_MINUTES + 1) * MINUTE;
+  const second = deriveAisAutomation(
+    shipment,
+    { ...stopped, position_timestamp: new Date(later).toISOString() },
+    config,
+    later,
+    null,
+  );
+  assert.equal(second.status, "Arrived");
+  assert.equal(second.statusChanged, true);
+});
+
+test("N8: a shipment already at the terminal Arrived status is never regressed or re-evaluated", () => {
+  // Stands in for "manual override is not regressed": whether Arrived was
+  // set manually or automatically, there is no next candidate for it, so
+  // no amount of contradictory fresh AIS data can move or re-flag it.
+  const shipment = makeShipment({ status: "Arrived", destination_port_id: DESTINATION_PORT.id });
+  const underwayElsewhere = makePosition({ sog: 15, nav_status: "0", ...FAR_AWAY });
+  const decision = deriveAisAutomation(shipment, underwayElsewhere, config, NOW, DESTINATION_PORT);
+  assert.equal(decision.status, "Arrived");
   assert.equal(decision.statusChanged, false);
   assert.equal(decision.pendingStatus, null);
 });

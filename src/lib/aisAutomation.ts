@@ -49,16 +49,27 @@ import {
   type Db,
   type EventSource,
   type MonitoringState,
+  type Port,
   type Shipment,
   type ShipmentStatus,
   type VesselPosition,
 } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
+import { haversineDistanceKm } from "@/lib/geo";
 import { monitoringInfo, type MonitoringConfig } from "@/lib/lifecycle";
 import { APPROACHING_WITHIN_HOURS } from "@/lib/autoStatus";
 
 const HOUR = 3_600_000;
 const MINUTE = 60_000;
+/**
+ * How much wider than the destination's own geofence counts as "getting
+ * close" for the (destination-aware) Approaching Destination signal — an
+ * MVP heuristic, not a claim about real approach distance for any given
+ * port. The ETA-window check below remains the primary signal; this is
+ * purely additive (an OR), so a shipment with no destination_port_id
+ * behaves exactly as before.
+ */
+export const APPROACH_RADIUS_MULTIPLIER = 10;
 
 /** Beyond this age, a position is no longer trusted as current evidence. */
 export const AIS_STALE_HOURS = 24;
@@ -138,12 +149,10 @@ function isStopped(position: VesselPosition): boolean {
 }
 
 /**
- * MVP approximation, not geographic destination detection: this repo has no
- * port coordinates for origin/destination (they're free-text strings) and no
- * ports reference table, so "approaching the destination" cannot be computed
- * from actual distance. Proximity to the current ETA is used as a time-based
- * stand-in instead. A real geofence would need a schema addition (port
- * lat/lon or a ports table) — out of scope for this phase.
+ * Time-based stand-in for "approaching the destination": proximity to the
+ * current ETA. Kept as-is (and still the primary signal below) even now
+ * that a structured destination may exist — an ETA can be a useful "getting
+ * close" signal on its own, independent of exact position.
  */
 function etaWithinApproachWindow(shipment: Shipment, now: number): boolean {
   const eta = shipment.eta ?? shipment.planned_eta;
@@ -152,9 +161,26 @@ function etaWithinApproachWindow(shipment: Shipment, now: number): boolean {
   return hoursToEta <= APPROACHING_WITHIN_HOURS;
 }
 
+/** Distance from a position to a port, in kilometers. */
+function distanceToPortKm(position: VesselPosition, port: Port): number {
+  return haversineDistanceKm(position.latitude, position.longitude, port.latitude, port.longitude);
+}
+
+/** Additive destination-aware signal for "getting close" — a wider radius
+ * around the same port used for the (stricter) arrival geofence. */
+function withinApproachRange(position: VesselPosition, port: Port): boolean {
+  return distanceToPortKm(position, port) <= port.geofence_radius_km * APPROACH_RADIUS_MULTIPLIER;
+}
+
 type Evidence = { ok: boolean; reason: string };
 
-function evidenceFor(nextCandidate: ActiveShipmentStatus, shipment: Shipment, position: VesselPosition | null, now: number): Evidence {
+function evidenceFor(
+  nextCandidate: ActiveShipmentStatus,
+  shipment: Shipment,
+  position: VesselPosition | null,
+  now: number,
+  destinationPort: Port | null,
+): Evidence {
   const fresh = isAisFresh(position, now);
   switch (nextCandidate) {
     case "Departed": {
@@ -181,25 +207,46 @@ function evidenceFor(nextCandidate: ActiveShipmentStatus, shipment: Shipment, po
     }
     case "Approaching Destination": {
       const withinWindow = etaWithinApproachWindow(shipment, now);
-      const ok = fresh && withinWindow;
-      return {
-        ok,
-        reason: !withinWindow
-          ? "Not yet within the approach window"
-          : fresh
-            ? `Within ${APPROACHING_WITHIN_HOURS}h of the current ETA and AIS is still reporting`
-            : `Within ${APPROACHING_WITHIN_HOURS}h of the current ETA, but AIS has gone stale`,
-      };
-    }
-    case "Arrived": {
-      const ok = fresh && isStopped(position!);
+      // Additive only: a structured destination can also qualify this on
+      // its own (e.g. ETA is stale/wrong but the vessel is genuinely
+      // getting close). Never removes or narrows the ETA-window path.
+      const withinRange = fresh && destinationPort ? withinApproachRange(position!, destinationPort) : false;
+      const ok = fresh && (withinWindow || withinRange);
       return {
         ok,
         reason: ok
-          ? "AIS shows the vessel stopped (moored/at anchor)"
+          ? withinWindow
+            ? `Within ${APPROACHING_WITHIN_HOURS}h of the current ETA and AIS is still reporting`
+            : `Within range of ${destinationPort!.name} and AIS is still reporting`
           : fresh
+            ? "Not yet within the approach window or destination range"
+            : "Within the approach window, but AIS has gone stale",
+      };
+    }
+    case "Arrived": {
+      const stopped = fresh && isStopped(position!);
+      if (!stopped) {
+        return {
+          ok: false,
+          reason: fresh
             ? "AIS position received, but the vessel is not yet confirmed stopped"
             : "No fresh AIS position — cannot confirm arrival",
+        };
+      }
+      if (!destinationPort) {
+        // No structured destination on this shipment — preserve the exact
+        // prior behavior (a confirmed stop anywhere is treated as arrival).
+        // See isStopped()'s own comment: this schema has no other location
+        // signal to check without one.
+        return { ok: true, reason: "AIS shows the vessel stopped (moored/at anchor)" };
+      }
+      const distanceKm = distanceToPortKm(position!, destinationPort);
+      const inGeofence = distanceKm <= destinationPort.geofence_radius_km;
+      return {
+        ok: inGeofence,
+        reason: inGeofence
+          ? `AIS shows the vessel stopped inside the ${destinationPort.name} geofence (${distanceKm.toFixed(1)} km, radius ${destinationPort.geofence_radius_km} km)`
+          : `Vessel is stopped but ${distanceKm.toFixed(1)} km from ${destinationPort.name} — outside its ${destinationPort.geofence_radius_km} km geofence, treated as an intermediate stop`,
       };
     }
     default:
@@ -252,6 +299,7 @@ export function deriveAisAutomation(
   position: VesselPosition | null,
   config: MonitoringConfig,
   now: number = Date.now(),
+  destinationPort: Port | null = null,
 ): AisDecision {
   const monitoring = monitoringInfo(shipment, config);
 
@@ -284,7 +332,7 @@ export function deriveAisAutomation(
     const nextCandidate = ACTIVE_STATUSES[rank(status) + 1] as ActiveShipmentStatus | undefined;
 
     if (nextCandidate) {
-      const evidence = evidenceFor(nextCandidate, shipment, position, now);
+      const evidence = evidenceFor(nextCandidate, shipment, position, now, destinationPort);
       const result = confirmCandidate(shipment, nextCandidate, evidence.ok, now);
       pendingStatus = result.pendingStatus;
       pendingSince = result.pendingSince;

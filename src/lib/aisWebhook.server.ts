@@ -9,7 +9,7 @@
  * truth for what qualifies as a status change, including the 15-minute
  * confirmation and staleness rules — this module never touches that logic.
  */
-import { getVesselPositionForShipment, isLegacyStatus, type Db, type Shipment } from "@/lib/api";
+import { getPortById, getVesselPositionForShipment, isLegacyStatus, type Db, type Port, type Shipment } from "@/lib/api";
 import { applyAisDecision, deriveAisAutomation } from "@/lib/aisAutomation";
 import { DEFAULT_MONITORING_CONFIG, type MonitoringConfig } from "@/lib/lifecycle";
 
@@ -69,9 +69,19 @@ export async function evaluateAisPositionForMmsi(
   const config = await loadConfig(db);
   const position = await getVesselPositionForShipment({ vessel_mmsi: mmsi }, db);
 
+  // Small per-run cache: multiple shipments can share the same destination
+  // port, so this avoids re-fetching it once per shipment in that case.
+  const portCache = new Map<string, Port | null>();
+  const loadDestinationPort = async (portId: string | null): Promise<Port | null> => {
+    if (!portId) return null;
+    if (!portCache.has(portId)) portCache.set(portId, await getPortById(portId, db));
+    return portCache.get(portId) ?? null;
+  };
+
   let updated = 0;
   for (const shipment of shipments) {
-    const decision = deriveAisAutomation(shipment, position, config, now);
+    const destinationPort = await loadDestinationPort(shipment.destination_port_id);
+    const decision = deriveAisAutomation(shipment, position, config, now, destinationPort);
     const pendingChanged =
       decision.pendingStatus !== shipment.ais_pending_status || decision.pendingSince !== shipment.ais_pending_since;
 

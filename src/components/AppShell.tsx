@@ -208,8 +208,8 @@ function TopBar({ onMenu }: { onMenu: () => void }) {
   );
 }
 
-function useDismiss(onClose: () => void) {
-  const ref = useRef<HTMLDivElement | null>(null);
+export function useDismiss<T extends HTMLElement = HTMLDivElement>(onClose: () => void) {
+  const ref = useRef<T | null>(null);
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) onClose();

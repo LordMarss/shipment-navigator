@@ -1,16 +1,19 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useState, type ReactNode } from "react";
 import { Check } from "lucide-react";
 import { toast } from "sonner";
 
 import { btnGhost, btnPrimary, fieldClass } from "@/components/AppShell";
-import { createShipment } from "@/lib/api";
+import { PortAutocomplete } from "@/components/PortAutocomplete";
+import { createShipment, listPorts } from "@/lib/api";
 
 const EMPTY = {
   client_name: "",
   origin: "",
+  origin_port_id: null as string | null,
   destination: "",
+  destination_port_id: null as string | null,
   vessel_name: "",
   vessel_mmsi: "",
   landed_cost: "",
@@ -27,6 +30,7 @@ export function NewShipmentForm({ onClose }: { onClose: () => void }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [form, setForm] = useState(EMPTY);
+  const { data: ports = [] } = useQuery({ queryKey: ["ports"], queryFn: () => listPorts() });
 
   const mmsi = form.vessel_mmsi.trim();
   const mmsiValid = /^\d{9}$/.test(mmsi);
@@ -36,7 +40,9 @@ export function NewShipmentForm({ onClose }: { onClose: () => void }) {
       createShipment({
         client_name: form.client_name.trim(),
         origin: form.origin.trim(),
+        origin_port_id: form.origin_port_id,
         destination: form.destination.trim(),
+        destination_port_id: form.destination_port_id,
         vessel_name: form.vessel_name.trim() || null,
         vessel_mmsi: mmsi || null,
         landed_cost: form.landed_cost === "" ? null : Number(form.landed_cost),
@@ -79,24 +85,24 @@ export function NewShipmentForm({ onClose }: { onClose: () => void }) {
             placeholder="Northline Trading"
           />
         </Field>
-        <Field label="Origin">
-          <input
-            className={fieldClass}
-            required
-            value={form.origin}
-            onChange={(e) => setForm({ ...form, origin: e.target.value })}
-            placeholder="Shanghai, CN"
-          />
-        </Field>
-        <Field label="Destination">
-          <input
-            className={fieldClass}
-            required
-            value={form.destination}
-            onChange={(e) => setForm({ ...form, destination: e.target.value })}
-            placeholder="Vancouver, CA"
-          />
-        </Field>
+        <PortAutocomplete
+          label="Origin"
+          required
+          value={form.origin}
+          portId={form.origin_port_id}
+          ports={ports}
+          placeholder="Shanghai, CN"
+          onChange={({ text, portId }) => setForm({ ...form, origin: text, origin_port_id: portId })}
+        />
+        <PortAutocomplete
+          label="Destination"
+          required
+          value={form.destination}
+          portId={form.destination_port_id}
+          ports={ports}
+          placeholder="Vancouver, CA"
+          onChange={({ text, portId }) => setForm({ ...form, destination: text, destination_port_id: portId })}
+        />
       </Section>
 
       <Section index="02" title="Vessel" hint="An MMSI enables live tracking on the fleet map.">

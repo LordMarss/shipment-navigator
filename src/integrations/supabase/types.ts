@@ -145,6 +145,39 @@ export type Database = {
           },
         ]
       }
+      ports: {
+        Row: {
+          country: string | null
+          created_at: string
+          geofence_radius_km: number
+          id: string
+          latitude: number
+          longitude: number
+          name: string
+          unlocode: string | null
+        }
+        Insert: {
+          country?: string | null
+          created_at?: string
+          geofence_radius_km?: number
+          id?: string
+          latitude: number
+          longitude: number
+          name: string
+          unlocode?: string | null
+        }
+        Update: {
+          country?: string | null
+          created_at?: string
+          geofence_radius_km?: number
+          id?: string
+          latitude?: number
+          longitude?: number
+          name?: string
+          unlocode?: string | null
+        }
+        Relationships: []
+      }
       shipment_events: {
         Row: {
           actor: string | null
@@ -251,6 +284,7 @@ export type Database = {
           created_at: string
           customer_reference: string | null
           destination: string
+          destination_port_id: string | null
           eta: string | null
           health: string
           health_reason: string | null
@@ -260,6 +294,7 @@ export type Database = {
           monitoring_start_offset_days: number | null
           monitoring_state: string
           origin: string
+          origin_port_id: string | null
           planned_eta: string | null
           planned_etd: string | null
           previous_eta: string | null
@@ -284,6 +319,7 @@ export type Database = {
           created_at?: string
           customer_reference?: string | null
           destination: string
+          destination_port_id?: string | null
           eta?: string | null
           health?: string
           health_reason?: string | null
@@ -293,6 +329,7 @@ export type Database = {
           monitoring_start_offset_days?: number | null
           monitoring_state?: string
           origin: string
+          origin_port_id?: string | null
           planned_eta?: string | null
           planned_etd?: string | null
           previous_eta?: string | null
@@ -317,6 +354,7 @@ export type Database = {
           created_at?: string
           customer_reference?: string | null
           destination?: string
+          destination_port_id?: string | null
           eta?: string | null
           health?: string
           health_reason?: string | null
@@ -326,6 +364,7 @@ export type Database = {
           monitoring_start_offset_days?: number | null
           monitoring_state?: string
           origin?: string
+          origin_port_id?: string | null
           planned_eta?: string | null
           planned_etd?: string | null
           previous_eta?: string | null
@@ -336,7 +375,22 @@ export type Database = {
           vessel_mmsi?: string | null
           vessel_name?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "shipments_destination_port_id_fkey"
+            columns: ["destination_port_id"]
+            isOneToOne: false
+            referencedRelation: "ports"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shipments_origin_port_id_fkey"
+            columns: ["origin_port_id"]
+            isOneToOne: false
+            referencedRelation: "ports"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       vessel_positions: {
         Row: {
