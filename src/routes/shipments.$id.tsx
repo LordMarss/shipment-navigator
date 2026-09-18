@@ -124,7 +124,6 @@ function eventSourceLabel(e: ShipmentEvent) {
 
 const ACCENT_DOT: Record<StatusAccent, string> = {
   neutral: "bg-muted-foreground/60",
-  teal: "bg-teal",
   primary: "bg-primary",
   positive: "bg-positive",
   warning: "bg-warning",
@@ -132,8 +131,7 @@ const ACCENT_DOT: Record<StatusAccent, string> = {
 
 const ACCENT_RING: Record<StatusAccent, { border: string; bg: string; bgSoft: string; text: string }> = {
   neutral: { border: "border-muted-foreground", bg: "bg-muted-foreground", bgSoft: "bg-muted-foreground/10", text: "text-muted-foreground" },
-  teal: { border: "border-teal", bg: "bg-teal", bgSoft: "bg-teal-soft", text: "text-teal" },
-  primary: { border: "border-primary", bg: "bg-primary", bgSoft: "bg-primary/10", text: "text-primary" },
+  primary: { border: "border-primary", bg: "bg-primary", bgSoft: "bg-primary-soft", text: "text-primary-deep" },
   positive: { border: "border-positive", bg: "bg-positive", bgSoft: "bg-positive-soft", text: "text-positive" },
   warning: { border: "border-warning", bg: "bg-warning", bgSoft: "bg-warning-soft", text: "text-warning" },
 };
@@ -354,8 +352,8 @@ function ShipmentDetail() {
       </div>
 
       {tab === "overview" ? (
-        <div className="flex flex-col gap-4">
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_1fr]">
+        <div className="flex flex-col gap-8">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.4fr_1fr]">
             <section className="panel p-4">
               <h2 className="label-xs mb-2">Status</h2>
               <StatusPill status={shipment.status} size="lg" />
@@ -375,7 +373,7 @@ function ShipmentDetail() {
               <h2 className="label-xs mb-2">Current Vessel</h2>
               {shipment.vessel_name || shipment.vessel_mmsi ? (
                 <div className="flex items-center gap-3">
-                  <span className="flex size-12 shrink-0 items-center justify-center rounded-sm border border-teal/25 bg-teal-soft text-teal">
+                  <span className="flex size-12 shrink-0 items-center justify-center rounded-lg border border-primary/20 bg-primary-soft text-primary-deep">
                     <Ship className="size-5" />
                   </span>
                   <div className="min-w-0">
@@ -396,7 +394,7 @@ function ShipmentDetail() {
                 <div
                   className={`mt-3 rounded-[var(--radius)] border p-3 ${
                     position && hasFreshAis
-                      ? "border-teal/25 bg-teal-soft"
+                      ? "border-primary/20 bg-primary-soft"
                       : "border-border bg-subtle/60"
                   }`}
                 >
@@ -405,11 +403,11 @@ function ShipmentDetail() {
                       <div className="mb-3 flex items-center justify-between">
                         <span
                           className={`inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.07em] ${
-                            hasFreshAis ? "text-teal" : "text-muted-foreground"
+                            hasFreshAis ? "text-primary-deep" : "text-muted-foreground"
                           }`}
                         >
                           <span
-                            className={`size-1.5 rounded-full ${hasFreshAis ? "bg-teal live-pulse" : "bg-muted-foreground/50"}`}
+                            className={`size-1.5 rounded-full ${hasFreshAis ? "bg-primary live-pulse" : "bg-muted-foreground/50"}`}
                             aria-hidden
                           />
                           {hasFreshAis ? "Live AIS" : "AIS · stale"}
@@ -514,11 +512,11 @@ function ShipmentDetail() {
               ) : null}
             </section>
 
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-6">
               <ShipmentNotes shipmentId={id} />
 
-              <section className="panel p-4">
-                <h2 className="mb-3 text-[13px] font-semibold">Change History</h2>
+              <section>
+                <h2 className="label-xs mb-3">Change History</h2>
                 {statusEvents.length === 0 ? (
                   <p className="text-[12px] text-muted-foreground">No status changes recorded yet.</p>
                 ) : (
@@ -553,10 +551,10 @@ function ShipmentDetail() {
             </div>
           </div>
 
-          <section className="panel p-4">
-            <h2 className="mb-3 text-[13px] font-semibold">Lifecycle</h2>
+          <section>
+            <h2 className="label-xs mb-4">Lifecycle</h2>
             <LifecycleStepper status={shipment.status} legacyTerminal={legacyTerminal} currentIndex={currentIndex} />
-            <div className="mt-4 space-y-1 border-t border-border pt-3 text-[12px] text-muted-foreground">
+            <div className="mt-5 flex flex-col gap-1 border-t border-border pt-4 text-[12px] text-muted-foreground sm:flex-row sm:gap-6">
               <p>Monitoring: {monitoring.reason}</p>
               <p>
                 Automation:{" "}

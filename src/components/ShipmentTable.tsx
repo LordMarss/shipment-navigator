@@ -26,8 +26,8 @@ const SEVERITY_RANK: Record<Severity, number> = { critical: 0, attention: 1, inf
  * (updated_at), not a decorative animation. */
 function freshnessDot(updatedAt: string): string {
   const ageHours = (Date.now() - new Date(updatedAt).getTime()) / 3_600_000;
-  if (ageHours < 1) return "bg-teal";
-  if (ageHours < 24) return "bg-primary/50";
+  if (ageHours < 1) return "bg-primary";
+  if (ageHours < 24) return "bg-primary/45";
   return "bg-muted-foreground/30";
 }
 
@@ -353,7 +353,7 @@ function Th({
       {sortKey && onSort ? (
         <button
           type="button"
-          className="focus-ring rounded-sm transition-colors hover:text-foreground"
+          className="focus-ring rounded-sm uppercase transition-colors hover:text-foreground"
           onClick={() => onSort(sortKey)}
         >
           {content}

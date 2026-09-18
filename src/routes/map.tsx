@@ -75,7 +75,7 @@ function FleetMap() {
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-subtle px-3 py-2">
             <span className="inline-flex items-center gap-2 text-[12px] font-medium">
               {tracked ? (
-                <span className="inline-flex size-1.5 shrink-0 rounded-full bg-teal live-pulse" aria-hidden />
+                <span className="inline-flex size-1.5 shrink-0 rounded-full bg-primary live-pulse" aria-hidden />
               ) : null}
               {tracked
                 ? `Tracking ${shortId(tracked.id)} · ${tracked.vessel_name || "vessel"} (MMSI ${tracked.vessel_mmsi})`

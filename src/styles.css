@@ -6,23 +6,32 @@
 
 /*
  * WhiteWind Logistics design system.
- * A maritime operations palette: deep navy navigation, a rich operational
- * blue as the primary accent, teal/aqua for live AIS data, restrained
- * green/amber/red for status. Distinct surfaces (dark nav, tinted
- * workspace, white panels) create depth without heavy shadows or
- * gradients. One typeface (Inter). Small-to-moderate radii.
+ *
+ * One accent family: a refined, softened sky blue with a real tonal
+ * scale (fill, hover, soft background, selected tint, deep text) — not
+ * one flat colour reused everywhere, and no secondary accent hue. Every
+ * neutral (background, border, muted text) shares the same blue-gray
+ * hue as the accent, so the whole interface reads as one family.
+ *
+ * Green / amber / red exist only for genuine health / warning / risk
+ * meaning. No decorative colour anywhere else.
+ *
+ * A consistent, moderate radius scale is used everywhere (buttons,
+ * inputs, panels, menus) — intentional curvature, never sharp corners,
+ * never pill-shaped-everything. One typeface (Inter). Depth comes from
+ * borders and very restrained shadows, never gradients or blur.
  */
 
 @theme inline {
   --font-sans:
     "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --radius-sm: 3px;
-  --radius-md: 4px;
-  --radius-lg: 6px;
-  --radius-xl: 8px;
-  --radius-2xl: 10px;
-  --radius-3xl: 12px;
-  --radius-4xl: 14px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+  --radius-2xl: 14px;
+  --radius-3xl: 16px;
+  --radius-4xl: 20px;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-surface: var(--surface);
@@ -32,7 +41,10 @@
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-deep: var(--primary-deep);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
@@ -51,8 +63,6 @@
   --color-warning-soft: var(--warning-soft);
   --color-risk: var(--risk);
   --color-risk-soft: var(--risk-soft);
-  --color-teal: var(--teal);
-  --color-teal-soft: var(--teal-soft);
   --color-tint-selected: var(--tint-selected);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
@@ -72,62 +82,67 @@
 }
 
 :root {
-  --radius: 5px;
+  --radius: 10px;
 
-  /* soft slate-blue workspace canvas — visibly tinted, not white */
-  --background: oklch(0.955 0.008 240);
-  /* deep navy-black text, tied to the brand hue for cohesion */
-  --foreground: oklch(0.19 0.022 250);
-  /* panels lift off the tinted canvas as near-white */
-  --surface: oklch(0.995 0.002 240);
-  /* row / header fill — clearly visible against surface */
-  --subtle: oklch(0.94 0.009 240);
+  /* soft, barely-tinted blue-gray canvas — calm, not stark white */
+  --background: oklch(0.976 0.003 244);
+  /* deep, crisp near-black text with a whisper of the brand hue */
+  --foreground: oklch(0.2 0.016 244);
+  /* panels lift off the canvas as near-white */
+  --surface: oklch(0.996 0.001 244);
+  /* row / header fill — quiet, present without shouting */
+  --subtle: oklch(0.955 0.005 244);
   --card: var(--surface);
   --card-foreground: var(--foreground);
   --popover: var(--surface);
   --popover-foreground: var(--foreground);
 
-  /* rich operational blue — the primary accent */
-  --primary: oklch(0.44 0.14 254);
-  --primary-foreground: oklch(0.99 0.002 240);
+  /* Primary blue scale — one accent family, several tones. */
+  /* Clear-sky blue: the main fill for buttons, active states, icons. */
+  --primary: oklch(0.53 0.13 244);
+  --primary-hover: oklch(0.475 0.135 244);
+  --primary-foreground: oklch(0.99 0.002 244);
+  /* Pale blue background — info surfaces, active/soft states. */
+  --primary-soft: oklch(0.955 0.024 244);
+  /* Deeper blue for small text on light backgrounds (status pill labels)
+   * where the lighter primary alone would read too soft. */
+  --primary-deep: oklch(0.4 0.11 244);
 
-  --secondary: oklch(0.94 0.009 240);
+  --secondary: oklch(0.955 0.005 244);
   --secondary-foreground: var(--foreground);
-  --muted: oklch(0.94 0.009 240);
-  /* slate blue-grey secondary text — kept dark enough to stay legible */
-  --muted-foreground: oklch(0.455 0.022 245);
-  --accent: oklch(0.94 0.009 240);
+  --muted: oklch(0.955 0.005 244);
+  /* blue-gray secondary text — legible, never a generic flat gray */
+  --muted-foreground: oklch(0.5 0.015 244);
+  --accent: oklch(0.955 0.005 244);
   --accent-foreground: var(--foreground);
 
-  /* muted brick red — genuine exceptions only */
-  --destructive: oklch(0.5 0.16 22);
-  --destructive-foreground: oklch(0.99 0.002 240);
+  /* muted red — genuine exceptions only */
+  --destructive: oklch(0.5 0.15 22);
+  --destructive-foreground: oklch(0.99 0.002 244);
 
-  /* visible slate-blue hairlines — present, not invisible */
-  --border: oklch(0.865 0.014 240);
-  --input: oklch(0.865 0.014 240);
-  --ring: oklch(0.44 0.14 254);
+  /* extremely light hairlines — present on close inspection, not loud */
+  --border: oklch(0.892 0.007 244);
+  --input: oklch(0.892 0.007 244);
+  --ring: var(--primary);
 
   /* restrained green — healthy / success */
-  --positive: oklch(0.48 0.1 152);
-  --positive-soft: oklch(0.95 0.03 152);
-  /* amber — warnings */
-  --warning: oklch(0.62 0.13 70);
-  --warning-soft: oklch(0.95 0.035 70);
-  /* muted brick red — genuine exceptions */
-  --risk: oklch(0.5 0.16 22);
-  --risk-soft: oklch(0.95 0.03 22);
-  /* teal/aqua — live AIS & operational-activity accent */
-  --teal: oklch(0.58 0.09 195);
-  --teal-soft: oklch(0.94 0.03 195);
-  /* subtle blue tint for hovered/selected rows */
-  --tint-selected: oklch(0.925 0.02 250);
+  --positive: oklch(0.49 0.1 152);
+  --positive-soft: oklch(0.955 0.026 152);
+  /* amber — attention / warnings */
+  --warning: oklch(0.62 0.12 70);
+  --warning-soft: oklch(0.955 0.03 70);
+  /* muted red — genuine exceptions */
+  --risk: oklch(0.5 0.15 22);
+  --risk-soft: oklch(0.955 0.026 22);
+  /* very light blue wash — hovered/selected rows, the lightest step
+   * of the primary scale. */
+  --tint-selected: oklch(0.965 0.016 244);
 
   --chart-1: var(--primary);
   --chart-2: var(--positive);
   --chart-3: var(--warning);
   --chart-4: var(--risk);
-  --chart-5: var(--teal);
+  --chart-5: var(--muted-foreground);
 
   --sidebar: var(--nav);
   --sidebar-foreground: var(--nav-foreground);
@@ -138,15 +153,15 @@
   --sidebar-border: var(--nav-border);
   --sidebar-ring: var(--ring);
 
-  /* Dark-navy navigation shell — the product's own visual identity,
-   * distinct from the light workspace it opens onto. */
-  --nav: oklch(0.2 0.03 253);
-  --nav-elevated: oklch(0.175 0.028 253);
-  --nav-foreground: oklch(0.93 0.008 240);
-  --nav-muted-foreground: oklch(0.63 0.022 245);
-  --nav-active: oklch(0.32 0.09 253);
-  --nav-active-foreground: oklch(0.98 0.005 240);
-  --nav-border: oklch(0.28 0.035 253);
+  /* Dark-navy navigation shell, same hue family as the accent —
+   * distinctive without introducing a second colour identity. */
+  --nav: oklch(0.2 0.026 244);
+  --nav-elevated: oklch(0.175 0.024 244);
+  --nav-foreground: oklch(0.94 0.006 244);
+  --nav-muted-foreground: oklch(0.62 0.018 244);
+  --nav-active: oklch(0.32 0.085 244);
+  --nav-active-foreground: oklch(0.98 0.004 244);
+  --nav-border: oklch(0.275 0.03 244);
 }
 
 @layer base {
@@ -179,7 +194,8 @@
   }
 }
 
-/* Flat hairline panel: sits directly on the page, depth from borders only. */
+/* Flat hairline panel: sits directly on the page, depth from a very
+ * light border, never a heavy shadow. */
 @utility panel {
   background-color: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -194,8 +210,8 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   box-shadow:
-    0 1px 2px color-mix(in oklab, var(--color-foreground) 6%, transparent),
-    0 8px 24px -8px color-mix(in oklab, var(--color-foreground) 14%, transparent);
+    0 1px 2px color-mix(in oklab, var(--color-foreground) 5%, transparent),
+    0 10px 28px -10px color-mix(in oklab, var(--color-foreground) 14%, transparent);
 }
 
 @utility label-xs {

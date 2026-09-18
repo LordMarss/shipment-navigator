@@ -111,7 +111,7 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const body = (
     <div className="flex h-full flex-col bg-nav">
       <div className="flex h-14 shrink-0 items-center gap-2 border-b border-nav-border bg-nav-elevated px-4">
-        <span className="grid size-6 place-items-center rounded-sm bg-teal text-nav">
+        <span className="grid size-6 place-items-center rounded-md bg-primary text-primary-foreground">
           <Ship className="size-3.5" />
         </span>
         <span className="text-[12px] font-semibold uppercase tracking-[0.09em] text-nav-foreground">
@@ -141,19 +141,19 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
                     {active ? (
                       <span
                         aria-hidden
-                        className="absolute inset-y-1 left-0 w-[3px] rounded-full bg-teal"
+                        className="absolute inset-y-1 left-0 w-[3px] rounded-full bg-primary"
                       />
                     ) : null}
                     <Link
                       to={item.to}
-                      className={`group flex items-center gap-2 rounded-sm px-2.5 py-1.5 text-[13px] transition-colors ${
+                      className={`group flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[13px] transition-colors ${
                         active
                           ? "bg-nav-active font-medium text-nav-active-foreground"
                           : "text-nav-muted-foreground hover:bg-nav-elevated hover:text-nav-foreground"
                       }`}
                     >
                       <item.icon
-                        className={`size-3.5 shrink-0 ${active ? "text-teal" : "text-nav-muted-foreground group-hover:text-nav-foreground"}`}
+                        className={`size-3.5 shrink-0 ${active ? "text-primary" : "text-nav-muted-foreground group-hover:text-nav-foreground"}`}
                       />
                       <span className="truncate">{item.label}</span>
                     </Link>

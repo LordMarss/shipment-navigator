@@ -7,7 +7,6 @@ import { listAlerts } from "@/lib/api";
 
 const ACCENT_BORDER = {
   neutral: "border-l-border",
-  teal: "border-l-teal",
   primary: "border-l-primary",
   positive: "border-l-positive",
   warning: "border-l-warning",

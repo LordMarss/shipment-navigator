@@ -1,7 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { AlertTriangle, Anchor, CheckCircle2, MapPin, Package, type LucideIcon } from "lucide-react";
 
 import { AppShell, btnPrimary } from "@/components/AppShell";
 import { NewShipmentForm } from "@/components/NewShipmentForm";
@@ -18,8 +17,8 @@ const SEVERITY_BORDER: Record<Severity, string> = {
 };
 
 const SOURCE_BORDER: Record<string, string> = {
-  ais: "border-l-teal",
-  system: "border-l-primary",
+  ais: "border-l-primary",
+  system: "border-l-primary/50",
   manual: "border-l-border",
 };
 
@@ -115,17 +114,16 @@ function Dashboard() {
     >
       {open ? <NewShipmentForm onClose={() => setOpen(false)} /> : null}
 
-      <div className="mb-4 grid grid-cols-2 divide-x divide-y divide-border overflow-hidden rounded-[var(--radius)] border border-border bg-surface sm:grid-cols-3 sm:divide-y-0 lg:grid-cols-5">
-        <Instrument icon={Package} label="Active" value={stats.active} tone="primary" />
-        <Instrument icon={Anchor} label="In Transit" value={stats.inTransit} tone="primary" />
-        <Instrument icon={MapPin} label="Approaching" value={stats.approaching} tone="teal" />
-        <Instrument icon={CheckCircle2} label="Arrived" value={stats.arrived} tone="positive" />
-        <Instrument
-          icon={AlertTriangle}
-          label="Alerts"
-          value={stats.exceptions}
-          tone={stats.exceptions > 0 ? "risk" : "neutral"}
-        />
+      <div className="mb-8 flex flex-wrap items-start gap-x-10 gap-y-5">
+        <Metric label="Active" value={stats.active} />
+        <Divider />
+        <Metric label="In Transit" value={stats.inTransit} />
+        <Divider />
+        <Metric label="Approaching" value={stats.approaching} />
+        <Divider />
+        <Metric label="Arrived" value={stats.arrived} />
+        <Divider />
+        <Metric label="Alerts" value={stats.exceptions} alert={stats.exceptions > 0} />
       </div>
 
       <ShipmentTable
@@ -237,36 +235,23 @@ function Dashboard() {
   );
 }
 
-const INSTRUMENT_TONE = {
-  primary: "bg-primary/[0.09] text-primary",
-  teal: "bg-teal-soft text-teal",
-  positive: "bg-positive-soft text-positive",
-  risk: "bg-risk-soft text-risk",
-  neutral: "bg-subtle text-muted-foreground",
-} as const;
-
-function Instrument({
-  icon: Icon,
-  label,
-  value,
-  tone,
-}: {
-  icon: LucideIcon;
-  label: string;
-  value: number;
-  tone: keyof typeof INSTRUMENT_TONE;
-}) {
+/**
+ * One cohesive line of operational numbers, not five separate cards.
+ * Colour is used exactly once here — a small red dot when there are
+ * genuinely open alerts — everything else is pure typography.
+ */
+function Metric({ label, value, alert }: { label: string; value: number; alert?: boolean }) {
   return (
-    <div className="flex items-center gap-2.5 px-4 py-3">
-      <span className={`grid size-8 shrink-0 place-items-center rounded-sm ${INSTRUMENT_TONE[tone]}`}>
-        <Icon className="size-4" />
+    <div className="flex flex-col gap-1.5">
+      <span className="label-xs">{label}</span>
+      <span className="inline-flex items-center gap-2 text-[26px] leading-none font-semibold tracking-tight tabular-nums text-foreground">
+        {alert ? <span aria-hidden className="size-[7px] rounded-full bg-risk" /> : null}
+        {value}
       </span>
-      <div className="min-w-0">
-        <p className="text-[19px] leading-none font-semibold tracking-[-0.01em] tabular-nums text-foreground">
-          {value}
-        </p>
-        <p className="mt-1 text-[11px] text-muted-foreground">{label}</p>
-      </div>
     </div>
   );
+}
+
+function Divider() {
+  return <span aria-hidden className="hidden h-9 w-px bg-border sm:block" />;
 }

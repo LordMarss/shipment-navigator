@@ -5,19 +5,19 @@ import type { ShipmentStatus } from "@/lib/api";
 import type { HealthLevel, MonitoringState, Severity } from "@/lib/lifecycle";
 
 /**
- * Each stage of the lifecycle gets its own meaning, not one flat accent:
+ * One consistent meaning per phase, not a different colour per stage:
  * Scheduled/Booked (not yet moving) — neutral slate.
- * Departed / Approaching Destination (transition points) — teal, the
- * same accent used for live AIS data, since these are AIS-observed moments.
- * In Transit (the long middle stretch, underway) — the primary operational blue.
+ * Departed / In Transit / Approaching Destination (all underway) — the
+ * same restrained blue; the icon (anchor / ship / pin) is what tells
+ * these apart, not the colour.
  * Arrived (success) — green. At Port (needs follow-up) — amber.
  */
 const TONE: Record<ShipmentStatus, string> = {
   Scheduled: "bg-subtle text-muted-foreground border-border",
   Booked: "bg-subtle text-muted-foreground border-border",
-  Departed: "bg-teal-soft text-teal border-teal/25",
-  "In Transit": "bg-primary/[0.08] text-primary border-primary/25",
-  "Approaching Destination": "bg-teal-soft text-teal border-teal/25",
+  Departed: "bg-primary-soft text-primary-deep border-primary/20",
+  "In Transit": "bg-primary-soft text-primary-deep border-primary/20",
+  "Approaching Destination": "bg-primary-soft text-primary-deep border-primary/20",
   Arrived: "bg-positive-soft text-positive border-positive/25",
   "At Port": "bg-warning-soft text-warning border-warning/25",
   "Cleared Customs": "bg-positive-soft text-positive border-positive/25",
@@ -27,16 +27,16 @@ const TONE: Record<ShipmentStatus, string> = {
 const DOT: Record<ShipmentStatus, string> = {
   Scheduled: "bg-muted-foreground/50",
   Booked: "bg-muted-foreground/50",
-  Departed: "bg-teal",
+  Departed: "bg-primary",
   "In Transit": "bg-primary",
-  "Approaching Destination": "bg-teal",
+  "Approaching Destination": "bg-primary",
   Arrived: "bg-positive",
   "At Port": "bg-warning",
   "Cleared Customs": "bg-positive",
   Delivered: "bg-positive",
 };
 
-export type StatusAccent = "neutral" | "teal" | "primary" | "positive" | "warning";
+export type StatusAccent = "neutral" | "primary" | "positive" | "warning";
 
 /** Which accent family a status belongs to — shared so the lifecycle
  * stepper and change history on the shipment detail page use exactly the
@@ -44,9 +44,8 @@ export type StatusAccent = "neutral" | "teal" | "primary" | "positive" | "warnin
 export function statusAccent(status: ShipmentStatus): StatusAccent {
   switch (status) {
     case "Departed":
-    case "Approaching Destination":
-      return "teal";
     case "In Transit":
+    case "Approaching Destination":
       return "primary";
     case "Arrived":
     case "Cleared Customs":
@@ -133,7 +132,7 @@ export function HealthBadge({ level }: { level: HealthLevel }) {
 const MONITORING: Record<MonitoringState, string> = {
   Scheduled: "bg-subtle text-muted-foreground border-border",
   "Pre-Monitoring": "bg-warning-soft text-warning border-warning/25",
-  "Active Monitoring": "bg-primary/[0.07] text-primary border-primary/20",
+  "Active Monitoring": "bg-primary-soft text-primary-deep border-primary/20",
   Completed: "bg-positive-soft text-positive border-positive/25",
 };
 
@@ -165,7 +164,7 @@ export function SeverityBadge({ severity, label }: { severity: Severity; label: 
 
 export function SourceTag({ source, automated }: { source: string; automated: boolean }) {
   const label = source === "ais" ? "AIS" : source === "system" ? "System" : "Manual";
-  const dot = !automated ? "bg-muted-foreground/40" : source === "ais" ? "bg-teal" : "bg-primary/70";
+  const dot = automated ? "bg-primary" : "bg-muted-foreground/40";
   return (
     <span className="inline-flex items-center gap-1 whitespace-nowrap text-[11px] text-muted-foreground">
       <span aria-hidden className={`size-1.5 rounded-full ${dot}`} />
@@ -190,13 +189,13 @@ export function DocsIndicator({ attached, total }: { attached: number; total: nu
 }
 
 const CONDITION_TONE: Record<VesselCondition["kind"], string> = {
-  underway: "bg-teal-soft text-teal border-teal/25",
+  underway: "bg-primary-soft text-primary-deep border-primary/20",
   stopped: "bg-warning-soft text-warning border-warning/25",
   unknown: "bg-subtle text-muted-foreground border-border",
 };
 
 const CONDITION_DOT: Record<VesselCondition["kind"], string> = {
-  underway: "bg-teal",
+  underway: "bg-primary",
   stopped: "bg-warning",
   unknown: "bg-muted-foreground/50",
 };
