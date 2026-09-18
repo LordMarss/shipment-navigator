@@ -5,23 +5,30 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * WhiteWind Logistics design system — v4 (visual rebuild).
+ * WhiteWind Logistics design system — v5.
  *
- * One accent family, used sparingly: a soft, restrained sky blue reserved
- * for interactive actions and the "underway" lifecycle meaning — nothing
- * else borrows it decoratively. Neutrals are true warm-ink grays, not
- * blue-tinted, so text reads as text rather than competing with the
- * accent. Status colour (green / amber / red) appears as exactly one
- * signal per element — a dot or a text colour, never border + background
- * + text all at once — and the green sits well clear of cyan so it never
- * drifts toward teal next to the blue.
+ * Identity: ocean, movement, precision, visibility. A shipment is a
+ * position moving along a route toward a known point — the interface
+ * says that visually wherever it can (a journey line instead of a
+ * generic progress bar, a heading arrow instead of a bare COG number,
+ * directional route text) rather than through decoration.
+ *
+ * Colour is a family built from one blue hue, not one flat accent plus
+ * grey: a mid blue for actions and the "underway" meaning, a pale wash
+ * for large calm backdrops, a deep navy for moments needing real
+ * contrast, and a blue-gray "slate" for secondary instrument text.
+ * Neutrals stay true warm-ink grays for body text, so the blue family
+ * still reads as deliberate rather than diluted. Status colour (green /
+ * amber / red) appears as exactly one signal per element — a dot or a
+ * text colour — and severity has real typographic weight behind it:
+ * critical is not styled the same as informational.
  *
  * Two container primitives only: `.panel` is a quiet surface (a hairline
  * border and a faint background shift, no shadow) reserved for things
  * that are genuinely distinct objects — a table, a form, a live widget.
  * `.panel-lifted` is the only surface that gets real shadow, reserved for
  * things that actually float above the page — menus, dropdowns, modals.
- * Most content needs neither: a label and hairline-divided rows are
+ * Most content needs neither: whitespace, alignment and a label are
  * enough. Radius is deliberate and role-based: controls (buttons, inputs)
  * use a tighter radius than containers (panels, menus), and pills are
  * used only for true status badges, not as a default label shape. No
@@ -73,7 +80,10 @@
   --color-primary-hover: var(--primary-hover);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary-soft: var(--primary-soft);
+  --color-primary-pale: var(--primary-pale);
   --color-primary-deep: var(--primary-deep);
+  --color-slate: var(--slate);
+  --color-navy: var(--navy);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
@@ -107,6 +117,8 @@
   --color-nav-muted-foreground: var(--nav-muted-foreground);
   --color-nav-active: var(--nav-active);
   --color-nav-active-foreground: var(--nav-active-foreground);
+  --color-nav-accent: var(--nav-accent);
+  --color-nav-label: var(--nav-label);
   --color-nav-border: var(--nav-border);
 }
 
@@ -128,13 +140,20 @@
   --popover: var(--surface);
   --popover-foreground: var(--foreground);
 
-  /* Accent — a single soft, restrained sky blue. Two jobs only:
-   * interactive actions, and the "underway" lifecycle meaning. */
+  /* Accent — a family of restrained blues built from one hue (241), not
+   * one flat colour: a soft mid blue for actions and the "underway"
+   * meaning, a pale wash for large backdrops, a deep navy for moments
+   * that need real contrast, and a blue-gray "slate" for secondary
+   * instrument text — so the interface reads as one considered ocean
+   * palette rather than "one accent plus grey." */
   --primary: oklch(0.585 0.096 241);
   --primary-hover: oklch(0.52 0.1 241);
   --primary-foreground: oklch(0.99 0.002 241);
   --primary-soft: oklch(0.958 0.018 241);
+  --primary-pale: oklch(0.975 0.01 241);
   --primary-deep: oklch(0.4 0.085 241);
+  --slate: oklch(0.52 0.025 235);
+  --navy: oklch(0.27 0.05 241);
 
   --secondary: oklch(0.958 0.004 78);
   --secondary-foreground: var(--foreground);
@@ -179,14 +198,21 @@
   --sidebar-ring: var(--ring);
 
   /* Dark navigation shell — same restrained hue family as the accent,
-   * quiet and flat (no gradient, no glow). */
-  --nav: oklch(0.205 0.02 241);
-  --nav-elevated: oklch(0.18 0.019 241);
-  --nav-foreground: oklch(0.93 0.005 241);
-  --nav-muted-foreground: oklch(0.6 0.015 241);
-  --nav-active: oklch(0.29 0.05 241);
-  --nav-active-foreground: oklch(0.98 0.003 241);
-  --nav-border: oklch(0.27 0.024 241);
+   * quiet and flat (no gradient, no glow), tuned deliberately for
+   * all-day legibility: a genuinely dark ground so lighter text has
+   * real headroom, a clearly brighter tone for the active item (not a
+   * near-invisible tint one step off the background), and a distinct
+   * pale accent hue used only for the active glyph/text so "you are
+   * here" reads as its own colour, not just "brighter". */
+  --nav: oklch(0.155 0.022 241);
+  --nav-elevated: oklch(0.205 0.026 241);
+  --nav-foreground: oklch(0.97 0.004 241);
+  --nav-muted-foreground: oklch(0.735 0.02 241);
+  --nav-label: oklch(0.52 0.03 241);
+  --nav-active: oklch(0.255 0.05 241);
+  --nav-active-foreground: oklch(0.985 0.003 241);
+  --nav-accent: oklch(0.8 0.075 214);
+  --nav-border: oklch(0.235 0.028 241);
 
   /* Motion — a single snappy-start/soft-landing curve for hover/press. */
   --ease-premium: cubic-bezier(0.16, 1, 0.3, 1);

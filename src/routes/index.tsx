@@ -88,12 +88,19 @@ function Dashboard() {
 
   const shipmentById = useMemo(() => new Map(shipments.map((s) => [s.id, s])), [shipments]);
 
+  // A clean, mutually-exclusive partition of every shipment for the mix
+  // bar below — not the overlapping "active" bucket used for the number,
+  // so the segments always sum to the full shipment count.
+  const mix = useMemo(() => {
+    const other = Math.max(0, shipments.length - stats.inTransit - stats.approaching - stats.arrived);
+    return { other, inTransit: stats.inTransit, approaching: stats.approaching, arrived: stats.arrived };
+  }, [shipments.length, stats]);
+  const mixTotal = shipments.length || 1;
+
   return (
     <AppShell
       title={`${greeting()}, StimTech Solutions`}
-      description={`Here's what's happening with your shipments today${
-        lastSync ? ` · monitoring last checked ${relativeTime(lastSync)}` : ""
-      }.`}
+      {...(lastSync ? { description: `Monitoring last checked ${relativeTime(lastSync)}.` } : {})}
       actions={
         <button className={btnPrimary} onClick={() => setOpen((v) => !v)}>
           {open ? "Cancel" : "New Shipment"}
@@ -102,12 +109,49 @@ function Dashboard() {
     >
       {open ? <NewShipmentForm onClose={() => setOpen(false)} /> : null}
 
-      <div className="mb-8 flex flex-wrap items-start gap-x-10 gap-y-5 border-b border-border pb-6">
-        <Stat label="Active" value={stats.active} />
-        <Stat label="In Transit" value={stats.inTransit} />
-        <Stat label="Approaching" value={stats.approaching} />
-        <Stat label="Arrived" value={stats.arrived} />
-        <Stat label="Alerts" value={stats.exceptions} {...(stats.exceptions > 0 ? { tone: "risk" as const } : {})} />
+      {/* Leads with what needs attention, before the stats do. */}
+      <div className="mb-6 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm">
+        {stats.exceptions > 0 ? (
+          <>
+            <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-risk" />
+            <span className="font-medium text-foreground">
+              {stats.exceptions} shipment{stats.exceptions === 1 ? "" : "s"} need attention
+            </span>
+            <Link to="/alerts" className="text-xs font-medium text-primary hover:underline">
+              Review →
+            </Link>
+          </>
+        ) : (
+          <>
+            <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-positive" />
+            <span className="text-muted-foreground">All shipments on track — nothing needs attention.</span>
+          </>
+        )}
+      </div>
+
+      <div className="mb-8 border-b border-border pb-6">
+        <div className="flex flex-wrap items-start gap-x-10 gap-y-5">
+          <Stat label="Active" value={stats.active} />
+          <Stat label="In Transit" value={stats.inTransit} />
+          <Stat label="Approaching" value={stats.approaching} />
+          <Stat label="Arrived" value={stats.arrived} />
+        </div>
+        {shipments.length > 0 ? (
+          <div className="mt-5 flex h-[3px] w-full overflow-hidden rounded-full bg-subtle" aria-hidden>
+            {mix.other > 0 ? (
+              <span className="bg-muted-foreground/25" style={{ width: `${(mix.other / mixTotal) * 100}%` }} />
+            ) : null}
+            {mix.inTransit > 0 ? (
+              <span className="bg-primary" style={{ width: `${(mix.inTransit / mixTotal) * 100}%` }} />
+            ) : null}
+            {mix.approaching > 0 ? (
+              <span className="bg-warning" style={{ width: `${(mix.approaching / mixTotal) * 100}%` }} />
+            ) : null}
+            {mix.arrived > 0 ? (
+              <span className="bg-positive" style={{ width: `${(mix.arrived / mixTotal) * 100}%` }} />
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       <ShipmentTable

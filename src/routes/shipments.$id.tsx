@@ -1,12 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
 import {
   ArrowLeft,
   ArrowRight,
   ArrowUp,
-  ArrowUpRight,
-  Check,
   ChevronRight,
   MapPin,
   MoreHorizontal,
@@ -27,6 +25,7 @@ import {
   ACTIVE_STATUSES,
   advanceStatus,
   deleteShipment,
+  formatEta,
   getShipment,
   getVesselPositionForShipment,
   listAlerts,
@@ -129,11 +128,11 @@ const ACCENT_DOT: Record<StatusAccent, string> = {
   warning: "bg-warning",
 };
 
-const ACCENT_RING: Record<StatusAccent, { border: string; bg: string; bgSoft: string; text: string }> = {
-  neutral: { border: "border-muted-foreground", bg: "bg-muted-foreground", bgSoft: "bg-muted-foreground/10", text: "text-muted-foreground" },
-  primary: { border: "border-primary", bg: "bg-primary", bgSoft: "bg-primary-soft", text: "text-primary-deep" },
-  positive: { border: "border-positive", bg: "bg-positive", bgSoft: "bg-positive-soft", text: "text-positive" },
-  warning: { border: "border-warning", bg: "bg-warning", bgSoft: "bg-warning-soft", text: "text-warning" },
+const ACCENT_RING: Record<StatusAccent, { bg: string; text: string }> = {
+  neutral: { bg: "bg-muted-foreground", text: "text-muted-foreground" },
+  primary: { bg: "bg-primary", text: "text-primary-deep" },
+  positive: { bg: "bg-positive", text: "text-positive" },
+  warning: { bg: "bg-warning", text: "text-warning" },
 };
 
 /** `shipment_events.to_value` is a plain string column — safely resolve it
@@ -299,6 +298,7 @@ function ShipmentDetail() {
   const shipmentAlerts = alerts.filter((a) => a.shipment_id === shipment.id);
   const statusEvents = events.filter(isStatusEvent);
   const lastStatusChange = statusEvents[0]?.occurred_at ?? shipment.updated_at;
+  const statusDot = ACCENT_DOT[statusAccent(shipment.status)];
 
   const openOverride = () => {
     setOverrideStatus((next ?? shipment.status) as ActiveShipmentStatus);
@@ -320,17 +320,14 @@ function ShipmentDetail() {
         </span>
       }
       actions={
-        <>
-          <StatusPill status={shipment.status} />
-          <HeaderMenu
-            next={next}
-            advancing={advance.isPending}
-            onAdvance={() => advance.mutate()}
-            onDelete={() => {
-              if (confirm("Delete this shipment and its documents?")) remove.mutate();
-            }}
-          />
-        </>
+        <HeaderMenu
+          next={next}
+          advancing={advance.isPending}
+          onAdvance={() => advance.mutate()}
+          onDelete={() => {
+            if (confirm("Delete this shipment and its documents?")) remove.mutate();
+          }}
+        />
       }
     >
       <div className="-mt-3 mb-6 flex gap-1 border-b border-border">
@@ -353,26 +350,78 @@ function ShipmentDetail() {
 
       {tab === "overview" ? (
         <div className="flex flex-col gap-9">
+          {/* Cockpit strip: the whole shipment at a glance, in the order it
+           * actually matters — current state, then route, then timing —
+           * before any panel asks you to read further. */}
+          <div className="flex flex-wrap items-start gap-x-10 gap-y-5 border-b border-border pb-6">
+            <HeaderStat
+              label="Status"
+              value={
+                <span className="inline-flex items-center gap-2">
+                  <span aria-hidden className={`size-2 shrink-0 rounded-full ${statusDot}`} />
+                  {shipment.status}
+                </span>
+              }
+            />
+            <HeaderStat
+              label="Route"
+              value={
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="truncate">{shipment.origin}</span>
+                  <ArrowRight className="size-4 shrink-0 text-muted-foreground" />
+                  <span className="truncate">{shipment.destination}</span>
+                </span>
+              }
+            />
+            <HeaderStat label="Vessel" value={shipment.vessel_name ?? "Unassigned"} />
+            <HeaderStat label="ETA" value={formatEta(shipment.eta)} />
+            <HeaderStat label="Updated" value={relativeTime(lastStatusChange)} />
+          </div>
+
+          {shipmentAlerts.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => setTab("alerts")}
+              className="-mt-4 flex items-center gap-2 text-left text-sm"
+            >
+              <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-risk" />
+              <span className="font-medium text-foreground">
+                {shipmentAlerts.length} alert{shipmentAlerts.length === 1 ? "" : "s"} on this shipment
+              </span>
+              <span className="text-xs font-medium text-primary">Review →</span>
+            </button>
+          ) : null}
+
+          <section>
+            <h2 className="label-xs mb-4">Lifecycle</h2>
+            <LifecycleJourney status={shipment.status} legacyTerminal={legacyTerminal} currentIndex={currentIndex} />
+            <div className="mt-5 flex flex-col gap-1 border-t border-border pt-4 text-xs text-muted-foreground sm:flex-row sm:gap-6">
+              <p>Monitoring: {monitoring.reason}</p>
+              <p>
+                Automation:{" "}
+                {decision.status === shipment.status ? "no pending change" : `will move to ${decision.status}`}
+                {" · "}
+                {decision.reason}
+              </p>
+            </div>
+          </section>
+
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.4fr_1fr]">
             <section className="panel p-5">
-              <h2 className="label-xs mb-2">Status</h2>
-              <StatusPill status={shipment.status} size="lg" />
-              {conditionLabel ? (
-                <div className="mt-2.5">
-                  <p className="label-xs mb-1">Operational</p>
-                  <VesselConditionBadge condition={vesselCondition} label={conditionLabel} />
-                </div>
-              ) : null}
-              <div className="mt-3">
-                <p className="label-xs">Last updated</p>
-                <p className="text-sm text-foreground">{formatDayTime(lastStatusChange)}</p>
+              <div className="flex items-center justify-between">
+                <h2 className="label-xs">Vessel &amp; Live Position</h2>
+                {shipment.vessel_mmsi ? (
+                  <Link
+                    to="/map"
+                    className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-primary hover:underline"
+                  >
+                    View on map <ArrowRight className="size-3.5" />
+                  </Link>
+                ) : null}
               </div>
 
-              <div className="my-4 border-t border-border" />
-
-              <h2 className="label-xs mb-2">Current Vessel</h2>
               {shipment.vessel_name || shipment.vessel_mmsi ? (
-                <div className="flex items-center gap-3">
+                <div className="mt-3 flex items-center gap-3">
                   <span className="flex size-11 shrink-0 items-center justify-center rounded-md border border-border bg-subtle text-muted-foreground">
                     <Ship className="size-5" />
                   </span>
@@ -383,22 +432,26 @@ function ShipmentDetail() {
                     <p className="text-xs text-muted-foreground">
                       {shipment.carrier ? `${shipment.carrier} · ` : ""}
                       MMSI {shipment.vessel_mmsi ?? "—"}
+                      {conditionLabel ? " · " : ""}
+                      {conditionLabel ? (
+                        <VesselConditionBadge condition={vesselCondition} label={conditionLabel} />
+                      ) : null}
                     </p>
                   </div>
                 </div>
               ) : (
-                <p className="text-xs text-muted-foreground">No vessel assigned to this shipment yet.</p>
+                <p className="mt-3 text-xs text-muted-foreground">No vessel assigned to this shipment yet.</p>
               )}
 
               {shipment.vessel_mmsi ? (
                 <div
-                  className={`mt-3 rounded-lg border p-3 ${
-                    position && hasFreshAis ? "border-primary/25 bg-primary-soft" : "border-border bg-subtle/60"
+                  className={`mt-4 rounded-lg border p-3.5 ${
+                    position && hasFreshAis ? "border-primary/25 bg-primary-pale" : "border-border bg-subtle/60"
                   }`}
                 >
                   {position ? (
                     <>
-                      <div className="mb-3 flex items-center justify-between">
+                      <div className="mb-3.5 flex items-center justify-between">
                         <span className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.06em] text-foreground">
                           <span
                             className={`size-1.5 rounded-full ${hasFreshAis ? "bg-primary live-pulse" : "bg-muted-foreground/50"}`}
@@ -406,24 +459,13 @@ function ShipmentDetail() {
                           />
                           {hasFreshAis ? "Live AIS" : "AIS · stale"}
                         </span>
-                        <Link
-                          to="/map"
-                          className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-primary hover:underline"
-                        >
-                          View on map <ArrowRight className="size-3.5" />
-                        </Link>
+                        <span className="text-xs text-slate">
+                          {relativeTime(position.position_timestamp ?? position.updated_at)}
+                        </span>
                       </div>
-                      <div className="grid grid-cols-3 gap-3">
-                        <AisRow
-                          icon={ArrowUp}
-                          label="SOG"
-                          value={position.sog != null ? `${position.sog.toFixed(1)} kn` : "—"}
-                        />
-                        <AisRow
-                          icon={ArrowUpRight}
-                          label="COG"
-                          value={position.cog != null ? `${position.cog}°` : "—"}
-                        />
+                      <div className="grid grid-cols-3 gap-4">
+                        <SpeedReadout sog={position.sog} />
+                        <HeadingReadout cog={position.cog} />
                         <AisRow icon={MapPin} label="Nav Status" value={navStatusLabel(position.nav_status)} />
                       </div>
                     </>
@@ -539,20 +581,6 @@ function ShipmentDetail() {
               </section>
             </div>
           </div>
-
-          <section>
-            <h2 className="label-xs mb-4">Lifecycle</h2>
-            <LifecycleStepper status={shipment.status} legacyTerminal={legacyTerminal} currentIndex={currentIndex} />
-            <div className="mt-5 flex flex-col gap-1 border-t border-border pt-4 text-xs text-muted-foreground sm:flex-row sm:gap-6">
-              <p>Monitoring: {monitoring.reason}</p>
-              <p>
-                Automation:{" "}
-                {decision.status === shipment.status ? "no pending change" : `will move to ${decision.status}`}
-                {" · "}
-                {decision.reason}
-              </p>
-            </div>
-          </section>
 
           <form
             className="panel p-5"
@@ -776,27 +804,85 @@ function HeaderMenu({
   );
 }
 
+/** Label-over-value readout — the same visual language as the dashboard's
+ * KPI strip, reused here so a shipment's vitals read the same way an
+ * operator already reads the fleet's. */
+function HeaderStat({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <span className="label-xs">{label}</span>
+      <span className="truncate text-lg font-semibold text-foreground">{value}</span>
+    </div>
+  );
+}
+
 function AisRow({
   icon: Icon,
   label,
   value,
 }: {
-  icon: React.ComponentType<{ className?: string }>;
+  icon: ComponentType<{ className?: string }>;
   label: string;
   value: string;
 }) {
   return (
     <div className="min-w-0">
-      <p className="flex items-center gap-1 text-xs text-muted-foreground">
+      <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <Icon className="size-3 shrink-0" />
         {label}
       </p>
-      <p className="mt-0.5 truncate text-base font-semibold tabular-nums text-foreground">{value}</p>
+      <p className="mt-1 truncate text-base font-semibold tabular-nums text-foreground">{value}</p>
     </div>
   );
 }
 
-function LifecycleStepper({
+/** Speed over ground as an instrument, not just a number — a bounded bar
+ * (0–28kn, the range that covers virtually every cargo vessel) makes
+ * "fast" or "slow" legible at a glance without a fake precision decimal
+ * chart. */
+function SpeedReadout({ sog }: { sog: number | null }) {
+  const pct = sog != null ? Math.max(0, Math.min(100, (sog / 28) * 100)) : 0;
+  return (
+    <div className="min-w-0">
+      <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <ArrowUp className="size-3 shrink-0" />
+        SOG
+      </p>
+      <p className="mt-1 truncate text-base font-semibold tabular-nums text-foreground">
+        {sog != null ? `${sog.toFixed(1)} kn` : "—"}
+      </p>
+      <div className="mt-1.5 h-[3px] w-full overflow-hidden rounded-full bg-border/60">
+        <div className="h-full rounded-full bg-primary transition-[width] duration-500" style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
+
+/** Course over ground as a heading, not just a number — the arrow rotates
+ * to the vessel's real bearing (0° = due north, clockwise), so direction
+ * of travel is visible without reading a degree symbol. */
+function HeadingReadout({ cog }: { cog: number | null }) {
+  return (
+    <div className="min-w-0">
+      <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <ArrowUp
+          className="size-3 shrink-0 text-primary transition-transform duration-500"
+          style={cog != null ? { transform: `rotate(${cog}deg)` } : undefined}
+        />
+        COG
+      </p>
+      <p className="mt-1 truncate text-base font-semibold tabular-nums text-foreground">
+        {cog != null ? `${cog}°` : "—"}
+      </p>
+    </div>
+  );
+}
+
+/** The shipment's journey as a line, not a generic numbered progress bar:
+ * a filled track behind everything already reached, a pulsing marker
+ * exactly where the shipment is now, and hollow ticks for what's ahead —
+ * position on a route, read at a glance. */
+function LifecycleJourney({
   status,
   legacyTerminal,
   currentIndex,
@@ -817,22 +903,26 @@ function LifecycleStepper({
           return (
             <li key={s} className="flex flex-1 flex-col items-center">
               <div className="flex w-full items-center">
-                <span className={`h-px flex-1 ${isFirst ? "opacity-0" : done || current ? c.bg : "bg-border"}`} />
-                <span
-                  className={`flex size-5 shrink-0 items-center justify-center rounded-full border text-xs font-semibold ${
-                    current
-                      ? `${c.border} ${c.bg} text-primary-foreground`
-                      : done
-                        ? `${c.border} ${c.bgSoft} ${c.text}`
-                        : "border-border bg-surface text-muted-foreground"
-                  }`}
-                >
-                  {done ? <Check className="size-3" /> : i + 1}
+                <span className={`h-[2px] flex-1 ${isFirst ? "opacity-0" : done || current ? c.bg : "bg-border"}`} />
+                <span className="relative grid shrink-0 place-items-center" style={{ width: 14, height: 14 }}>
+                  {current ? (
+                    <span aria-hidden className={`live-pulse absolute size-3.5 rounded-full ${c.bg} opacity-20`} />
+                  ) : null}
+                  <span
+                    aria-hidden
+                    className={`relative rounded-full ${
+                      current
+                        ? `size-2 ${c.bg}`
+                        : done
+                          ? `size-[7px] ${c.bg}`
+                          : "size-[7px] border-[1.5px] border-border bg-surface"
+                    }`}
+                  />
                 </span>
-                <span className={`h-px flex-1 ${isLast ? "opacity-0" : done ? c.bg : "bg-border"}`} />
+                <span className={`h-[2px] flex-1 ${isLast ? "opacity-0" : done ? c.bg : "bg-border"}`} />
               </div>
               <span
-                className={`mt-1.5 text-center text-xs leading-tight ${
+                className={`mt-2 text-center text-xs leading-tight ${
                   current ? `font-semibold ${c.text}` : done ? "text-foreground" : "text-muted-foreground"
                 }`}
               >
@@ -860,7 +950,7 @@ function InfoField({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block">
       <span className="label-xs mb-1 block">{label}</span>

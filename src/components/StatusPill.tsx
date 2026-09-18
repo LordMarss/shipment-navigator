@@ -125,15 +125,29 @@ export function MonitoringBadge({ state }: { state: MonitoringState }) {
   );
 }
 
+/**
+ * Severity carries real typographic weight, not just a coloured dot —
+ * critical is meant to interrupt a scan of the page, informational is
+ * meant to recede. Red is reserved for genuinely critical items so it
+ * keeps its meaning instead of appearing on every row.
+ */
+const SEVERITY_STYLE: Record<Severity, string> = {
+  critical: "text-risk font-semibold",
+  attention: "text-warning font-medium",
+  informational: "text-muted-foreground/80 font-medium",
+};
+
 const SEVERITY_DOT: Record<Severity, string> = {
   critical: "bg-risk",
   attention: "bg-warning",
-  informational: "bg-muted-foreground/50",
+  informational: "bg-muted-foreground/40",
 };
 
 export function SeverityBadge({ severity, label }: { severity: Severity; label: string }) {
   return (
-    <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium uppercase tracking-[0.04em] text-muted-foreground">
+    <span
+      className={`inline-flex items-center gap-1.5 whitespace-nowrap text-xs uppercase tracking-[0.04em] ${SEVERITY_STYLE[severity]}`}
+    >
       <span className={`size-1.5 rounded-full ${SEVERITY_DOT[severity]}`} aria-hidden />
       {label}
     </span>
