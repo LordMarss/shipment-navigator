@@ -71,8 +71,12 @@ function FleetMap() {
     >
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
         <div className="panel overflow-hidden">
+          <div className="h-[3px] bg-primary" aria-hidden />
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-subtle px-3 py-2">
-            <span className="text-[12px] font-medium">
+            <span className="inline-flex items-center gap-2 text-[12px] font-medium">
+              {tracked ? (
+                <span className="inline-flex size-1.5 shrink-0 rounded-full bg-teal live-pulse" aria-hidden />
+              ) : null}
               {tracked
                 ? `Tracking ${shortId(tracked.id)} · ${tracked.vessel_name || "vessel"} (MMSI ${tracked.vessel_mmsi})`
                 : "Global traffic · Pacific Coast / North America lanes"}
@@ -93,8 +97,8 @@ function FleetMap() {
           </p>
         </div>
 
-        <aside className="panel divide-y divide-border">
-          <div className="px-3 py-2">
+        <aside className="panel overflow-hidden">
+          <div className="border-b border-border px-3 py-2">
             <h2 className="text-[13px] font-semibold">Active shipments</h2>
             <p className="text-[12px] text-muted-foreground">Not yet delivered</p>
           </div>
@@ -106,56 +110,69 @@ function FleetMap() {
               No active shipments.
             </p>
           ) : (
-            active.map((s) => (
-              <div key={s.id} className="px-3 py-2.5">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <Link
-                      to="/shipments/$id"
-                      params={{ id: s.id }}
-                      className="block truncate text-[13px] font-medium text-primary hover:underline"
-                    >
-                      {shortId(s.id)} · {s.client_name}
-                    </Link>
-                    <p className="truncate text-[12px] text-muted-foreground">
-                      {s.origin} → {s.destination}
-                    </p>
-                  </div>
-                  <StatusPill status={s.status} />
-                </div>
-
-                {s.vessel_mmsi ? (
-                  <div className="mt-2 flex items-center justify-between gap-2">
-                    <span className="text-[12px] text-muted-foreground">
-                      {s.vessel_name || "Vessel"} · {s.vessel_mmsi}
-                    </span>
-                    <button className={btnGhost} onClick={() => setTracked(s)}>
-                      Track this shipment
-                    </button>
-                  </div>
-                ) : (
-                  <form
-                    className="mt-2 flex items-center gap-1.5"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      const mmsi = (mmsiDraft[s.id] ?? "").trim();
-                      if (!mmsi) return;
-                      saveMmsi.mutate({ id: s.id, mmsi });
-                    }}
+            <ul className="divide-y divide-border">
+              {active.map((s) => {
+                const isTracked = tracked?.id === s.id;
+                return (
+                  <li
+                    key={s.id}
+                    className={`border-l-2 px-3 py-2.5 transition-colors ${
+                      isTracked ? "border-l-primary bg-tint-selected/40" : "border-l-transparent hover:bg-subtle/60"
+                    }`}
                   >
-                    <input
-                      className={fieldClass}
-                      placeholder="Vessel MMSI"
-                      value={mmsiDraft[s.id] ?? ""}
-                      onChange={(e) => setMmsiDraft({ ...mmsiDraft, [s.id]: e.target.value })}
-                    />
-                    <button className={btnPrimary} type="submit">
-                      Save
-                    </button>
-                  </form>
-                )}
-              </div>
-            ))
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <Link
+                          to="/shipments/$id"
+                          params={{ id: s.id }}
+                          className="block truncate text-[13px] font-medium text-primary hover:underline"
+                        >
+                          {shortId(s.id)} · {s.client_name}
+                        </Link>
+                        <p className="truncate text-[12px] text-muted-foreground">
+                          {s.origin} → {s.destination}
+                        </p>
+                      </div>
+                      <StatusPill status={s.status} />
+                    </div>
+
+                    {s.vessel_mmsi ? (
+                      <div className="mt-2 flex items-center justify-between gap-2">
+                        <span className="text-[12px] text-muted-foreground">
+                          {s.vessel_name || "Vessel"} · {s.vessel_mmsi}
+                        </span>
+                        <button
+                          className={isTracked ? btnPrimary : btnGhost}
+                          onClick={() => setTracked(s)}
+                        >
+                          {isTracked ? "Tracking" : "Track this shipment"}
+                        </button>
+                      </div>
+                    ) : (
+                      <form
+                        className="mt-2 flex items-center gap-1.5"
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          const mmsi = (mmsiDraft[s.id] ?? "").trim();
+                          if (!mmsi) return;
+                          saveMmsi.mutate({ id: s.id, mmsi });
+                        }}
+                      >
+                        <input
+                          className={fieldClass}
+                          placeholder="Vessel MMSI"
+                          value={mmsiDraft[s.id] ?? ""}
+                          onChange={(e) => setMmsiDraft({ ...mmsiDraft, [s.id]: e.target.value })}
+                        />
+                        <button className={btnPrimary} type="submit">
+                          Save
+                        </button>
+                      </form>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
           )}
         </aside>
       </div>

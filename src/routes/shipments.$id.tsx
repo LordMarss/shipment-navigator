@@ -21,7 +21,7 @@ import { PortAutocomplete } from "@/components/PortAutocomplete";
 import { ShipmentNotes } from "@/components/ShipmentNotes";
 import { ShipmentTimeline } from "@/components/ShipmentTimeline";
 import { StatusHistory } from "@/components/StatusHistory";
-import { SeverityBadge, StatusPill, VesselConditionBadge } from "@/components/StatusPill";
+import { SeverityBadge, StatusPill, VesselConditionBadge, statusAccent, type StatusAccent } from "@/components/StatusPill";
 import { useMonitoringConfig } from "@/hooks/useMonitoringConfig";
 import {
   ACTIVE_STATUSES,
@@ -120,6 +120,30 @@ function isStatusEvent(e: ShipmentEvent) {
 function eventSourceLabel(e: ShipmentEvent) {
   if (!e.automated) return "Manual";
   return e.source === "ais" ? "Automated (AIS)" : "Automated (System)";
+}
+
+const ACCENT_DOT: Record<StatusAccent, string> = {
+  neutral: "bg-muted-foreground/60",
+  teal: "bg-teal",
+  primary: "bg-primary",
+  positive: "bg-positive",
+  warning: "bg-warning",
+};
+
+const ACCENT_RING: Record<StatusAccent, { border: string; bg: string; bgSoft: string; text: string }> = {
+  neutral: { border: "border-muted-foreground", bg: "bg-muted-foreground", bgSoft: "bg-muted-foreground/10", text: "text-muted-foreground" },
+  teal: { border: "border-teal", bg: "bg-teal", bgSoft: "bg-teal-soft", text: "text-teal" },
+  primary: { border: "border-primary", bg: "bg-primary", bgSoft: "bg-primary/10", text: "text-primary" },
+  positive: { border: "border-positive", bg: "bg-positive", bgSoft: "bg-positive-soft", text: "text-positive" },
+  warning: { border: "border-warning", bg: "bg-warning", bgSoft: "bg-warning-soft", text: "text-warning" },
+};
+
+/** `shipment_events.to_value` is a plain string column — safely resolve it
+ * back to a known status for colour purposes, defaulting to neutral for
+ * anything unrecognized rather than guessing. */
+function accentForValue(value: string | null): StatusAccent {
+  const known = ACTIVE_STATUSES.find((s) => s === value);
+  return known ? statusAccent(known) : "neutral";
 }
 
 type TabKey = "overview" | "timeline" | "documents" | "notes" | "alerts";
@@ -351,7 +375,7 @@ function ShipmentDetail() {
               <h2 className="label-xs mb-2">Current Vessel</h2>
               {shipment.vessel_name || shipment.vessel_mmsi ? (
                 <div className="flex items-center gap-3">
-                  <span className="flex size-12 shrink-0 items-center justify-center rounded-sm border border-border bg-subtle text-muted-foreground">
+                  <span className="flex size-12 shrink-0 items-center justify-center rounded-sm border border-teal/25 bg-teal-soft text-teal">
                     <Ship className="size-5" />
                   </span>
                   <div className="min-w-0">
@@ -369,10 +393,35 @@ function ShipmentDetail() {
               )}
 
               {shipment.vessel_mmsi ? (
-                <div className="mt-3 rounded-[var(--radius)] border border-border bg-subtle/60 p-3">
+                <div
+                  className={`mt-3 rounded-[var(--radius)] border p-3 ${
+                    position && hasFreshAis
+                      ? "border-teal/25 bg-teal-soft"
+                      : "border-border bg-subtle/60"
+                  }`}
+                >
                   {position ? (
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="space-y-2.5">
+                    <>
+                      <div className="mb-3 flex items-center justify-between">
+                        <span
+                          className={`inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.07em] ${
+                            hasFreshAis ? "text-teal" : "text-muted-foreground"
+                          }`}
+                        >
+                          <span
+                            className={`size-1.5 rounded-full ${hasFreshAis ? "bg-teal live-pulse" : "bg-muted-foreground/50"}`}
+                            aria-hidden
+                          />
+                          {hasFreshAis ? "Live AIS" : "AIS · stale"}
+                        </span>
+                        <Link
+                          to="/map"
+                          className="inline-flex shrink-0 items-center gap-1 text-[12px] font-medium text-primary hover:underline"
+                        >
+                          View on map <ArrowRight className="size-3.5" />
+                        </Link>
+                      </div>
+                      <div className="grid grid-cols-3 gap-3">
                         <AisRow
                           icon={ArrowUp}
                           label="SOG"
@@ -385,13 +434,7 @@ function ShipmentDetail() {
                         />
                         <AisRow icon={MapPin} label="Nav Status" value={navStatusLabel(position.nav_status)} />
                       </div>
-                      <Link
-                        to="/map"
-                        className="inline-flex shrink-0 items-center gap-1 self-center text-[12px] font-medium text-primary hover:underline"
-                      >
-                        View on map <ArrowRight className="size-3.5" />
-                      </Link>
-                    </div>
+                    </>
                   ) : (
                     <p className="text-[12px] text-muted-foreground">
                       No AIS position received yet for MMSI {shipment.vessel_mmsi}.
@@ -404,13 +447,13 @@ function ShipmentDetail() {
                 type="button"
                 disabled={legacyTerminal}
                 onClick={openOverride}
-                className="mt-4 flex w-full items-center justify-between gap-2 rounded-[var(--radius)] border border-primary/30 bg-primary/[0.05] px-4 py-3 text-[13px] font-semibold text-primary transition-colors hover:bg-primary/[0.09] disabled:cursor-not-allowed disabled:opacity-50"
+                className="mt-4 flex w-full items-center justify-between gap-2 rounded-[var(--radius)] border border-border bg-surface px-3.5 py-2.5 text-[13px] font-medium text-muted-foreground transition-colors hover:border-primary/30 hover:bg-primary/[0.04] hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <span className="inline-flex items-center gap-2">
-                  <RotateCcw className="size-4" />
+                  <RotateCcw className="size-3.5" />
                   Override Status
                 </span>
-                <ChevronRight className="size-4" />
+                <ChevronRight className="size-3.5" />
               </button>
 
               {legacyTerminal ? (
@@ -480,27 +523,30 @@ function ShipmentDetail() {
                   <p className="text-[12px] text-muted-foreground">No status changes recorded yet.</p>
                 ) : (
                   <ol>
-                    {statusEvents.map((e, i) => (
-                      <li key={e.id} className="relative flex gap-3 pb-4 last:pb-0">
-                        {i < statusEvents.length - 1 ? (
+                    {statusEvents.map((e, i) => {
+                      const dotColor = ACCENT_DOT[accentForValue(e.to_value)];
+                      return (
+                        <li key={e.id} className="relative flex gap-3 pb-4 last:pb-0">
+                          {i < statusEvents.length - 1 ? (
+                            <span
+                              aria-hidden
+                              className="absolute left-[4px] top-3 h-full w-px bg-border"
+                            />
+                          ) : null}
                           <span
                             aria-hidden
-                            className="absolute left-[4px] top-3 h-full w-px bg-border"
+                            className={`mt-1 size-[9px] shrink-0 rounded-full ${dotColor} ${i === 0 ? "" : "opacity-45"}`}
                           />
-                        ) : null}
-                        <span
-                          aria-hidden
-                          className={`mt-1 size-[9px] shrink-0 rounded-full ${i === 0 ? "bg-primary" : "bg-border"}`}
-                        />
-                        <div className="min-w-0">
-                          <p className="text-[13px] font-semibold text-foreground">
-                            {e.to_value ?? e.event_type}
-                          </p>
-                          <p className="text-[12px] text-muted-foreground">{eventSourceLabel(e)}</p>
-                          <p className="text-[11px] text-muted-foreground">{formatDayTime(e.occurred_at)}</p>
-                        </div>
-                      </li>
-                    ))}
+                          <div className="min-w-0">
+                            <p className="text-[13px] font-semibold text-foreground">
+                              {e.to_value ?? e.event_type}
+                            </p>
+                            <p className="text-[12px] text-muted-foreground">{eventSourceLabel(e)}</p>
+                            <p className="text-[11px] text-muted-foreground">{formatDayTime(e.occurred_at)}</p>
+                          </div>
+                        </li>
+                      );
+                    })}
                   </ol>
                 )}
               </section>
@@ -753,12 +799,12 @@ function AisRow({
   value: string;
 }) {
   return (
-    <div className="flex items-start gap-2">
-      <Icon className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-      <div>
-        <p className="text-[11px] text-muted-foreground">{label}</p>
-        <p className="text-[13px] font-medium text-foreground">{value}</p>
-      </div>
+    <div className="min-w-0">
+      <p className="flex items-center gap-1 text-[10px] text-muted-foreground">
+        <Icon className="size-3 shrink-0" />
+        {label}
+      </p>
+      <p className="mt-0.5 truncate text-[14px] font-semibold tabular-nums text-foreground">{value}</p>
     </div>
   );
 }
@@ -780,26 +826,27 @@ function LifecycleStepper({
           const current = !legacyTerminal && i === currentIndex;
           const isFirst = i === 0;
           const isLast = i === ACTIVE_STATUSES.length - 1;
+          const c = ACCENT_RING[statusAccent(s)];
           return (
             <li key={s} className="flex flex-1 flex-col items-center">
               <div className="flex w-full items-center">
-                <span className={`h-px flex-1 ${isFirst ? "opacity-0" : done || current ? "bg-primary" : "bg-border"}`} />
+                <span className={`h-px flex-1 ${isFirst ? "opacity-0" : done || current ? c.bg : "bg-border"}`} />
                 <span
                   className={`flex size-5 shrink-0 items-center justify-center rounded-full border text-[10px] font-semibold ${
                     current
-                      ? "border-primary bg-primary text-primary-foreground"
+                      ? `${c.border} ${c.bg} text-primary-foreground`
                       : done
-                        ? "border-primary bg-primary/10 text-primary"
+                        ? `${c.border} ${c.bgSoft} ${c.text}`
                         : "border-border bg-surface text-muted-foreground"
                   }`}
                 >
                   {done ? <Check className="size-3" /> : i + 1}
                 </span>
-                <span className={`h-px flex-1 ${isLast ? "opacity-0" : done ? "bg-primary" : "bg-border"}`} />
+                <span className={`h-px flex-1 ${isLast ? "opacity-0" : done ? c.bg : "bg-border"}`} />
               </div>
               <span
                 className={`mt-1.5 text-center text-[11px] leading-tight ${
-                  current ? "font-semibold text-foreground" : done ? "text-foreground" : "text-muted-foreground"
+                  current ? `font-semibold ${c.text}` : done ? "text-foreground" : "text-muted-foreground"
                 }`}
               >
                 {s}

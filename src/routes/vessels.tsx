@@ -1,6 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 
+import { Ship } from "lucide-react";
+
 import { AppShell, EmptyState, Skeleton } from "@/components/AppShell";
 import { StatusPill } from "@/components/StatusPill";
 import { formatEta, listShipments, shortId } from "@/lib/api";
@@ -49,6 +51,7 @@ function VesselsPage() {
       ) : withVessel.length === 0 ? (
         <div className="panel">
           <EmptyState
+            icon={Ship}
             title="No vessels yet"
             description="Add a vessel name or MMSI to a shipment and it will appear here."
           />
@@ -68,7 +71,7 @@ function VesselsPage() {
             </thead>
             <tbody className="divide-y divide-border">
               {withVessel.map((s) => (
-                <tr key={s.id} className="transition-colors hover:bg-subtle/60">
+                <tr key={s.id} className="transition-colors hover:bg-tint-selected/30">
                   <td className="px-3 py-2 font-medium">{s.vessel_name || "Unnamed vessel"}</td>
                   <td className="px-3 py-2 font-mono text-[12px] text-muted-foreground">
                     {s.vessel_mmsi || "—"}

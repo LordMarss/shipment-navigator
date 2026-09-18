@@ -109,16 +109,16 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   const body = (
-    <div className="flex h-full flex-col">
-      <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border px-4">
-        <span className="grid size-6 place-items-center rounded-sm bg-primary text-primary-foreground">
+    <div className="flex h-full flex-col bg-nav">
+      <div className="flex h-14 shrink-0 items-center gap-2 border-b border-nav-border bg-nav-elevated px-4">
+        <span className="grid size-6 place-items-center rounded-sm bg-teal text-nav">
           <Ship className="size-3.5" />
         </span>
-        <span className="text-[12px] font-semibold uppercase tracking-[0.09em] text-foreground">
-          StimTech
+        <span className="text-[12px] font-semibold uppercase tracking-[0.09em] text-nav-foreground">
+          WhiteWind
         </span>
         <button
-          className="focus-ring ml-auto rounded-sm p-1 text-muted-foreground lg:hidden"
+          className="focus-ring ml-auto rounded-sm p-1 text-nav-muted-foreground lg:hidden"
           onClick={onClose}
           aria-label="Close navigation"
         >
@@ -129,23 +129,31 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
       <nav className="flex-1 overflow-y-auto px-2 py-3">
         {NAV_GROUPS.map((group, gi) => (
           <div key={group.label || `g${gi}`} className={gi === 0 ? "" : "mt-4"}>
-            {group.label ? <p className="label-xs px-2 pb-1.5">{group.label}</p> : null}
+            {group.label ? (
+              <p className="label-xs px-2 pb-1.5 text-nav-muted-foreground">{group.label}</p>
+            ) : null}
             <ul className="space-y-0.5">
               {group.items.map((item) => {
                 const active =
                   item.to === "/" ? pathname === "/" : pathname === item.to;
                 return (
-                  <li key={item.to}>
+                  <li key={item.to} className="relative">
+                    {active ? (
+                      <span
+                        aria-hidden
+                        className="absolute inset-y-1 left-0 w-[3px] rounded-full bg-teal"
+                      />
+                    ) : null}
                     <Link
                       to={item.to}
-                      className={`group flex items-center gap-2 rounded-sm px-2 py-1.5 text-[13px] transition-colors ${
+                      className={`group flex items-center gap-2 rounded-sm px-2.5 py-1.5 text-[13px] transition-colors ${
                         active
-                          ? "bg-subtle font-medium text-foreground"
-                          : "text-muted-foreground hover:bg-subtle/70 hover:text-foreground"
+                          ? "bg-nav-active font-medium text-nav-active-foreground"
+                          : "text-nav-muted-foreground hover:bg-nav-elevated hover:text-nav-foreground"
                       }`}
                     >
                       <item.icon
-                        className={`size-3.5 shrink-0 ${active ? "text-primary" : "text-muted-foreground/80"}`}
+                        className={`size-3.5 shrink-0 ${active ? "text-teal" : "text-nav-muted-foreground group-hover:text-nav-foreground"}`}
                       />
                       <span className="truncate">{item.label}</span>
                     </Link>
@@ -157,26 +165,24 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
         ))}
       </nav>
 
-      <div className="shrink-0 border-t border-border px-3 py-2.5">
-        <p className="text-[11px] text-muted-foreground">Logistics Intelligence</p>
-        <p className="text-[11px] text-muted-foreground/70">v1.0 · Operations workspace</p>
+      <div className="shrink-0 border-t border-nav-border px-3 py-2.5">
+        <p className="text-[11px] text-nav-foreground/80">Logistics Intelligence</p>
+        <p className="text-[11px] text-nav-muted-foreground">v1.0 · Operations workspace</p>
       </div>
     </div>
   );
 
   return (
     <>
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[228px] border-r border-border bg-surface lg:block">
-        {body}
-      </aside>
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[228px] lg:block">{body}</aside>
       {open ? (
         <div className="fixed inset-0 z-40 lg:hidden">
           <button
-            className="absolute inset-0 bg-foreground/20"
+            className="absolute inset-0 bg-foreground/30"
             aria-label="Close navigation"
             onClick={onClose}
           />
-          <aside className="absolute inset-y-0 left-0 w-[248px] border-r border-border bg-surface">
+          <aside className="absolute inset-y-0 left-0 w-[248px] shadow-[0_0_32px_rgba(0,0,0,0.25)]">
             {body}
           </aside>
         </div>
@@ -187,7 +193,7 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
 
 function TopBar({ onMenu }: { onMenu: () => void }) {
   return (
-    <header className="sticky top-0 z-20 border-b border-border bg-surface/95 backdrop-blur">
+    <header className="sticky top-0 z-20 border-b border-border bg-surface/95 shadow-[0_1px_0_0_var(--color-border),0_2px_10px_-6px_rgba(15,23,42,0.12)] backdrop-blur">
       <div className="flex h-14 items-center gap-2 px-3 sm:px-4">
         <button
           className="focus-ring rounded-sm p-1.5 text-muted-foreground hover:bg-subtle lg:hidden"
@@ -254,7 +260,7 @@ function GlobalSearch() {
         className="focus-ring h-8 w-full rounded-sm border border-input bg-background pl-8 pr-2 text-[13px] placeholder:text-muted-foreground"
       />
       {open && term ? (
-        <div className="panel animate-in absolute left-0 top-9 z-30 w-full overflow-hidden p-1 shadow-[0_8px_24px_-12px_rgba(20,33,61,0.25)]">
+        <div className="panel-lifted animate-in absolute left-0 top-9 z-30 w-full overflow-hidden p-1">
           {results.length === 0 ? (
             <p className="px-2 py-3 text-[12px] text-muted-foreground">
               No shipments match “{q.trim()}”.
@@ -305,7 +311,7 @@ function NotificationsMenu() {
         ) : null}
       </button>
       {open ? (
-        <div className="panel animate-in absolute right-0 top-10 z-30 w-[320px] overflow-hidden shadow-[0_8px_24px_-12px_rgba(20,33,61,0.25)]">
+        <div className="panel-lifted animate-in absolute right-0 top-10 z-30 w-[320px] overflow-hidden">
           <div className="flex items-center justify-between border-b border-border px-3 py-2">
             <span className="text-[12px] font-semibold">Notifications</span>
             <Link to="/alerts" className="text-[12px] text-primary hover:underline">
@@ -352,7 +358,7 @@ function WorkspaceMenu() {
         <ChevronDown className="size-3.5 text-muted-foreground" />
       </button>
       {open ? (
-        <div className="panel animate-in absolute right-0 top-10 z-30 w-[220px] overflow-hidden p-1 shadow-[0_8px_24px_-12px_rgba(20,33,61,0.25)]">
+        <div className="panel-lifted animate-in absolute right-0 top-10 z-30 w-[220px] overflow-hidden p-1">
           <div className="px-2 py-1.5">
             <p className="text-[12px] font-medium">StimTech Solutions</p>
             <p className="text-[11px] text-muted-foreground">Single-user workspace</p>
@@ -385,13 +391,20 @@ export function EmptyState({
   title,
   description,
   action,
+  icon: Icon,
 }: {
   title: string;
   description?: string;
   action?: ReactNode;
+  icon?: typeof LayoutDashboard;
 }) {
   return (
     <div className="flex flex-col items-center justify-center px-6 py-14 text-center">
+      {Icon ? (
+        <span className="mb-3 grid size-10 place-items-center rounded-full bg-primary/[0.08] text-primary">
+          <Icon className="size-[18px]" />
+        </span>
+      ) : null}
       <p className="text-[13px] font-medium text-foreground">{title}</p>
       {description ? (
         <p className="mt-1 max-w-sm text-[12px] text-muted-foreground">{description}</p>
@@ -402,10 +415,10 @@ export function EmptyState({
 }
 
 export const btnPrimary =
-  "focus-ring inline-flex h-8 items-center gap-1.5 rounded-sm border border-primary bg-primary px-3 text-[13px] font-medium text-primary-foreground transition-all hover:opacity-90 active:scale-[0.985] disabled:opacity-45";
+  "focus-ring inline-flex h-8 items-center gap-1.5 rounded-sm border border-primary bg-primary px-3 text-[13px] font-medium text-primary-foreground shadow-[0_1px_2px_rgba(15,23,42,0.12)] transition-all hover:bg-primary/90 hover:shadow-[0_2px_6px_rgba(15,23,42,0.16)] active:scale-[0.985] disabled:opacity-45 disabled:shadow-none";
 
 export const btnGhost =
-  "focus-ring inline-flex h-8 items-center gap-1.5 rounded-sm border border-border bg-surface px-3 text-[13px] font-medium text-foreground transition-all hover:bg-subtle active:scale-[0.985] disabled:opacity-45";
+  "focus-ring inline-flex h-8 items-center gap-1.5 rounded-sm border border-border bg-surface px-3 text-[13px] font-medium text-foreground transition-all hover:border-primary/30 hover:bg-subtle active:scale-[0.985] disabled:opacity-45";
 
 export const btnDanger =
   "focus-ring inline-flex h-8 items-center gap-1.5 rounded-sm border border-destructive/30 bg-surface px-3 text-[13px] font-medium text-destructive transition-all hover:bg-risk-soft active:scale-[0.985]";

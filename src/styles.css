@@ -5,9 +5,12 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * StimTech Solutions design system.
- * Dense, hairline-bordered, single-accent (deep navy) operations tool.
- * One typeface (Inter). Small radii. No gradients or heavy shadows.
+ * WhiteWind Logistics design system.
+ * A maritime operations palette: deep navy navigation, a rich operational
+ * blue as the primary accent, teal/aqua for live AIS data, restrained
+ * green/amber/red for status. Distinct surfaces (dark nav, tinted
+ * workspace, white panels) create depth without heavy shadows or
+ * gradients. One typeface (Inter). Small-to-moderate radii.
  */
 
 @theme inline {
@@ -48,6 +51,9 @@
   --color-warning-soft: var(--warning-soft);
   --color-risk: var(--risk);
   --color-risk-soft: var(--risk-soft);
+  --color-teal: var(--teal);
+  --color-teal-soft: var(--teal-soft);
+  --color-tint-selected: var(--tint-selected);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -56,69 +62,91 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-nav: var(--nav);
+  --color-nav-elevated: var(--nav-elevated);
+  --color-nav-foreground: var(--nav-foreground);
+  --color-nav-muted-foreground: var(--nav-muted-foreground);
+  --color-nav-active: var(--nav-active);
+  --color-nav-active-foreground: var(--nav-active-foreground);
+  --color-nav-border: var(--nav-border);
 }
 
 :root {
   --radius: 5px;
 
-  /* #FAFAFA */
-  --background: oklch(0.9816 0 0);
-  /* #1C1C1F */
-  --foreground: oklch(0.2418 0.0037 285.9);
-  /* pure white panels sit on the near-white page */
-  --surface: oklch(1 0 0);
-  /* #F4F4F5 subtle row / header fill */
-  --subtle: oklch(0.9666 0.0011 286.4);
-  --card: oklch(1 0 0);
+  /* soft slate-blue workspace canvas — visibly tinted, not white */
+  --background: oklch(0.955 0.008 240);
+  /* deep navy-black text, tied to the brand hue for cohesion */
+  --foreground: oklch(0.19 0.022 250);
+  /* panels lift off the tinted canvas as near-white */
+  --surface: oklch(0.995 0.002 240);
+  /* row / header fill — clearly visible against surface */
+  --subtle: oklch(0.94 0.009 240);
+  --card: var(--surface);
   --card-foreground: var(--foreground);
-  --popover: oklch(1 0 0);
+  --popover: var(--surface);
   --popover-foreground: var(--foreground);
 
-  /* #14213D deep navy — the only accent */
-  --primary: oklch(0.2646 0.0555 264.5);
-  --primary-foreground: oklch(0.9816 0 0);
+  /* rich operational blue — the primary accent */
+  --primary: oklch(0.44 0.14 254);
+  --primary-foreground: oklch(0.99 0.002 240);
 
-  --secondary: oklch(0.9666 0.0011 286.4);
+  --secondary: oklch(0.94 0.009 240);
   --secondary-foreground: var(--foreground);
-  --muted: oklch(0.9666 0.0011 286.4);
-  /* #71717A */
-  --muted-foreground: oklch(0.5519 0.0139 285.9);
-  --accent: oklch(0.9666 0.0011 286.4);
+  --muted: oklch(0.94 0.009 240);
+  /* slate blue-grey secondary text — kept dark enough to stay legible */
+  --muted-foreground: oklch(0.455 0.022 245);
+  --accent: oklch(0.94 0.009 240);
   --accent-foreground: var(--foreground);
 
-  /* #B33A3A */
-  --destructive: oklch(0.5185 0.1391 25.9);
-  --destructive-foreground: oklch(0.9816 0 0);
+  /* muted brick red — genuine exceptions only */
+  --destructive: oklch(0.5 0.16 22);
+  --destructive-foreground: oklch(0.99 0.002 240);
 
-  /* #E4E4E7 hairlines */
-  --border: oklch(0.9197 0.0037 286.3);
-  --input: oklch(0.9197 0.0037 286.3);
-  --ring: oklch(0.2646 0.0555 264.5);
+  /* visible slate-blue hairlines — present, not invisible */
+  --border: oklch(0.865 0.014 240);
+  --input: oklch(0.865 0.014 240);
+  --ring: oklch(0.44 0.14 254);
 
-  /* #2F6F4E */
-  --positive: oklch(0.4936 0.0846 155.2);
-  --positive-soft: oklch(0.9646 0.0206 155.2);
-  /* #C08A2E */
-  --warning: oklch(0.6494 0.1096 79.5);
-  --warning-soft: oklch(0.9682 0.0286 79.5);
-  /* #B33A3A */
-  --risk: oklch(0.5185 0.1391 25.9);
-  --risk-soft: oklch(0.9611 0.0206 25.9);
+  /* restrained green — healthy / success */
+  --positive: oklch(0.48 0.1 152);
+  --positive-soft: oklch(0.95 0.03 152);
+  /* amber — warnings */
+  --warning: oklch(0.62 0.13 70);
+  --warning-soft: oklch(0.95 0.035 70);
+  /* muted brick red — genuine exceptions */
+  --risk: oklch(0.5 0.16 22);
+  --risk-soft: oklch(0.95 0.03 22);
+  /* teal/aqua — live AIS & operational-activity accent */
+  --teal: oklch(0.58 0.09 195);
+  --teal-soft: oklch(0.94 0.03 195);
+  /* subtle blue tint for hovered/selected rows */
+  --tint-selected: oklch(0.925 0.02 250);
 
   --chart-1: var(--primary);
   --chart-2: var(--positive);
   --chart-3: var(--warning);
   --chart-4: var(--risk);
-  --chart-5: var(--muted-foreground);
+  --chart-5: var(--teal);
 
-  --sidebar: oklch(0.9816 0 0);
-  --sidebar-foreground: var(--foreground);
+  --sidebar: var(--nav);
+  --sidebar-foreground: var(--nav-foreground);
   --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: var(--primary-foreground);
-  --sidebar-accent: oklch(0.9666 0.0011 286.4);
-  --sidebar-accent-foreground: var(--foreground);
-  --sidebar-border: oklch(0.9197 0.0037 286.3);
+  --sidebar-accent: var(--nav-active);
+  --sidebar-accent-foreground: var(--nav-active-foreground);
+  --sidebar-border: var(--nav-border);
   --sidebar-ring: var(--ring);
+
+  /* Dark-navy navigation shell — the product's own visual identity,
+   * distinct from the light workspace it opens onto. */
+  --nav: oklch(0.2 0.03 253);
+  --nav-elevated: oklch(0.175 0.028 253);
+  --nav-foreground: oklch(0.93 0.008 240);
+  --nav-muted-foreground: oklch(0.63 0.022 245);
+  --nav-active: oklch(0.32 0.09 253);
+  --nav-active-foreground: oklch(0.98 0.005 240);
+  --nav-border: oklch(0.28 0.035 253);
 }
 
 @layer base {
@@ -151,11 +179,23 @@
   }
 }
 
-/* Hairline panel: depth comes from borders, never shadows. */
+/* Flat hairline panel: sits directly on the page, depth from borders only. */
 @utility panel {
   background-color: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
+}
+
+/* Same panel, lifted slightly off the page — for menus, dropdowns and
+ * anything that should feel layered above the workspace. Kept very
+ * restrained: two soft, tinted shadow layers, never a heavy drop shadow. */
+@utility panel-lifted {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow:
+    0 1px 2px color-mix(in oklab, var(--color-foreground) 6%, transparent),
+    0 8px 24px -8px color-mix(in oklab, var(--color-foreground) 14%, transparent);
 }
 
 @utility label-xs {
@@ -178,6 +218,12 @@
   animation: lv-fade-in 160ms ease-out both;
 }
 
+/* Slow, restrained "live" pulse — for genuinely live data (fresh AIS),
+ * never decorative. Opacity only, no motion, no color shift. */
+@utility live-pulse {
+  animation: lv-live-pulse 2.4s ease-in-out infinite;
+}
+
 @keyframes lv-fade-in {
   from {
     opacity: 0;
@@ -186,5 +232,15 @@
   to {
     opacity: 1;
     transform: none;
+  }
+}
+
+@keyframes lv-live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
   }
 }

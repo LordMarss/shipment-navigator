@@ -1,6 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 
+import { FileText } from "lucide-react";
+
 import { AppShell, EmptyState, Skeleton } from "@/components/AppShell";
 import { DocsIndicator } from "@/components/StatusPill";
 import { STANDARD_DOCUMENTS, listAllDocuments, listShipments, shortId } from "@/lib/api";
@@ -51,6 +53,7 @@ function DocumentsPage() {
       ) : shipments.length === 0 ? (
         <div className="panel">
           <EmptyState
+            icon={FileText}
             title="No documents yet"
             description="Create a shipment and its four standard documents will be tracked here."
           />
@@ -80,7 +83,7 @@ function DocumentsPage() {
                 const attached = standard.filter((d) => d?.file_path).length;
                 const other = docs.filter((d) => !d.is_standard).length;
                 return (
-                  <tr key={s.id} className="transition-colors hover:bg-subtle/60">
+                  <tr key={s.id} className="transition-colors hover:bg-tint-selected/30">
                     <td className="px-3 py-2">
                       <Link
                         to="/shipments/$id"

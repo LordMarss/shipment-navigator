@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState, type ReactNode } from "react";
-import { ArrowDown, ArrowUp, Search } from "lucide-react";
+import { ArrowDown, ArrowUp, Package, Search, Ship } from "lucide-react";
 
 import { EmptyState, Skeleton, fieldClass } from "@/components/AppShell";
 import { DocsIndicator, SeverityBadge, StatusPill } from "@/components/StatusPill";
@@ -21,6 +21,15 @@ import { docsFor } from "@/lib/insights";
 type SortKey = "created_at" | "client_name" | "eta" | "landed_cost" | "status";
 
 const SEVERITY_RANK: Record<Severity, number> = { critical: 0, attention: 1, informational: 2 };
+
+/** Small colored cue for how recently a shipment was touched — real data
+ * (updated_at), not a decorative animation. */
+function freshnessDot(updatedAt: string): string {
+  const ageHours = (Date.now() - new Date(updatedAt).getTime()) / 3_600_000;
+  if (ageHours < 1) return "bg-teal";
+  if (ageHours < 24) return "bg-primary/50";
+  return "bg-muted-foreground/30";
+}
 
 export function ShipmentTable({
   shipments,
@@ -170,7 +179,7 @@ export function ShipmentTable({
       <div className="overflow-x-auto">
         <table className="w-full min-w-[980px] border-collapse text-[13px]">
           <thead>
-            <tr className="border-b border-border bg-subtle/60">
+            <tr className="border-b border-border bg-subtle">
               <Th>Shipment</Th>
               {showClient ? (
                 <Th sortKey="client_name" sort={sort} onSort={toggleSort}>
@@ -208,6 +217,7 @@ export function ShipmentTable({
               <tr>
                 <td colSpan={columnCount}>
                   <EmptyState
+                    icon={shipments.length === 0 ? Package : Search}
                     title={shipments.length === 0 ? emptyTitle : "No shipments match your filters"}
                     description={
                       shipments.length === 0
@@ -226,9 +236,9 @@ export function ShipmentTable({
                   <tr
                     key={s.id}
                     onClick={() => navigate({ to: "/shipments/$id", params: { id: s.id } })}
-                    className="group cursor-pointer border-b border-border last:border-0 transition-colors hover:bg-subtle/70"
+                    className="group cursor-pointer border-b border-border last:border-0 transition-colors hover:bg-tint-selected/35"
                   >
-                    <td className="px-3 py-2.5 font-mono text-[12px] text-muted-foreground group-hover:text-primary">
+                    <td className="border-l-2 border-l-transparent px-3 py-2.5 font-mono text-[12px] text-muted-foreground transition-colors group-hover:border-l-primary group-hover:text-primary">
                       {shortId(s.id)}
                     </td>
                     {showClient ? (
@@ -239,7 +249,10 @@ export function ShipmentTable({
                     </td>
                     <td className="px-3 py-2.5">
                       {s.vessel_name ? (
-                        <span className="text-foreground">{s.vessel_name}</span>
+                        <span className="inline-flex items-center gap-1.5 text-foreground">
+                          <Ship className="size-3 shrink-0 text-muted-foreground/70" />
+                          {s.vessel_name}
+                        </span>
                       ) : (
                         <span className="text-muted-foreground/70">—</span>
                       )}
@@ -269,7 +282,13 @@ export function ShipmentTable({
                     </td>
                     {showLastUpdated ? (
                       <td className="px-3 py-2.5 text-muted-foreground">
-                        {relativeTime(s.updated_at)}
+                        <span className="inline-flex items-center gap-1.5">
+                          <span
+                            className={`size-1.5 rounded-full ${freshnessDot(s.updated_at)}`}
+                            aria-hidden
+                          />
+                          {relativeTime(s.updated_at)}
+                        </span>
                       </td>
                     ) : null}
                     {showLandedCost ? (

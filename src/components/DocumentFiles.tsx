@@ -140,7 +140,7 @@ function DocumentRow({
         <div className="flex items-center gap-2 text-[13px]">
           <span
             aria-hidden
-            className={`size-1.5 shrink-0 rounded-full ${attached ? "bg-emerald-600" : "bg-border"}`}
+            className={`size-1.5 shrink-0 rounded-full ${attached ? "bg-positive" : "bg-border"}`}
           />
           <span className="truncate font-medium">{doc.name}</span>
           {attached ? (

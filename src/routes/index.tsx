@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
+import { AlertTriangle, Anchor, CheckCircle2, MapPin, Package, type LucideIcon } from "lucide-react";
 
 import { AppShell, btnPrimary } from "@/components/AppShell";
 import { NewShipmentForm } from "@/components/NewShipmentForm";
@@ -8,7 +9,19 @@ import { ShipmentTable } from "@/components/ShipmentTable";
 import { SeverityBadge, SourceTag } from "@/components/StatusPill";
 import { useMonitoringConfig } from "@/hooks/useMonitoringConfig";
 import { isLegacyStatus, listAllDocuments, listAllEvents, listAlerts, listShipments } from "@/lib/api";
-import { alertSeverity, kpis, relativeTime, SEVERITY_LABEL } from "@/lib/lifecycle";
+import { alertSeverity, kpis, relativeTime, SEVERITY_LABEL, type Severity } from "@/lib/lifecycle";
+
+const SEVERITY_BORDER: Record<Severity, string> = {
+  critical: "border-l-risk",
+  attention: "border-l-warning",
+  informational: "border-l-border",
+};
+
+const SOURCE_BORDER: Record<string, string> = {
+  ais: "border-l-teal",
+  system: "border-l-primary",
+  manual: "border-l-border",
+};
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -102,12 +115,17 @@ function Dashboard() {
     >
       {open ? <NewShipmentForm onClose={() => setOpen(false)} /> : null}
 
-      <div className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[13px]">
-        <Summary label="Active" value={stats.active} />
-        <Summary label="In Transit" value={stats.inTransit} />
-        <Summary label="Approaching" value={stats.approaching} />
-        <Summary label="Arrived" value={stats.arrived} tone="positive" />
-        <Summary label="Alerts" value={stats.exceptions} tone={stats.exceptions > 0 ? "risk" : undefined} />
+      <div className="mb-4 grid grid-cols-2 divide-x divide-y divide-border overflow-hidden rounded-[var(--radius)] border border-border bg-surface sm:grid-cols-3 sm:divide-y-0 lg:grid-cols-5">
+        <Instrument icon={Package} label="Active" value={stats.active} tone="primary" />
+        <Instrument icon={Anchor} label="In Transit" value={stats.inTransit} tone="primary" />
+        <Instrument icon={MapPin} label="Approaching" value={stats.approaching} tone="teal" />
+        <Instrument icon={CheckCircle2} label="Arrived" value={stats.arrived} tone="positive" />
+        <Instrument
+          icon={AlertTriangle}
+          label="Alerts"
+          value={stats.exceptions}
+          tone={stats.exceptions > 0 ? "risk" : "neutral"}
+        />
       </div>
 
       <ShipmentTable
@@ -128,7 +146,7 @@ function Dashboard() {
               View all
             </Link>
           </div>
-          <div className="rounded-[var(--radius)] border border-border bg-surface">
+          <div className="panel overflow-hidden">
             {topAlerts.length === 0 ? (
               <p className="px-3 py-3 text-[12px] text-muted-foreground">No open alerts.</p>
             ) : (
@@ -136,7 +154,9 @@ function Dashboard() {
                 {topAlerts.map(({ alert, severity }) => {
                   const shipment = alert.shipment_id ? shipmentById.get(alert.shipment_id) : undefined;
                   const row = (
-                    <div className="flex items-center gap-2.5 px-3 py-2">
+                    <div
+                      className={`flex items-center gap-2.5 border-l-2 px-3 py-2 ${SEVERITY_BORDER[severity]}`}
+                    >
                       <SeverityBadge severity={severity} label={SEVERITY_LABEL[severity]} />
                       <p className="min-w-0 flex-1 truncate text-[12px] text-foreground">{alert.message}</p>
                       <span className="shrink-0 text-[11px] text-muted-foreground">
@@ -150,7 +170,7 @@ function Dashboard() {
                         <Link
                           to="/shipments/$id"
                           params={{ id: shipment.id }}
-                          className="block transition-colors hover:bg-subtle/70"
+                          className="block transition-colors hover:bg-tint-selected/30"
                         >
                           {row}
                         </Link>
@@ -167,7 +187,7 @@ function Dashboard() {
 
         <section>
           <h2 className="label-xs mb-1.5">Recent activity</h2>
-          <div className="rounded-[var(--radius)] border border-border bg-surface">
+          <div className="panel overflow-hidden">
             {events.length === 0 ? (
               <p className="px-3 py-3 text-[12px] text-muted-foreground">No recent activity yet.</p>
             ) : (
@@ -179,7 +199,9 @@ function Dashboard() {
                       ? `${event.field} → ${event.to_value ?? "—"}`
                       : (event.reason ?? event.event_type);
                   const content = (
-                    <div className="flex items-center gap-2.5 px-3 py-2">
+                    <div
+                      className={`flex items-center gap-2.5 border-l-2 px-3 py-2 ${SOURCE_BORDER[event.source] ?? "border-l-border"}`}
+                    >
                       <p className="min-w-0 flex-1 truncate text-[12px] text-foreground">
                         {shipment ? shipment.client_name : "Shipment"}
                         <span className="text-muted-foreground"> — {description}</span>
@@ -196,7 +218,7 @@ function Dashboard() {
                         <Link
                           to="/shipments/$id"
                           params={{ id: shipment.id }}
-                          className="block transition-colors hover:bg-subtle/70"
+                          className="block transition-colors hover:bg-tint-selected/30"
                         >
                           {content}
                         </Link>
@@ -215,20 +237,36 @@ function Dashboard() {
   );
 }
 
-function Summary({
+const INSTRUMENT_TONE = {
+  primary: "bg-primary/[0.09] text-primary",
+  teal: "bg-teal-soft text-teal",
+  positive: "bg-positive-soft text-positive",
+  risk: "bg-risk-soft text-risk",
+  neutral: "bg-subtle text-muted-foreground",
+} as const;
+
+function Instrument({
+  icon: Icon,
   label,
   value,
   tone,
 }: {
+  icon: LucideIcon;
   label: string;
   value: number;
-  tone?: "positive" | "risk" | undefined;
+  tone: keyof typeof INSTRUMENT_TONE;
 }) {
-  const valueTone = tone === "positive" ? "text-positive" : tone === "risk" ? "text-risk" : "text-foreground";
   return (
-    <span className="inline-flex items-baseline gap-1.5">
-      <span className="text-muted-foreground">{label}</span>
-      <span className={`font-semibold tabular-nums ${valueTone}`}>{value}</span>
-    </span>
+    <div className="flex items-center gap-2.5 px-4 py-3">
+      <span className={`grid size-8 shrink-0 place-items-center rounded-sm ${INSTRUMENT_TONE[tone]}`}>
+        <Icon className="size-4" />
+      </span>
+      <div className="min-w-0">
+        <p className="text-[19px] leading-none font-semibold tracking-[-0.01em] tabular-nums text-foreground">
+          {value}
+        </p>
+        <p className="mt-1 text-[11px] text-muted-foreground">{label}</p>
+      </div>
+    </div>
   );
 }

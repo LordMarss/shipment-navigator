@@ -2,8 +2,16 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 
 import { AppShell } from "@/components/AppShell";
-import { StatusPill } from "@/components/StatusPill";
+import { StatusPill, statusAccent } from "@/components/StatusPill";
 import { listAlerts } from "@/lib/api";
+
+const ACCENT_BORDER = {
+  neutral: "border-l-border",
+  teal: "border-l-teal",
+  primary: "border-l-primary",
+  positive: "border-l-positive",
+  warning: "border-l-warning",
+} as const;
 
 export const Route = createFileRoute("/alerts")({
   head: () => ({
@@ -37,7 +45,12 @@ function AlertsPage() {
           </p>
         ) : (
           alerts.map((a) => (
-            <div key={a.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2.5">
+            <div
+              key={a.id}
+              className={`flex flex-wrap items-center gap-x-3 gap-y-1 border-l-2 px-3 py-2.5 transition-colors hover:bg-subtle/50 ${
+                ACCENT_BORDER[a.to_status ? statusAccent(a.to_status) : "neutral"]
+              }`}
+            >
               <span className="w-36 shrink-0 font-mono text-[12px] text-muted-foreground">
                 {new Date(a.created_at).toLocaleString(undefined, {
                   month: "short",

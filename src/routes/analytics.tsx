@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { BarChart3 } from "lucide-react";
 
 import { AppShell, EmptyState, Skeleton } from "@/components/AppShell";
 import { StatusPill } from "@/components/StatusPill";
@@ -75,6 +76,7 @@ function AnalyticsPage() {
       {shipments.length === 0 ? (
         <div className="panel">
           <EmptyState
+            icon={BarChart3}
             title="Nothing to analyse yet"
             description="Metrics appear once your first shipment is created."
           />
@@ -118,7 +120,10 @@ function AnalyticsPage() {
               <p className="label-xs mb-3">Landed cost by client</p>
               <ul className="divide-y divide-border">
                 {byClient.map(([client, row]) => (
-                  <li key={client} className="flex items-center justify-between py-2 text-[13px]">
+                  <li
+                    key={client}
+                    className="flex items-center justify-between rounded-sm px-1.5 py-2 text-[13px] transition-colors hover:bg-tint-selected/30"
+                  >
                     <span className="truncate font-medium">{client}</span>
                     <span className="ml-3 shrink-0 text-muted-foreground">
                       {row.count} · {formatCost(row.cost)}
