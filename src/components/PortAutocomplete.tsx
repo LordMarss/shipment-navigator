@@ -56,25 +56,25 @@ export function PortAutocomplete({
         onFocus={() => setOpen(true)}
       />
       {portId ? (
-        <span className="mt-1 flex items-center gap-1 text-[11px] text-positive">
+        <span className="mt-1 flex items-center gap-1 text-xs text-positive">
           <Check className="size-3" />
           Linked to a seeded port
         </span>
       ) : null}
       {open && matches.length > 0 ? (
-        <div className="panel animate-in absolute left-0 top-[calc(100%+2px)] z-30 w-full max-w-sm overflow-hidden p-1 shadow-[0_8px_24px_-12px_rgba(20,33,61,0.25)]">
+        <div className="panel-lifted animate-in absolute left-0 top-[calc(100%+2px)] z-30 w-full max-w-sm overflow-hidden p-1">
           {matches.map((p) => (
             <button
               key={p.id}
               type="button"
-              className="focus-ring flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] hover:bg-subtle"
+              className="focus-ring flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm transition-colors hover:bg-subtle"
               onClick={() => {
                 onChange({ text: p.country ? `${p.name}, ${p.country}` : p.name, portId: p.id });
                 setOpen(false);
               }}
             >
               <span className="truncate font-medium">{p.name}</span>
-              <span className="ml-auto shrink-0 truncate text-[12px] text-muted-foreground">
+              <span className="ml-auto shrink-0 truncate text-xs text-muted-foreground">
                 {[p.country, p.unlocode].filter(Boolean).join(" · ")}
               </span>
             </button>

@@ -45,7 +45,7 @@ function DocumentsPage() {
       wide
     >
       {isLoading ? (
-        <div className="panel space-y-2 p-3">
+        <div className="panel space-y-2 p-4">
           {[0, 1, 2].map((i) => (
             <Skeleton key={i} className="h-9 w-full" />
           ))}
@@ -60,18 +60,18 @@ function DocumentsPage() {
         </div>
       ) : (
         <div className="panel overflow-x-auto">
-          <table className="w-full min-w-[860px] border-collapse text-[13px]">
+          <table className="w-full min-w-[860px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-border text-left">
-                <th className="label-xs px-3 py-2">Shipment</th>
-                <th className="label-xs px-3 py-2">Client</th>
+                <th className="label-xs px-4 py-2.5">Shipment</th>
+                <th className="label-xs px-4 py-2.5">Client</th>
                 {STANDARD_DOCUMENTS.map((name) => (
-                  <th key={name} className="label-xs px-3 py-2">
+                  <th key={name} className="label-xs px-4 py-2.5">
                     {name}
                   </th>
                 ))}
-                <th className="label-xs px-3 py-2">Other</th>
-                <th className="label-xs px-3 py-2">Complete</th>
+                <th className="label-xs px-4 py-2.5">Other</th>
+                <th className="label-xs px-4 py-2.5">Complete</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -83,33 +83,33 @@ function DocumentsPage() {
                 const attached = standard.filter((d) => d?.file_path).length;
                 const other = docs.filter((d) => !d.is_standard).length;
                 return (
-                  <tr key={s.id} className="transition-colors hover:bg-tint-selected/30">
-                    <td className="px-3 py-2">
+                  <tr key={s.id} className="transition-colors hover:bg-subtle/60">
+                    <td className="px-4 py-2.5">
                       <Link
                         to="/shipments/$id"
                         params={{ id: s.id }}
-                        className="font-mono text-[12px] text-primary hover:underline"
+                        className="font-mono text-xs text-primary hover:underline"
                       >
                         {shortId(s.id)}
                       </Link>
                     </td>
-                    <td className="px-3 py-2 font-medium">{s.client_name}</td>
+                    <td className="px-4 py-2.5 font-medium">{s.client_name}</td>
                     {standard.map((d, i) => (
-                      <td key={i} className="px-3 py-2">
+                      <td key={i} className="px-4 py-2.5">
                         {d?.file_path ? (
-                          <span className="inline-flex items-center gap-1.5 text-[12px] text-muted-foreground">
+                          <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
                             <span className="size-1.5 rounded-full bg-positive" />
                             <span className="max-w-[140px] truncate">{d.file_name}</span>
                           </span>
                         ) : (
-                          <span className="text-[12px] text-muted-foreground/60">Missing</span>
+                          <span className="text-xs text-muted-foreground/60">Missing</span>
                         )}
                       </td>
                     ))}
-                    <td className="px-3 py-2 text-[12px] text-muted-foreground">
+                    <td className="px-4 py-2.5 text-xs text-muted-foreground">
                       {other > 0 ? `${other} file${other === 1 ? "" : "s"}` : "—"}
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-4 py-2.5">
                       <DocsIndicator attached={attached} total={STANDARD_DOCUMENTS.length} />
                     </td>
                   </tr>

@@ -43,7 +43,7 @@ function VesselsPage() {
       wide
     >
       {isLoading ? (
-        <div className="panel space-y-2 p-3">
+        <div className="panel space-y-2 p-4">
           {[0, 1, 2].map((i) => (
             <Skeleton key={i} className="h-9 w-full" />
           ))}
@@ -58,38 +58,38 @@ function VesselsPage() {
         </div>
       ) : (
         <div className="panel overflow-x-auto">
-          <table className="w-full min-w-[820px] border-collapse text-[13px]">
+          <table className="w-full min-w-[820px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-border text-left">
-                <th className="label-xs px-3 py-2">Vessel</th>
-                <th className="label-xs px-3 py-2">MMSI</th>
-                <th className="label-xs px-3 py-2">Shipment</th>
-                <th className="label-xs px-3 py-2">Route</th>
-                <th className="label-xs px-3 py-2">ETA</th>
-                <th className="label-xs px-3 py-2">Status</th>
+                <th className="label-xs px-4 py-2.5">Vessel</th>
+                <th className="label-xs px-4 py-2.5">MMSI</th>
+                <th className="label-xs px-4 py-2.5">Shipment</th>
+                <th className="label-xs px-4 py-2.5">Route</th>
+                <th className="label-xs px-4 py-2.5">ETA</th>
+                <th className="label-xs px-4 py-2.5">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {withVessel.map((s) => (
-                <tr key={s.id} className="transition-colors hover:bg-tint-selected/30">
-                  <td className="px-3 py-2 font-medium">{s.vessel_name || "Unnamed vessel"}</td>
-                  <td className="px-3 py-2 font-mono text-[12px] text-muted-foreground">
+                <tr key={s.id} className="transition-colors hover:bg-subtle/60">
+                  <td className="px-4 py-2.5 font-medium">{s.vessel_name || "Unnamed vessel"}</td>
+                  <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">
                     {s.vessel_mmsi || "—"}
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-4 py-2.5">
                     <Link
                       to="/shipments/$id"
                       params={{ id: s.id }}
-                      className="font-mono text-[12px] text-primary hover:underline"
+                      className="font-mono text-xs text-primary hover:underline"
                     >
                       {shortId(s.id)}
                     </Link>
                   </td>
-                  <td className="px-3 py-2 text-muted-foreground">
+                  <td className="px-4 py-2.5 text-muted-foreground">
                     {s.origin} → {s.destination}
                   </td>
-                  <td className="px-3 py-2 text-muted-foreground">{formatEta(s.eta)}</td>
-                  <td className="px-3 py-2">
+                  <td className="px-4 py-2.5 text-muted-foreground">{formatEta(s.eta)}</td>
+                  <td className="px-4 py-2.5">
                     <StatusPill status={s.status} />
                   </td>
                 </tr>

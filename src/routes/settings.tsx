@@ -44,28 +44,28 @@ function SettingsPage() {
       title="Settings"
       description="Configuration for this single-user operations workspace."
     >
-      <div className="grid gap-4 lg:grid-cols-2">
-        <section className="panel p-3">
-          <p className="label-xs mb-2">Workspace</p>
+      <div className="grid gap-x-10 gap-y-8 lg:grid-cols-2">
+        <section>
+          <h2 className="label-xs mb-1">Workspace</h2>
           <Row label="Company" value="StimTech Solutions" />
           <Row label="Mode" value="Single-user (no sign-in required)" />
           <Row label="Shipments stored" value={String(shipments.length)} />
           <Row label="Documents stored" value={String(documents.length)} />
         </section>
 
-        <section className="panel p-3">
-          <p className="label-xs mb-2">Document policy</p>
+        <section>
+          <h2 className="label-xs mb-1">Document policy</h2>
           <Row label="Max file size" value={formatBytes(MAX_FILE_BYTES)} />
           <Row label="Accepted types" value="PDF, JPG, PNG" />
           <Row label="Storage access" value="Private — signed links only" />
           <Row label="Raw accept list" value={ACCEPTED_FILE_TYPES} />
         </section>
 
-        <section className="panel p-3 lg:col-span-2">
-          <p className="label-xs mb-2">Standard documents auto-created per shipment</p>
+        <section className="lg:col-span-2">
+          <h2 className="label-xs mb-2">Standard documents auto-created per shipment</h2>
           <ul className="grid gap-1.5 sm:grid-cols-2">
             {STANDARD_DOCUMENTS.map((name) => (
-              <li key={name} className="flex items-center gap-2 text-[13px]">
+              <li key={name} className="flex items-center gap-2 text-sm">
                 <span className="size-1.5 rounded-full bg-primary/70" />
                 {name}
               </li>
@@ -79,7 +79,7 @@ function SettingsPage() {
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-start justify-between gap-4 border-t border-border py-2 text-[13px] first-of-type:border-t-0">
+    <div className="flex items-start justify-between gap-4 border-t border-border py-2.5 text-sm first-of-type:border-t-0">
       <span className="text-muted-foreground">{label}</span>
       <span className="max-w-[60%] truncate text-right font-medium">{value}</span>
     </div>

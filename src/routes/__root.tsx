@@ -10,6 +10,7 @@ import {
 import { useEffect, type ReactNode } from "react";
 
 import { Toaster } from "@/components/ui/sonner";
+import { btnGhost, btnPrimary } from "@/components/AppShell";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 
@@ -17,16 +18,13 @@ function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
-        <h1 className="text-2xl font-semibold text-foreground">404</h1>
-        <h2 className="mt-2 text-[15px] font-medium text-foreground">Page not found</h2>
-        <p className="mt-1 text-[13px] text-muted-foreground">
+        <h1 className="text-3xl font-semibold text-foreground">404</h1>
+        <h2 className="mt-2 text-base font-medium text-foreground">Page not found</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
           The page you're looking for doesn't exist or has been moved.
         </p>
         <div className="mt-5">
-          <Link
-            to="/"
-            className="inline-flex h-8 items-center rounded-sm border border-primary bg-primary px-3 text-[13px] font-medium text-primary-foreground"
-          >
+          <Link to="/" className={btnPrimary}>
             Back to dashboard
           </Link>
         </div>
@@ -45,10 +43,8 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
-        <h1 className="text-[15px] font-semibold tracking-tight text-foreground">
-          This page didn't load
-        </h1>
-        <p className="mt-1 text-[13px] text-muted-foreground">
+        <h1 className="text-lg font-semibold tracking-tight text-foreground">This page didn't load</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Something went wrong. You can retry or head back to the dashboard.
         </p>
         <div className="mt-5 flex flex-wrap justify-center gap-2">
@@ -57,14 +53,11 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
               router.invalidate();
               reset();
             }}
-            className="inline-flex h-8 items-center rounded-sm border border-primary bg-primary px-3 text-[13px] font-medium text-primary-foreground"
+            className={btnPrimary}
           >
             Try again
           </button>
-          <a
-            href="/"
-            className="inline-flex h-8 items-center rounded-sm border border-border bg-surface px-3 text-[13px] font-medium text-foreground"
-          >
+          <a href="/" className={btnGhost}>
             Dashboard
           </a>
         </div>

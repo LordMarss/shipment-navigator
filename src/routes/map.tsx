@@ -71,9 +71,8 @@ function FleetMap() {
     >
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
         <div className="panel overflow-hidden">
-          <div className="h-[3px] bg-primary" aria-hidden />
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-subtle px-3 py-2">
-            <span className="inline-flex items-center gap-2 text-[12px] font-medium">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
+            <span className="inline-flex items-center gap-2 text-sm font-medium">
               {tracked ? (
                 <span className="inline-flex size-1.5 shrink-0 rounded-full bg-primary live-pulse" aria-hidden />
               ) : null}
@@ -90,7 +89,7 @@ function FleetMap() {
             className="h-[420px] w-full border-0 lg:h-[560px]"
             loading="lazy"
           />
-          <p className="border-t border-border px-3 py-2 text-[12px] text-muted-foreground">
+          <p className="border-t border-border px-4 py-2.5 text-xs text-muted-foreground">
             {tracked
               ? "If the vessel does not appear on the map: No current position data for this vessel."
               : "Vessel positions are supplied by the public MarineTraffic live map."}
@@ -98,17 +97,15 @@ function FleetMap() {
         </div>
 
         <aside className="panel overflow-hidden">
-          <div className="border-b border-border px-3 py-2">
-            <h2 className="text-[13px] font-semibold">Active shipments</h2>
-            <p className="text-[12px] text-muted-foreground">Not yet delivered</p>
+          <div className="border-b border-border px-4 py-3">
+            <h2 className="label-xs">Active shipments</h2>
+            <p className="mt-1 text-xs text-muted-foreground">Not yet delivered</p>
           </div>
 
           {isLoading ? (
-            <p className="px-3 py-6 text-center text-[13px] text-muted-foreground">Loading…</p>
+            <p className="px-4 py-6 text-center text-sm text-muted-foreground">Loading…</p>
           ) : active.length === 0 ? (
-            <p className="px-3 py-6 text-center text-[13px] text-muted-foreground">
-              No active shipments.
-            </p>
+            <p className="px-4 py-6 text-center text-sm text-muted-foreground">No active shipments.</p>
           ) : (
             <ul className="divide-y divide-border">
               {active.map((s) => {
@@ -116,7 +113,7 @@ function FleetMap() {
                 return (
                   <li
                     key={s.id}
-                    className={`border-l-2 px-3 py-2.5 transition-colors ${
+                    className={`border-l-2 px-4 py-3 transition-colors duration-150 ${
                       isTracked ? "border-l-primary bg-tint-selected/40" : "border-l-transparent hover:bg-subtle/60"
                     }`}
                   >
@@ -125,11 +122,11 @@ function FleetMap() {
                         <Link
                           to="/shipments/$id"
                           params={{ id: s.id }}
-                          className="block truncate text-[13px] font-medium text-primary hover:underline"
+                          className="block truncate text-sm font-medium text-primary hover:underline"
                         >
                           {shortId(s.id)} · {s.client_name}
                         </Link>
-                        <p className="truncate text-[12px] text-muted-foreground">
+                        <p className="truncate text-xs text-muted-foreground">
                           {s.origin} → {s.destination}
                         </p>
                       </div>
@@ -138,7 +135,7 @@ function FleetMap() {
 
                     {s.vessel_mmsi ? (
                       <div className="mt-2 flex items-center justify-between gap-2">
-                        <span className="text-[12px] text-muted-foreground">
+                        <span className="text-xs text-muted-foreground">
                           {s.vessel_name || "Vessel"} · {s.vessel_mmsi}
                         </span>
                         <button

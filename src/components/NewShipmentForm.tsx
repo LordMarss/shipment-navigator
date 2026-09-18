@@ -62,15 +62,15 @@ export function NewShipmentForm({ onClose }: { onClose: () => void }) {
 
   return (
     <form
-      className="panel animate-in mb-5 overflow-hidden"
+      className="panel animate-in mb-6 overflow-hidden"
       onSubmit={(e) => {
         e.preventDefault();
         create.mutate();
       }}
     >
-      <div className="border-b border-border px-4 py-3">
-        <h2 className="text-[14px] font-semibold">New shipment</h2>
-        <p className="text-[12px] text-muted-foreground">
+      <div className="border-b border-border px-5 py-4">
+        <h2 className="text-base font-semibold">New shipment</h2>
+        <p className="text-xs text-muted-foreground">
           Four standard trade documents are created automatically.
         </p>
       </div>
@@ -142,7 +142,7 @@ export function NewShipmentForm({ onClose }: { onClose: () => void }) {
         {mmsi ? (
           <div className="sm:col-span-3">
             {mmsiValid ? (
-              <p className="flex items-center gap-1.5 text-[12px] text-positive">
+              <p className="flex items-center gap-1.5 text-xs text-positive">
                 <Check className="size-3.5" />
                 Vessel found on the fleet map
                 {form.vessel_name.trim() ? (
@@ -156,7 +156,7 @@ export function NewShipmentForm({ onClose }: { onClose: () => void }) {
                 )}
               </p>
             ) : (
-              <p className="text-[12px] text-warning">
+              <p className="text-xs text-warning">
                 An MMSI is 9 digits. Live tracking stays off until a valid MMSI is saved.
               </p>
             )}
@@ -177,7 +177,7 @@ export function NewShipmentForm({ onClose }: { onClose: () => void }) {
         </Field>
       </Section>
 
-      <div className="flex items-center gap-2 border-t border-border bg-subtle/40 px-4 py-3">
+      <div className="flex items-center gap-2 border-t border-border bg-subtle/50 px-5 py-3.5">
         <button className={btnPrimary} type="submit" disabled={create.isPending}>
           {create.isPending ? "Creating…" : "Create shipment"}
         </button>
@@ -201,13 +201,13 @@ function Section({
   children: ReactNode;
 }) {
   return (
-    <div className="grid grid-cols-1 gap-4 border-b border-border px-4 py-4 lg:grid-cols-[180px_1fr]">
+    <div className="grid grid-cols-1 gap-4 border-b border-border px-5 py-5 lg:grid-cols-[180px_1fr]">
       <div>
         <p className="flex items-baseline gap-2">
-          <span className="font-mono text-[11px] text-muted-foreground">{index}</span>
-          <span className="text-[13px] font-semibold">{title}</span>
+          <span className="font-mono text-xs text-muted-foreground">{index}</span>
+          <span className="text-sm font-semibold">{title}</span>
         </p>
-        <p className="mt-0.5 text-[12px] text-muted-foreground">{hint}</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">{children}</div>
     </div>

@@ -31,7 +31,7 @@ export function ShipmentNotes({ shipmentId }: { shipmentId: string }) {
 
   return (
     <div className="panel p-4">
-      <h2 className="mb-3 text-[13px] font-semibold">Notes</h2>
+      <h2 className="label-xs mb-3">Notes</h2>
 
       <form
         className="mb-4 flex flex-col gap-2 border-b border-border pb-4"
@@ -56,9 +56,9 @@ export function ShipmentNotes({ shipmentId }: { shipmentId: string }) {
       </form>
 
       {isLoading ? (
-        <p className="text-[12px] text-muted-foreground">Loading notes…</p>
+        <p className="text-xs text-muted-foreground">Loading notes…</p>
       ) : notes.length === 0 ? (
-        <p className="text-[12px] text-muted-foreground">No notes yet.</p>
+        <p className="text-xs text-muted-foreground">No notes yet.</p>
       ) : (
         <ul className="space-y-3">
           {notes.map((n) => (
@@ -96,8 +96,8 @@ function NoteRow({
   });
 
   return (
-    <li className="rounded-sm border border-border bg-subtle/40 p-3">
-      <div className="mb-1.5 flex items-center justify-between text-[11px] text-muted-foreground">
+    <li className="rounded-md border border-border bg-subtle/50 p-3">
+      <div className="mb-1.5 flex items-center justify-between text-xs text-muted-foreground">
         <span>{note.author ?? "Operator"}</span>
         <span>
           {formatDayTime(note.created_at)}
@@ -134,18 +134,18 @@ function NoteRow({
         </div>
       ) : (
         <>
-          <p className="whitespace-pre-wrap text-[13px] text-foreground">{note.body}</p>
+          <p className="whitespace-pre-wrap text-sm text-foreground">{note.body}</p>
           <div className="mt-1.5 flex justify-end gap-1.5">
             <button
               type="button"
-              className="text-[11px] text-muted-foreground hover:text-foreground"
+              className="text-xs text-muted-foreground hover:text-foreground"
               onClick={() => setEditing(true)}
             >
               Edit
             </button>
             <button
               type="button"
-              className="text-[11px] text-muted-foreground hover:text-destructive"
+              className="text-xs text-muted-foreground hover:text-destructive"
               disabled={remove.isPending}
               onClick={() => {
                 if (confirm("Delete this note?")) remove.mutate();

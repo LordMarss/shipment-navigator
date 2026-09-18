@@ -137,7 +137,7 @@ export function ShipmentTable({
 
   return (
     <section className="panel overflow-hidden">
-      <div className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2.5">
+      <div className="flex flex-wrap items-center gap-2.5 border-b border-border px-4 py-3">
         <div className="relative min-w-[200px] flex-1">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
           <input
@@ -171,15 +171,15 @@ export function ShipmentTable({
             </option>
           ))}
         </select>
-        <span className="ml-auto text-[12px] text-muted-foreground">
+        <span className="ml-auto text-xs text-muted-foreground">
           {rows.length} of {shipments.length}
         </span>
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[980px] border-collapse text-[13px]">
+        <table className="w-full min-w-[980px] border-collapse text-sm">
           <thead>
-            <tr className="border-b border-border bg-subtle">
+            <tr className="border-b border-border">
               <Th>Shipment</Th>
               {showClient ? (
                 <Th sortKey="client_name" sort={sort} onSort={toggleSort}>
@@ -208,7 +208,7 @@ export function ShipmentTable({
             {isLoading ? (
               Array.from({ length: 4 }).map((_, i) => (
                 <tr key={i} className="border-b border-border last:border-0">
-                  <td colSpan={columnCount} className="px-3 py-2.5">
+                  <td colSpan={columnCount} className="px-4 py-3">
                     <Skeleton className="h-4 w-full" />
                   </td>
                 </tr>
@@ -236,18 +236,16 @@ export function ShipmentTable({
                   <tr
                     key={s.id}
                     onClick={() => navigate({ to: "/shipments/$id", params: { id: s.id } })}
-                    className="group cursor-pointer border-b border-border last:border-0 transition-colors hover:bg-tint-selected/35"
+                    className="group cursor-pointer border-b border-border last:border-0 transition-colors duration-150 hover:bg-subtle/60"
                   >
-                    <td className="border-l-2 border-l-transparent px-3 py-2.5 font-mono text-[12px] text-muted-foreground transition-colors group-hover:border-l-primary group-hover:text-primary">
+                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground transition-colors group-hover:text-primary">
                       {shortId(s.id)}
                     </td>
-                    {showClient ? (
-                      <td className="px-3 py-2.5 font-medium">{s.client_name}</td>
-                    ) : null}
-                    <td className="px-3 py-2.5 text-muted-foreground">
+                    {showClient ? <td className="px-4 py-3 font-medium">{s.client_name}</td> : null}
+                    <td className="px-4 py-3 text-muted-foreground">
                       {s.origin} <span className="text-muted-foreground/50">→</span> {s.destination}
                     </td>
-                    <td className="px-3 py-2.5">
+                    <td className="px-4 py-3">
                       {s.vessel_name ? (
                         <span className="inline-flex items-center gap-1.5 text-foreground">
                           <Ship className="size-3 shrink-0 text-muted-foreground/70" />
@@ -257,12 +255,12 @@ export function ShipmentTable({
                         <span className="text-muted-foreground/70">—</span>
                       )}
                     </td>
-                    <td className="px-3 py-2.5">
+                    <td className="px-4 py-3">
                       <StatusPill status={s.status} />
                     </td>
-                    <td className="px-3 py-2.5 text-muted-foreground">{formatEta(s.eta)}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{formatEta(s.eta)}</td>
                     {alerts ? (
-                      <td className="px-3 py-2.5">
+                      <td className="px-4 py-3">
                         {shipmentAlert ? (
                           <SeverityBadge
                             severity={shipmentAlert.severity}
@@ -277,11 +275,11 @@ export function ShipmentTable({
                         )}
                       </td>
                     ) : null}
-                    <td className="px-3 py-2.5">
+                    <td className="px-4 py-3">
                       <DocsIndicator attached={docs.attached} total={docs.total} />
                     </td>
                     {showLastUpdated ? (
-                      <td className="px-3 py-2.5 text-muted-foreground">
+                      <td className="px-4 py-3 text-muted-foreground">
                         <span className="inline-flex items-center gap-1.5">
                           <span
                             className={`size-1.5 rounded-full ${freshnessDot(s.updated_at)}`}
@@ -292,7 +290,7 @@ export function ShipmentTable({
                       </td>
                     ) : null}
                     {showLandedCost ? (
-                      <td className="px-3 py-2.5 text-right font-medium tabular-nums">
+                      <td className="px-4 py-3 text-right font-medium tabular-nums">
                         {formatCost(s.landed_cost)}
                       </td>
                     ) : null}
@@ -305,7 +303,7 @@ export function ShipmentTable({
       </div>
 
       {rows.length > 0 ? (
-        <div className="border-t border-border px-3 py-2 text-[12px] text-muted-foreground">
+        <div className="border-t border-border px-4 py-2.5 text-xs text-muted-foreground">
           Select a row to open the shipment, or{" "}
           <Link to="/map" className="text-primary hover:underline">
             view the fleet map
@@ -346,7 +344,7 @@ function Th({
 
   return (
     <th
-      className={`px-3 py-2 text-[11px] font-medium uppercase tracking-[0.05em] text-muted-foreground ${
+      className={`px-4 py-2.5 text-xs font-medium uppercase tracking-[0.05em] text-muted-foreground ${
         align === "right" ? "text-right" : "text-left"
       }`}
     >

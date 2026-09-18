@@ -14,6 +14,9 @@ import {
   type ShipmentDocument,
 } from "@/lib/api";
 
+const actionBtn =
+  "focus-ring rounded-md border border-border bg-surface px-2 py-1 text-xs text-foreground transition-colors hover:bg-subtle disabled:opacity-45";
+
 export function DocumentFiles({
   shipmentId,
   documents,
@@ -44,8 +47,8 @@ export function DocumentFiles({
   return (
     <div className="panel p-4">
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-[13px] font-semibold">Documents</h2>
-        <span className="text-[12px] text-muted-foreground">
+        <h2 className="label-xs">Documents</h2>
+        <span className="text-xs text-muted-foreground">
           {doneCount}/{standard.length} attached
         </span>
       </div>
@@ -58,7 +61,7 @@ export function DocumentFiles({
 
       <div className="mt-4 border-t border-border pt-3">
         <div className="mb-1 flex items-center justify-between">
-          <h3 className="text-[13px] font-semibold">Other documents</h3>
+          <h3 className="label-xs">Other documents</h3>
           <button
             type="button"
             className={btnGhost}
@@ -68,7 +71,7 @@ export function DocumentFiles({
             {addingOther ? "Uploading…" : "Add file"}
           </button>
         </div>
-        <p className="text-[12px] text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           Customs notices, photos, email confirmations — PDF, JPG or PNG up to 10 MB.
         </p>
         <input
@@ -91,7 +94,7 @@ export function DocumentFiles({
             ))}
           </ul>
         ) : (
-          <p className="mt-2 text-[12px] text-muted-foreground">No additional files.</p>
+          <p className="mt-2 text-xs text-muted-foreground">No additional files.</p>
         )}
       </div>
     </div>
@@ -137,24 +140,24 @@ function DocumentRow({
   return (
     <li className="flex items-start justify-between gap-3 py-2.5">
       <div className="min-w-0">
-        <div className="flex items-center gap-2 text-[13px]">
+        <div className="flex items-center gap-2 text-sm">
           <span
             aria-hidden
             className={`size-1.5 shrink-0 rounded-full ${attached ? "bg-positive" : "bg-border"}`}
           />
           <span className="truncate font-medium">{doc.name}</span>
           {attached ? (
-            <span className="shrink-0 text-[11px] uppercase tracking-wide text-muted-foreground">
+            <span className="shrink-0 text-xs uppercase tracking-wide text-muted-foreground">
               {doc.file_type}
             </span>
           ) : null}
         </div>
         {attached ? (
-          <p className="mt-0.5 truncate pl-3.5 text-[12px] text-muted-foreground">
+          <p className="mt-0.5 truncate pl-3.5 text-xs text-muted-foreground">
             {doc.file_name} · {formatDate(doc.uploaded_at)}
           </p>
         ) : (
-          <p className="mt-0.5 pl-3.5 text-[12px] text-muted-foreground">No file attached</p>
+          <p className="mt-0.5 pl-3.5 text-xs text-muted-foreground">No file attached</p>
         )}
       </div>
 
@@ -173,17 +176,12 @@ function DocumentRow({
         />
         {attached ? (
           <>
-            <button
-              type="button"
-              className="focus-ring rounded-sm border border-border bg-surface px-1.5 py-1 text-[12px] text-foreground hover:bg-subtle"
-              title="View or download"
-              onClick={open}
-            >
+            <button type="button" className={actionBtn} title="View or download" onClick={open}>
               View
             </button>
             <button
               type="button"
-              className="focus-ring rounded-sm border border-border bg-surface px-1.5 py-1 text-[12px] text-foreground hover:bg-subtle disabled:opacity-45"
+              className={actionBtn}
               disabled={busy}
               onClick={() => input.current?.click()}
             >
@@ -191,7 +189,7 @@ function DocumentRow({
             </button>
             <button
               type="button"
-              className="focus-ring rounded-sm border border-destructive/30 bg-surface px-1.5 py-1 text-[12px] text-destructive hover:bg-risk-soft disabled:opacity-45"
+              className="focus-ring rounded-md border border-destructive/30 bg-surface px-2 py-1 text-xs text-destructive transition-colors hover:bg-risk-soft disabled:opacity-45"
               disabled={busy}
               onClick={() =>
                 void run(
@@ -206,7 +204,7 @@ function DocumentRow({
         ) : (
           <button
             type="button"
-            className="focus-ring rounded-sm border border-primary bg-primary px-2 py-1 text-[12px] font-medium text-primary-foreground hover:opacity-90 disabled:opacity-45"
+            className="focus-ring rounded-md border border-primary bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary-hover disabled:opacity-45"
             disabled={busy}
             onClick={() => input.current?.click()}
           >

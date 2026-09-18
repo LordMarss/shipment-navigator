@@ -266,7 +266,7 @@ function ShipmentDetail() {
   if (isLoading) {
     return (
       <AppShell title="Shipment">
-        <p className="panel px-3 py-8 text-center text-[13px] text-muted-foreground">Loading…</p>
+        <p className="panel px-4 py-8 text-center text-sm text-muted-foreground">Loading…</p>
       </AppShell>
     );
   }
@@ -274,7 +274,7 @@ function ShipmentDetail() {
   if (!shipment || !draft || !dates) {
     return (
       <AppShell title="Shipment not found">
-        <div className="panel px-3 py-8 text-center text-[13px] text-muted-foreground">
+        <div className="panel px-4 py-8 text-center text-sm text-muted-foreground">
           This shipment no longer exists.{" "}
           <Link to="/" className="text-primary hover:underline">
             Back to dashboard
@@ -312,7 +312,7 @@ function ShipmentDetail() {
           <Link
             to="/"
             aria-label="Back to shipments"
-            className="focus-ring -ml-1 rounded-sm p-1 text-muted-foreground hover:text-foreground"
+            className="focus-ring -ml-1 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-subtle hover:text-foreground"
           >
             <ArrowLeft className="size-4" />
           </Link>
@@ -333,13 +333,13 @@ function ShipmentDetail() {
         </>
       }
     >
-      <div className="-mt-2 mb-4 flex gap-1 border-b border-border">
+      <div className="-mt-3 mb-6 flex gap-1 border-b border-border">
         {TABS.map((t) => (
           <button
             key={t.key}
             type="button"
             onClick={() => setTab(t.key)}
-            className={`-mb-px border-b-2 px-3 py-2 text-[13px] font-medium transition-colors ${
+            className={`-mb-px border-b-2 px-3.5 py-2.5 text-sm font-medium transition-colors duration-150 ${
               tab === t.key
                 ? "border-primary text-primary"
                 : "border-transparent text-muted-foreground hover:text-foreground"
@@ -352,9 +352,9 @@ function ShipmentDetail() {
       </div>
 
       {tab === "overview" ? (
-        <div className="flex flex-col gap-8">
+        <div className="flex flex-col gap-9">
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.4fr_1fr]">
-            <section className="panel p-4">
+            <section className="panel p-5">
               <h2 className="label-xs mb-2">Status</h2>
               <StatusPill status={shipment.status} size="lg" />
               {conditionLabel ? (
@@ -365,7 +365,7 @@ function ShipmentDetail() {
               ) : null}
               <div className="mt-3">
                 <p className="label-xs">Last updated</p>
-                <p className="text-[13px] text-foreground">{formatDayTime(lastStatusChange)}</p>
+                <p className="text-sm text-foreground">{formatDayTime(lastStatusChange)}</p>
               </div>
 
               <div className="my-4 border-t border-border" />
@@ -373,39 +373,33 @@ function ShipmentDetail() {
               <h2 className="label-xs mb-2">Current Vessel</h2>
               {shipment.vessel_name || shipment.vessel_mmsi ? (
                 <div className="flex items-center gap-3">
-                  <span className="flex size-12 shrink-0 items-center justify-center rounded-lg border border-primary/20 bg-primary-soft text-primary-deep">
+                  <span className="flex size-11 shrink-0 items-center justify-center rounded-md border border-border bg-subtle text-muted-foreground">
                     <Ship className="size-5" />
                   </span>
                   <div className="min-w-0">
-                    <p className="truncate text-[14px] font-semibold text-foreground">
+                    <p className="truncate text-base font-semibold text-foreground">
                       {shipment.vessel_name ?? "Unnamed vessel"}
                     </p>
-                    <p className="text-[12px] text-muted-foreground">
+                    <p className="text-xs text-muted-foreground">
                       {shipment.carrier ? `${shipment.carrier} · ` : ""}
                       MMSI {shipment.vessel_mmsi ?? "—"}
                     </p>
                   </div>
                 </div>
               ) : (
-                <p className="text-[12px] text-muted-foreground">No vessel assigned to this shipment yet.</p>
+                <p className="text-xs text-muted-foreground">No vessel assigned to this shipment yet.</p>
               )}
 
               {shipment.vessel_mmsi ? (
                 <div
-                  className={`mt-3 rounded-[var(--radius)] border p-3 ${
-                    position && hasFreshAis
-                      ? "border-primary/20 bg-primary-soft"
-                      : "border-border bg-subtle/60"
+                  className={`mt-3 rounded-lg border p-3 ${
+                    position && hasFreshAis ? "border-primary/25 bg-primary-soft" : "border-border bg-subtle/60"
                   }`}
                 >
                   {position ? (
                     <>
                       <div className="mb-3 flex items-center justify-between">
-                        <span
-                          className={`inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.07em] ${
-                            hasFreshAis ? "text-primary-deep" : "text-muted-foreground"
-                          }`}
-                        >
+                        <span className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.06em] text-foreground">
                           <span
                             className={`size-1.5 rounded-full ${hasFreshAis ? "bg-primary live-pulse" : "bg-muted-foreground/50"}`}
                             aria-hidden
@@ -414,7 +408,7 @@ function ShipmentDetail() {
                         </span>
                         <Link
                           to="/map"
-                          className="inline-flex shrink-0 items-center gap-1 text-[12px] font-medium text-primary hover:underline"
+                          className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-primary hover:underline"
                         >
                           View on map <ArrowRight className="size-3.5" />
                         </Link>
@@ -434,7 +428,7 @@ function ShipmentDetail() {
                       </div>
                     </>
                   ) : (
-                    <p className="text-[12px] text-muted-foreground">
+                    <p className="text-xs text-muted-foreground">
                       No AIS position received yet for MMSI {shipment.vessel_mmsi}.
                     </p>
                   )}
@@ -445,7 +439,7 @@ function ShipmentDetail() {
                 type="button"
                 disabled={legacyTerminal}
                 onClick={openOverride}
-                className="mt-4 flex w-full items-center justify-between gap-2 rounded-[var(--radius)] border border-border bg-surface px-3.5 py-2.5 text-[13px] font-medium text-muted-foreground transition-colors hover:border-primary/30 hover:bg-primary/[0.04] hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+                className="mt-4 flex w-full items-center justify-between gap-2 rounded-md border border-border bg-surface px-3.5 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/30 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <span className="inline-flex items-center gap-2">
                   <RotateCcw className="size-3.5" />
@@ -455,12 +449,12 @@ function ShipmentDetail() {
               </button>
 
               {legacyTerminal ? (
-                <p className="mt-2 text-[12px] text-muted-foreground">
+                <p className="mt-2 text-xs text-muted-foreground">
                   This shipment holds a legacy status and has moved past the active lifecycle.
                 </p>
               ) : overrideOpen ? (
-                <div className="mt-3 space-y-3 rounded-sm border border-border bg-subtle/40 p-3">
-                  <p className="text-[12px] text-muted-foreground">
+                <div className="mt-3 space-y-3 rounded-lg border border-border bg-subtle/50 p-3.5">
+                  <p className="text-xs text-muted-foreground">
                     Use this if you need to correct a status change, like an accidental update or
                     incorrect AIS data. This will create a manual timeline event. Automation remains
                     primary.
@@ -518,7 +512,7 @@ function ShipmentDetail() {
               <section>
                 <h2 className="label-xs mb-3">Change History</h2>
                 {statusEvents.length === 0 ? (
-                  <p className="text-[12px] text-muted-foreground">No status changes recorded yet.</p>
+                  <p className="text-xs text-muted-foreground">No status changes recorded yet.</p>
                 ) : (
                   <ol>
                     {statusEvents.map((e, i) => {
@@ -526,21 +520,16 @@ function ShipmentDetail() {
                       return (
                         <li key={e.id} className="relative flex gap-3 pb-4 last:pb-0">
                           {i < statusEvents.length - 1 ? (
-                            <span
-                              aria-hidden
-                              className="absolute left-[4px] top-3 h-full w-px bg-border"
-                            />
+                            <span aria-hidden className="absolute left-[4px] top-3 h-full w-px bg-border" />
                           ) : null}
                           <span
                             aria-hidden
                             className={`mt-1 size-[9px] shrink-0 rounded-full ${dotColor} ${i === 0 ? "" : "opacity-45"}`}
                           />
                           <div className="min-w-0">
-                            <p className="text-[13px] font-semibold text-foreground">
-                              {e.to_value ?? e.event_type}
-                            </p>
-                            <p className="text-[12px] text-muted-foreground">{eventSourceLabel(e)}</p>
-                            <p className="text-[11px] text-muted-foreground">{formatDayTime(e.occurred_at)}</p>
+                            <p className="text-sm font-semibold text-foreground">{e.to_value ?? e.event_type}</p>
+                            <p className="text-xs text-muted-foreground">{eventSourceLabel(e)}</p>
+                            <p className="text-xs text-muted-foreground">{formatDayTime(e.occurred_at)}</p>
                           </div>
                         </li>
                       );
@@ -554,7 +543,7 @@ function ShipmentDetail() {
           <section>
             <h2 className="label-xs mb-4">Lifecycle</h2>
             <LifecycleStepper status={shipment.status} legacyTerminal={legacyTerminal} currentIndex={currentIndex} />
-            <div className="mt-5 flex flex-col gap-1 border-t border-border pt-4 text-[12px] text-muted-foreground sm:flex-row sm:gap-6">
+            <div className="mt-5 flex flex-col gap-1 border-t border-border pt-4 text-xs text-muted-foreground sm:flex-row sm:gap-6">
               <p>Monitoring: {monitoring.reason}</p>
               <p>
                 Automation:{" "}
@@ -566,13 +555,13 @@ function ShipmentDetail() {
           </section>
 
           <form
-            className="panel p-4"
+            className="panel p-5"
             onSubmit={(e) => {
               e.preventDefault();
               save.mutate();
             }}
           >
-            <h2 className="mb-3 text-[13px] font-semibold">Shipment Information</h2>
+            <h2 className="label-xs mb-3">Shipment Information</h2>
             <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
               <Field label="Client">
                 <input
@@ -694,24 +683,24 @@ function ShipmentDetail() {
       {tab === "alerts" ? (
         <div className="panel divide-y divide-border">
           {shipmentAlerts.length === 0 ? (
-            <p className="px-3 py-8 text-center text-[13px] text-muted-foreground">
+            <p className="px-4 py-8 text-center text-sm text-muted-foreground">
               No alerts recorded for this shipment.
             </p>
           ) : (
             shipmentAlerts.map((a) => {
               const severity = alertSeverity(a);
               return (
-                <div key={a.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2.5">
+                <div key={a.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
                   <SeverityBadge severity={severity} label={SEVERITY_LABEL[severity]} />
-                  <span className="flex-1 text-[13px] text-foreground">{a.message}</span>
+                  <span className="flex-1 text-sm text-foreground">{a.message}</span>
                   <span className="flex items-center gap-1.5">
                     {a.from_status ? <StatusPill status={a.from_status} /> : null}
                     {a.from_status && a.to_status ? (
-                      <span className="text-[11px] text-muted-foreground">→</span>
+                      <span className="text-xs text-muted-foreground">→</span>
                     ) : null}
                     {a.to_status ? <StatusPill status={a.to_status} /> : null}
                   </span>
-                  <span className="w-32 shrink-0 text-right text-[11px] text-muted-foreground">
+                  <span className="w-32 shrink-0 text-right text-xs text-muted-foreground">
                     {formatDayTime(a.created_at)}
                   </span>
                 </div>
@@ -750,18 +739,18 @@ function HeaderMenu({
     <div className="relative" ref={ref}>
       <button
         type="button"
-        className="focus-ring rounded-sm p-1.5 text-muted-foreground hover:bg-subtle hover:text-foreground"
+        className="focus-ring rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-subtle hover:text-foreground"
         aria-label="More actions"
         onClick={() => setOpen((v) => !v)}
       >
         <MoreHorizontal className="size-4" />
       </button>
       {open ? (
-        <div className="absolute right-0 z-10 mt-1 w-48 rounded-[var(--radius)] border border-border bg-surface py-1">
+        <div className="panel-lifted animate-in absolute right-0 z-10 mt-1.5 w-48 overflow-hidden p-1">
           {next ? (
             <button
               type="button"
-              className="block w-full px-3 py-1.5 text-left text-[13px] text-foreground hover:bg-subtle disabled:opacity-50"
+              className="block w-full rounded-md px-2.5 py-1.5 text-left text-sm text-foreground transition-colors hover:bg-subtle disabled:opacity-50"
               disabled={advancing}
               onClick={() => {
                 onAdvance();
@@ -773,7 +762,7 @@ function HeaderMenu({
           ) : null}
           <button
             type="button"
-            className="block w-full px-3 py-1.5 text-left text-[13px] text-destructive hover:bg-risk-soft"
+            className="block w-full rounded-md px-2.5 py-1.5 text-left text-sm text-destructive transition-colors hover:bg-risk-soft"
             onClick={() => {
               setOpen(false);
               onDelete();
@@ -798,11 +787,11 @@ function AisRow({
 }) {
   return (
     <div className="min-w-0">
-      <p className="flex items-center gap-1 text-[10px] text-muted-foreground">
+      <p className="flex items-center gap-1 text-xs text-muted-foreground">
         <Icon className="size-3 shrink-0" />
         {label}
       </p>
-      <p className="mt-0.5 truncate text-[14px] font-semibold tabular-nums text-foreground">{value}</p>
+      <p className="mt-0.5 truncate text-base font-semibold tabular-nums text-foreground">{value}</p>
     </div>
   );
 }
@@ -830,7 +819,7 @@ function LifecycleStepper({
               <div className="flex w-full items-center">
                 <span className={`h-px flex-1 ${isFirst ? "opacity-0" : done || current ? c.bg : "bg-border"}`} />
                 <span
-                  className={`flex size-5 shrink-0 items-center justify-center rounded-full border text-[10px] font-semibold ${
+                  className={`flex size-5 shrink-0 items-center justify-center rounded-full border text-xs font-semibold ${
                     current
                       ? `${c.border} ${c.bg} text-primary-foreground`
                       : done
@@ -843,7 +832,7 @@ function LifecycleStepper({
                 <span className={`h-px flex-1 ${isLast ? "opacity-0" : done ? c.bg : "bg-border"}`} />
               </div>
               <span
-                className={`mt-1.5 text-center text-[11px] leading-tight ${
+                className={`mt-1.5 text-center text-xs leading-tight ${
                   current ? `font-semibold ${c.text}` : done ? "text-foreground" : "text-muted-foreground"
                 }`}
               >
@@ -854,7 +843,7 @@ function LifecycleStepper({
         })}
       </ol>
       {legacyTerminal ? (
-        <p className="mt-3 text-[12px] text-muted-foreground">
+        <p className="mt-3 text-xs text-muted-foreground">
           This shipment holds a legacy status ({status}), retired from the active lifecycle.
         </p>
       ) : null}
@@ -866,7 +855,7 @@ function InfoField({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <span className="label-xs mb-1 block">{label}</span>
-      <span className="text-[13px] text-foreground">{value}</span>
+      <span className="text-sm text-foreground">{value}</span>
     </div>
   );
 }

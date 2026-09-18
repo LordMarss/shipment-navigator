@@ -2,25 +2,13 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 
-import { AppShell, btnPrimary } from "@/components/AppShell";
+import { AppShell, Stat, btnPrimary } from "@/components/AppShell";
 import { NewShipmentForm } from "@/components/NewShipmentForm";
 import { ShipmentTable } from "@/components/ShipmentTable";
 import { SeverityBadge, SourceTag } from "@/components/StatusPill";
 import { useMonitoringConfig } from "@/hooks/useMonitoringConfig";
 import { isLegacyStatus, listAllDocuments, listAllEvents, listAlerts, listShipments } from "@/lib/api";
 import { alertSeverity, kpis, relativeTime, SEVERITY_LABEL, type Severity } from "@/lib/lifecycle";
-
-const SEVERITY_BORDER: Record<Severity, string> = {
-  critical: "border-l-risk",
-  attention: "border-l-warning",
-  informational: "border-l-border",
-};
-
-const SOURCE_BORDER: Record<string, string> = {
-  ais: "border-l-primary",
-  system: "border-l-primary/50",
-  manual: "border-l-border",
-};
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -114,16 +102,12 @@ function Dashboard() {
     >
       {open ? <NewShipmentForm onClose={() => setOpen(false)} /> : null}
 
-      <div className="mb-8 flex flex-wrap items-start gap-x-10 gap-y-5">
-        <Metric label="Active" value={stats.active} />
-        <Divider />
-        <Metric label="In Transit" value={stats.inTransit} />
-        <Divider />
-        <Metric label="Approaching" value={stats.approaching} />
-        <Divider />
-        <Metric label="Arrived" value={stats.arrived} />
-        <Divider />
-        <Metric label="Alerts" value={stats.exceptions} alert={stats.exceptions > 0} />
+      <div className="mb-8 flex flex-wrap items-start gap-x-10 gap-y-5 border-b border-border pb-6">
+        <Stat label="Active" value={stats.active} />
+        <Stat label="In Transit" value={stats.inTransit} />
+        <Stat label="Approaching" value={stats.approaching} />
+        <Stat label="Arrived" value={stats.arrived} />
+        <Stat label="Alerts" value={stats.exceptions} {...(stats.exceptions > 0 ? { tone: "risk" as const } : {})} />
       </div>
 
       <ShipmentTable
@@ -136,122 +120,93 @@ function Dashboard() {
         showLastUpdated
       />
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+      <div className="mt-9 grid gap-8 lg:grid-cols-2">
         <section>
-          <div className="mb-1.5 flex items-center justify-between">
+          <div className="mb-2.5 flex items-center justify-between">
             <h2 className="label-xs">Exceptions</h2>
-            <Link to="/alerts" className="text-[11px] text-primary hover:underline">
+            <Link to="/alerts" className="text-xs font-medium text-primary hover:underline">
               View all
             </Link>
           </div>
-          <div className="panel overflow-hidden">
-            {topAlerts.length === 0 ? (
-              <p className="px-3 py-3 text-[12px] text-muted-foreground">No open alerts.</p>
-            ) : (
-              <ul>
-                {topAlerts.map(({ alert, severity }) => {
-                  const shipment = alert.shipment_id ? shipmentById.get(alert.shipment_id) : undefined;
-                  const row = (
-                    <div
-                      className={`flex items-center gap-2.5 border-l-2 px-3 py-2 ${SEVERITY_BORDER[severity]}`}
-                    >
-                      <SeverityBadge severity={severity} label={SEVERITY_LABEL[severity]} />
-                      <p className="min-w-0 flex-1 truncate text-[12px] text-foreground">{alert.message}</p>
-                      <span className="shrink-0 text-[11px] text-muted-foreground">
-                        {relativeTime(alert.created_at)}
-                      </span>
-                    </div>
-                  );
-                  return (
-                    <li key={alert.id} className="border-b border-border last:border-0">
-                      {shipment ? (
-                        <Link
-                          to="/shipments/$id"
-                          params={{ id: shipment.id }}
-                          className="block transition-colors hover:bg-tint-selected/30"
-                        >
-                          {row}
-                        </Link>
-                      ) : (
-                        row
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
+          {topAlerts.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No open alerts.</p>
+          ) : (
+            <ul className="divide-y divide-border">
+              {topAlerts.map(({ alert, severity }) => {
+                const shipment = alert.shipment_id ? shipmentById.get(alert.shipment_id) : undefined;
+                const row = (
+                  <div className="flex items-center gap-3 py-2.5">
+                    <SeverityBadge severity={severity} label={SEVERITY_LABEL[severity]} />
+                    <p className="min-w-0 flex-1 truncate text-sm text-foreground">{alert.message}</p>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {relativeTime(alert.created_at)}
+                    </span>
+                  </div>
+                );
+                return (
+                  <li key={alert.id}>
+                    {shipment ? (
+                      <Link
+                        to="/shipments/$id"
+                        params={{ id: shipment.id }}
+                        className="block transition-colors duration-150 hover:bg-subtle/60"
+                      >
+                        {row}
+                      </Link>
+                    ) : (
+                      row
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </section>
 
         <section>
-          <h2 className="label-xs mb-1.5">Recent activity</h2>
-          <div className="panel overflow-hidden">
-            {events.length === 0 ? (
-              <p className="px-3 py-3 text-[12px] text-muted-foreground">No recent activity yet.</p>
-            ) : (
-              <ul>
-                {events.map((event) => {
-                  const shipment = shipmentById.get(event.shipment_id);
-                  const description =
-                    event.field && (event.from_value || event.to_value)
-                      ? `${event.field} → ${event.to_value ?? "—"}`
-                      : (event.reason ?? event.event_type);
-                  const content = (
-                    <div
-                      className={`flex items-center gap-2.5 border-l-2 px-3 py-2 ${SOURCE_BORDER[event.source] ?? "border-l-border"}`}
-                    >
-                      <p className="min-w-0 flex-1 truncate text-[12px] text-foreground">
-                        {shipment ? shipment.client_name : "Shipment"}
-                        <span className="text-muted-foreground"> — {description}</span>
-                      </p>
-                      <SourceTag source={event.source} automated={event.automated} />
-                      <span className="shrink-0 text-[11px] text-muted-foreground">
-                        {relativeTime(event.occurred_at)}
-                      </span>
-                    </div>
-                  );
-                  return (
-                    <li key={event.id} className="border-b border-border last:border-0">
-                      {shipment ? (
-                        <Link
-                          to="/shipments/$id"
-                          params={{ id: shipment.id }}
-                          className="block transition-colors hover:bg-tint-selected/30"
-                        >
-                          {content}
-                        </Link>
-                      ) : (
-                        content
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
+          <h2 className="label-xs mb-2.5">Recent activity</h2>
+          {events.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No recent activity yet.</p>
+          ) : (
+            <ul className="divide-y divide-border">
+              {events.map((event) => {
+                const shipment = shipmentById.get(event.shipment_id);
+                const description =
+                  event.field && (event.from_value || event.to_value)
+                    ? `${event.field} → ${event.to_value ?? "—"}`
+                    : (event.reason ?? event.event_type);
+                const content = (
+                  <div className="flex items-center gap-3 py-2.5">
+                    <p className="min-w-0 flex-1 truncate text-sm text-foreground">
+                      {shipment ? shipment.client_name : "Shipment"}
+                      <span className="text-muted-foreground"> — {description}</span>
+                    </p>
+                    <SourceTag source={event.source} automated={event.automated} />
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {relativeTime(event.occurred_at)}
+                    </span>
+                  </div>
+                );
+                return (
+                  <li key={event.id}>
+                    {shipment ? (
+                      <Link
+                        to="/shipments/$id"
+                        params={{ id: shipment.id }}
+                        className="block transition-colors duration-150 hover:bg-subtle/60"
+                      >
+                        {content}
+                      </Link>
+                    ) : (
+                      content
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </section>
       </div>
     </AppShell>
   );
-}
-
-/**
- * One cohesive line of operational numbers, not five separate cards.
- * Colour is used exactly once here — a small red dot when there are
- * genuinely open alerts — everything else is pure typography.
- */
-function Metric({ label, value, alert }: { label: string; value: number; alert?: boolean }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <span className="label-xs">{label}</span>
-      <span className="inline-flex items-center gap-2 text-[26px] leading-none font-semibold tracking-tight tabular-nums text-foreground">
-        {alert ? <span aria-hidden className="size-[7px] rounded-full bg-risk" /> : null}
-        {value}
-      </span>
-    </div>
-  );
-}
-
-function Divider() {
-  return <span aria-hidden className="hidden h-9 w-px bg-border sm:block" />;
 }
