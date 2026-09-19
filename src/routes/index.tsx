@@ -7,8 +7,40 @@ import { NewShipmentForm } from "@/components/NewShipmentForm";
 import { ShipmentTable } from "@/components/ShipmentTable";
 import { SeverityBadge, SourceTag } from "@/components/StatusPill";
 import { useMonitoringConfig } from "@/hooks/useMonitoringConfig";
-import { isLegacyStatus, listAllDocuments, listAllEvents, listAlerts, listShipments } from "@/lib/api";
+import {
+  formatEta,
+  isLegacyStatus,
+  listAllDocuments,
+  listAllEvents,
+  listAlerts,
+  listShipments,
+  type Shipment,
+} from "@/lib/api";
 import { alertSeverity, kpis, relativeTime, SEVERITY_LABEL, type Severity } from "@/lib/lifecycle";
+
+/** "in 3 days" / "tomorrow" / "today" — the future-facing counterpart to
+ * `relativeTime`, which only ever looks backward. */
+function daysUntil(iso: string) {
+  const days = Math.round((new Date(iso).getTime() - Date.now()) / 86_400_000);
+  if (days <= 0) return "today";
+  if (days === 1) return "tomorrow";
+  return `in ${days} days`;
+}
+
+function NextEvent({ label, shipment, date }: { label: string; shipment: Shipment; date: string }) {
+  return (
+    <Link to="/shipments/$id" params={{ id: shipment.id }} className="flex flex-col gap-1.5 hover:opacity-75">
+      <span className="label-xs">{label}</span>
+      <span className="text-sm">
+        <span className="font-medium text-foreground">{shipment.client_name}</span>
+        <span className="text-muted-foreground">
+          {" "}
+          · {formatEta(date)} · {daysUntil(date)}
+        </span>
+      </span>
+    </Link>
+  );
+}
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -97,6 +129,26 @@ function Dashboard() {
   }, [shipments.length, stats]);
   const mixTotal = shipments.length || 1;
 
+  const nextDeparture = useMemo(() => {
+    const now = Date.now();
+    return shipments
+      .filter((s) => !s.actual_departure && s.planned_etd && new Date(s.planned_etd).getTime() > now)
+      .sort((a, b) => new Date(a.planned_etd!).getTime() - new Date(b.planned_etd!).getTime())[0];
+  }, [shipments]);
+
+  const nextArrival = useMemo(() => {
+    const now = Date.now();
+    return shipments
+      .filter(
+        (s) =>
+          s.status !== "Arrived" &&
+          s.status !== "Delivered" &&
+          s.eta &&
+          new Date(s.eta).getTime() > now,
+      )
+      .sort((a, b) => new Date(a.eta!).getTime() - new Date(b.eta!).getTime())[0];
+  }, [shipments]);
+
   return (
     <AppShell
       title={`${greeting()}, StimTech Solutions`}
@@ -153,6 +205,15 @@ function Dashboard() {
           </div>
         ) : null}
       </div>
+
+      {nextDeparture || nextArrival ? (
+        <div className="mb-9 flex flex-wrap gap-x-12 gap-y-4">
+          {nextDeparture ? (
+            <NextEvent label="Next departure" shipment={nextDeparture} date={nextDeparture.planned_etd!} />
+          ) : null}
+          {nextArrival ? <NextEvent label="Next arrival" shipment={nextArrival} date={nextArrival.eta!} /> : null}
+        </div>
+      ) : null}
 
       <ShipmentTable
         shipments={shipments}

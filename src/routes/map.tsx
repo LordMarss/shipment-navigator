@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { AppShell, btnGhost, btnPrimary, fieldClass } from "@/components/AppShell";
+import { AppShell, Stat, btnGhost, btnPrimary, fieldClass } from "@/components/AppShell";
 import { StatusPill } from "@/components/StatusPill";
 import { listShipments, shortId, updateShipment, type Shipment } from "@/lib/api";
 
@@ -46,6 +46,8 @@ function FleetMap() {
     queryFn: listShipments,
   });
   const active = shipments.filter((s) => s.status !== "Delivered");
+  const trackedByAis = active.filter((s) => s.vessel_mmsi).length;
+  const inTransitCount = active.filter((s) => s.status === "In Transit").length;
 
   const saveMmsi = useMutation({
     mutationFn: ({ id, mmsi }: { id: string; mmsi: string }) =>
@@ -69,6 +71,12 @@ function FleetMap() {
         ) : null
       }
     >
+      <div className="mb-8 flex flex-wrap items-start gap-x-10 gap-y-5 border-b border-border pb-6">
+        <Stat label="Active Shipments" value={active.length} />
+        <Stat label="Tracked by AIS" value={trackedByAis} />
+        <Stat label="In Transit" value={inTransitCount} />
+      </div>
+
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
         <div className="panel overflow-hidden">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">

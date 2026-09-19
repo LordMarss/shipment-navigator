@@ -3,7 +3,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { ArrowDown, ArrowUp, Package, Search, Ship } from "lucide-react";
 
 import { EmptyState, Skeleton, fieldClass } from "@/components/AppShell";
-import { DocsIndicator, SeverityBadge, StatusPill } from "@/components/StatusPill";
+import { DocsIndicator, HealthBadge, SeverityBadge, StatusPill, statusAccent, type StatusAccent } from "@/components/StatusPill";
 import {
   ACTIVE_STATUSES,
   STATUSES,
@@ -15,12 +15,20 @@ import {
   type ShipmentDocument,
   type ShipmentStatus,
 } from "@/lib/api";
-import { alertSeverity, relativeTime, SEVERITY_LABEL, type Severity } from "@/lib/lifecycle";
+import { alertSeverity, relativeTime, SEVERITY_LABEL, shipmentHealth, type Severity } from "@/lib/lifecycle";
 import { docsFor } from "@/lib/insights";
+import { useMonitoringConfig } from "@/hooks/useMonitoringConfig";
 
 type SortKey = "created_at" | "client_name" | "eta" | "landed_cost" | "status";
 
 const SEVERITY_RANK: Record<Severity, number> = { critical: 0, attention: 1, informational: 2 };
+
+const ROW_ACCENT: Record<StatusAccent, string> = {
+  neutral: "hover:border-l-muted-foreground/40",
+  primary: "hover:border-l-primary",
+  positive: "hover:border-l-positive",
+  warning: "hover:border-l-warning",
+};
 
 /** Small colored cue for how recently a shipment was touched — real data
  * (updated_at), not a decorative animation. */
@@ -59,6 +67,7 @@ export function ShipmentTable({
   emptyAction?: ReactNode;
 }) {
   const navigate = useNavigate();
+  const config = useMonitoringConfig();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<ShipmentStatus | "all">("all");
   const [client, setClient] = useState("all");
@@ -232,11 +241,14 @@ export function ShipmentTable({
               rows.map((s) => {
                 const docs = docsFor(documents, s.id);
                 const shipmentAlert = alerts ? alertsByShipment.get(s.id) : undefined;
+                const health = shipmentHealth(s, docs, config);
+                const showHealth = health.level !== "On Track" && health.level !== "Delivered";
+                const accent = ROW_ACCENT[statusAccent(s.status)];
                 return (
                   <tr
                     key={s.id}
                     onClick={() => navigate({ to: "/shipments/$id", params: { id: s.id } })}
-                    className="group cursor-pointer border-b border-border last:border-0 transition-colors duration-150 hover:bg-subtle/60"
+                    className={`group cursor-pointer border-b border-l-2 border-border border-l-transparent transition-colors duration-150 last:border-b-0 hover:bg-subtle/60 ${accent}`}
                   >
                     <td className="px-4 py-3 font-mono text-xs text-muted-foreground transition-colors group-hover:text-primary">
                       {shortId(s.id)}
@@ -256,7 +268,10 @@ export function ShipmentTable({
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <StatusPill status={s.status} />
+                      <div className="flex flex-col gap-0.5">
+                        <StatusPill status={s.status} />
+                        {showHealth ? <HealthBadge level={health.level} /> : null}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">{formatEta(s.eta)}</td>
                     {alerts ? (

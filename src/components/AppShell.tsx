@@ -19,8 +19,9 @@ import {
   X,
 } from "lucide-react";
 
-import { listAlerts, listShipments, shortId } from "@/lib/api";
-import { relativeTime } from "@/lib/insights";
+import { isLegacyStatus, listAllDocuments, listAlerts, listShipments, shortId, type Shipment } from "@/lib/api";
+import { useMonitoringConfig } from "@/hooks/useMonitoringConfig";
+import { kpis, relativeTime } from "@/lib/insights";
 
 type NavItem = { to: string; label: string; icon: typeof LayoutDashboard };
 
@@ -103,6 +104,15 @@ export function AppShell({
 
 function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const config = useMonitoringConfig();
+  const { data: shipments = [] } = useQuery({ queryKey: ["shipments"], queryFn: listShipments });
+  const { data: documents = [] } = useQuery({ queryKey: ["documents", "all"], queryFn: listAllDocuments });
+  const activeCount = shipments.filter((s) => !isLegacyStatus(s.status) && s.status !== "Arrived").length;
+  // Same definition as the dashboard's attention line (real risk state, via
+  // shipmentHealth) — never the raw alert-feed volume, so the two numbers
+  // never disagree about what "needs attention" means.
+  const { atRisk, delayed } = kpis(shipments, documents, config);
+  const exceptions = atRisk + delayed;
 
   const body = (
     <div className="flex h-full flex-col bg-nav">
@@ -118,6 +128,27 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
         >
           <X className="size-4" />
         </button>
+      </div>
+
+      {/* Fleet pulse — the sidebar itself reports what's moving and what
+       * needs attention, so "visibility" starts before you click anything. */}
+      <div className="flex shrink-0 flex-col gap-1 border-b border-nav-border px-5 py-3">
+        <Link
+          to="/shipments/active"
+          className="flex items-center gap-1.5 text-xs text-nav-muted-foreground transition-colors hover:text-nav-foreground"
+        >
+          <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-nav-accent" />
+          {activeCount} shipment{activeCount === 1 ? "" : "s"} active
+        </Link>
+        {exceptions > 0 ? (
+          <Link
+            to="/alerts"
+            className="flex items-center gap-1.5 text-xs text-risk transition-opacity hover:opacity-80"
+          >
+            <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-risk" />
+            {exceptions} need{exceptions === 1 ? "s" : ""} attention
+          </Link>
+        ) : null}
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3 py-5">
@@ -225,53 +256,130 @@ export function useDismiss<T extends HTMLElement = HTMLDivElement>(onClose: () =
   return ref;
 }
 
+/** Slim trigger in the top bar; the actual search lives in a centered
+ * command palette (⌘K), which feels like a real application affordance
+ * rather than a generic top-bar input everyone has seen before. */
 function GlobalSearch() {
-  const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
-  const navigate = useNavigate();
-  const ref = useDismiss(() => setOpen(false));
 
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setOpen(true);
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="focus-ring flex h-8 w-full max-w-[380px] items-center gap-2 rounded-md border border-input bg-background px-2.5 text-sm text-muted-foreground transition-colors hover:border-primary/30"
+      >
+        <Search className="size-3.5 shrink-0" />
+        <span className="flex-1 truncate text-left">Search shipments, vessels, clients…</span>
+        <kbd className="hidden shrink-0 items-center rounded border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground sm:flex">
+          ⌘K
+        </kbd>
+      </button>
+      {open ? <CommandPalette onClose={() => setOpen(false)} /> : null}
+    </>
+  );
+}
+
+function CommandPalette({ onClose }: { onClose: () => void }) {
+  const [q, setQ] = useState("");
+  const [index, setIndex] = useState(0);
+  const navigate = useNavigate();
+  const inputRef = useRef<HTMLInputElement | null>(null);
   const { data: shipments = [] } = useQuery({ queryKey: ["shipments"], queryFn: listShipments });
 
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
   const term = q.trim().toLowerCase();
-  const results = term
-    ? shipments
-        .filter((s) =>
+  const results = (
+    term
+      ? shipments.filter((s) =>
           [s.client_name, s.origin, s.destination, s.vessel_name ?? "", s.vessel_mmsi ?? "", shortId(s.id)]
             .join(" ")
             .toLowerCase()
             .includes(term),
         )
-        .slice(0, 6)
-    : [];
+      : shipments
+  ).slice(0, 8);
+
+  const go = (s: Shipment) => {
+    onClose();
+    navigate({ to: "/shipments/$id", params: { id: s.id } });
+  };
+
+  useEffect(() => {
+    setIndex(0);
+  }, [q]);
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        onClose();
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setIndex((i) => Math.min(i + 1, results.length - 1));
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setIndex((i) => Math.max(i - 1, 0));
+      } else if (e.key === "Enter" && results[index]) {
+        go(results[index]);
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [results, index]);
 
   return (
-    <div ref={ref} className="relative w-full max-w-[400px]">
-      <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-      <input
-        value={q}
-        onChange={(e) => {
-          setQ(e.target.value);
-          setOpen(true);
-        }}
-        onFocus={() => setOpen(true)}
-        placeholder="Search shipments, clients, vessels, MMSI…"
-        className="focus-ring h-8 w-full rounded-md border border-input bg-background pl-8 pr-2.5 text-sm transition-colors placeholder:text-muted-foreground"
-      />
-      {open && term ? (
-        <div className="panel-lifted animate-in absolute left-0 top-9 z-30 w-full overflow-hidden p-1">
-          {results.length === 0 ? (
-            <p className="px-2.5 py-3 text-xs text-muted-foreground">No shipments match “{q.trim()}”.</p>
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center bg-foreground/20 px-4 pt-[14vh] backdrop-blur-[2px]"
+      onClick={onClose}
+    >
+      <div
+        className="panel-lifted animate-in w-full max-w-lg overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center gap-2.5 border-b border-border px-4 py-3">
+          <Search className="size-4 shrink-0 text-muted-foreground" />
+          <input
+            ref={inputRef}
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search shipments, clients, vessels, MMSI…"
+            className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+          />
+          <kbd className="hidden shrink-0 rounded border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground sm:block">
+            ESC
+          </kbd>
+        </div>
+        <div className="max-h-[360px] overflow-y-auto p-1.5">
+          {shipments.length === 0 ? (
+            <p className="px-3 py-6 text-center text-sm text-muted-foreground">No shipments yet.</p>
+          ) : results.length === 0 ? (
+            <p className="px-3 py-6 text-center text-sm text-muted-foreground">
+              No shipments match “{q.trim()}”.
+            </p>
           ) : (
-            results.map((s) => (
+            results.map((s, i) => (
               <button
                 key={s.id}
-                className="focus-ring flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm transition-colors hover:bg-subtle"
-                onClick={() => {
-                  setOpen(false);
-                  setQ("");
-                  navigate({ to: "/shipments/$id", params: { id: s.id } });
-                }}
+                onClick={() => go(s)}
+                onMouseEnter={() => setIndex(i)}
+                className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm transition-colors ${
+                  i === index ? "bg-subtle" : ""
+                }`}
               >
                 <span className="font-mono text-xs text-muted-foreground">{shortId(s.id)}</span>
                 <span className="truncate font-medium">{s.client_name}</span>
@@ -282,7 +390,7 @@ function GlobalSearch() {
             ))
           )}
         </div>
-      ) : null}
+      </div>
     </div>
   );
 }

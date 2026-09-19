@@ -290,7 +290,8 @@ function ShipmentDetail() {
   const legacyTerminal = currentIndex === -1;
   const next = nextStatus(shipment.status);
   const monitoring = monitoringInfo(shipment, config);
-  const health = shipmentHealth(shipment, docsFor(documents, shipment.id), config);
+  const docs = docsFor(documents, shipment.id);
+  const health = shipmentHealth(shipment, docs, config);
   const hasFreshAis = isAisFresh(position ?? null, Date.now());
   const decision = deriveAutomation(shipment, config, hasFreshAis);
   const vesselCondition = deriveVesselCondition(shipment, position ?? null);
@@ -299,6 +300,8 @@ function ShipmentDetail() {
   const statusEvents = events.filter(isStatusEvent);
   const lastStatusChange = statusEvents[0]?.occurred_at ?? shipment.updated_at;
   const statusDot = ACCENT_DOT[statusAccent(shipment.status)];
+  const showHealth = health.level !== "On Track" && health.level !== "Delivered";
+  const healthDot = health.level === "Attention" ? "bg-warning" : "bg-risk";
 
   const openOverride = () => {
     setOverrideStatus((next ?? shipment.status) as ActiveShipmentStatus);
@@ -373,10 +376,26 @@ function ShipmentDetail() {
                 </span>
               }
             />
+            {showHealth ? (
+              <HeaderStat
+                label="Health"
+                value={
+                  <span className={`inline-flex items-center gap-2 ${health.level === "Attention" ? "text-warning" : "text-risk"}`}>
+                    <span aria-hidden className={`size-2 shrink-0 rounded-full ${healthDot}`} />
+                    {health.level}
+                  </span>
+                }
+              />
+            ) : null}
             <HeaderStat label="Vessel" value={shipment.vessel_name ?? "Unassigned"} />
             <HeaderStat label="ETA" value={formatEta(shipment.eta)} />
+            <HeaderStat label="Documents" value={`${docs.attached}/${docs.total}`} />
             <HeaderStat label="Updated" value={relativeTime(lastStatusChange)} />
           </div>
+
+          {showHealth ? (
+            <p className="-mt-4 text-xs text-muted-foreground">{health.reason}</p>
+          ) : null}
 
           {shipmentAlerts.length > 0 ? (
             <button
