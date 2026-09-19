@@ -30,10 +30,10 @@ function daysUntil(iso: string) {
 function NextEvent({ label, shipment, date }: { label: string; shipment: Shipment; date: string }) {
   return (
     <Link to="/shipments/$id" params={{ id: shipment.id }} className="flex flex-col gap-1.5 hover:opacity-75">
-      <span className="label-xs">{label}</span>
+      <span className="text-[11px] font-medium uppercase tracking-[0.05em] text-nav-muted-foreground">{label}</span>
       <span className="text-sm">
-        <span className="font-medium text-foreground">{shipment.client_name}</span>
-        <span className="text-muted-foreground">
+        <span className="font-medium text-nav-foreground">{shipment.client_name}</span>
+        <span className="instrument text-nav-muted-foreground">
           {" "}
           · {formatEta(date)} · {daysUntil(date)}
         </span>
@@ -158,62 +158,69 @@ function Dashboard() {
           {open ? "Cancel" : "New Shipment"}
         </button>
       }
-    >
-      {open ? <NewShipmentForm onClose={() => setOpen(false)} /> : null}
+      headerExtra={
+        <div className="flex flex-col gap-7">
+          {/* Leads with what needs attention, before the stats do. */}
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm">
+            {stats.exceptions > 0 ? (
+              <>
+                <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-risk" />
+                <span className="font-medium text-nav-foreground">
+                  {stats.exceptions} shipment{stats.exceptions === 1 ? "" : "s"} need attention
+                </span>
+                <Link to="/alerts" className="text-xs font-medium text-nav-accent hover:underline">
+                  Review →
+                </Link>
+              </>
+            ) : (
+              <>
+                <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-positive" />
+                <span className="text-nav-muted-foreground">
+                  All shipments on track — nothing needs attention.
+                </span>
+              </>
+            )}
+          </div>
 
-      {/* Leads with what needs attention, before the stats do. */}
-      <div className="mb-6 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm">
-        {stats.exceptions > 0 ? (
-          <>
-            <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-risk" />
-            <span className="font-medium text-foreground">
-              {stats.exceptions} shipment{stats.exceptions === 1 ? "" : "s"} need attention
-            </span>
-            <Link to="/alerts" className="text-xs font-medium text-primary hover:underline">
-              Review →
-            </Link>
-          </>
-        ) : (
-          <>
-            <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-positive" />
-            <span className="text-muted-foreground">All shipments on track — nothing needs attention.</span>
-          </>
-        )}
-      </div>
-
-      <div className="mb-8 border-b border-border pb-6">
-        <div className="flex flex-wrap items-start gap-x-10 gap-y-5">
-          <Stat label="Active" value={stats.active} />
-          <Stat label="In Transit" value={stats.inTransit} />
-          <Stat label="Approaching" value={stats.approaching} />
-          <Stat label="Arrived" value={stats.arrived} />
-        </div>
-        {shipments.length > 0 ? (
-          <div className="mt-5 flex h-[3px] w-full overflow-hidden rounded-full bg-subtle" aria-hidden>
-            {mix.other > 0 ? (
-              <span className="bg-muted-foreground/25" style={{ width: `${(mix.other / mixTotal) * 100}%` }} />
-            ) : null}
-            {mix.inTransit > 0 ? (
-              <span className="bg-primary" style={{ width: `${(mix.inTransit / mixTotal) * 100}%` }} />
-            ) : null}
-            {mix.approaching > 0 ? (
-              <span className="bg-warning" style={{ width: `${(mix.approaching / mixTotal) * 100}%` }} />
-            ) : null}
-            {mix.arrived > 0 ? (
-              <span className="bg-positive" style={{ width: `${(mix.arrived / mixTotal) * 100}%` }} />
+          <div>
+            <div className="flex flex-wrap items-start gap-x-10 gap-y-5">
+              <Stat label="Active" value={stats.active} onBezel />
+              <Stat label="In Transit" value={stats.inTransit} onBezel />
+              <Stat label="Approaching" value={stats.approaching} onBezel />
+              <Stat label="Arrived" value={stats.arrived} onBezel />
+            </div>
+            {shipments.length > 0 ? (
+              <div className="mt-5 flex h-[3px] w-full overflow-hidden rounded-full bg-nav-border" aria-hidden>
+                {mix.other > 0 ? (
+                  <span className="bg-nav-muted-foreground/40" style={{ width: `${(mix.other / mixTotal) * 100}%` }} />
+                ) : null}
+                {mix.inTransit > 0 ? (
+                  <span className="bg-nav-accent" style={{ width: `${(mix.inTransit / mixTotal) * 100}%` }} />
+                ) : null}
+                {mix.approaching > 0 ? (
+                  <span className="bg-warning" style={{ width: `${(mix.approaching / mixTotal) * 100}%` }} />
+                ) : null}
+                {mix.arrived > 0 ? (
+                  <span className="bg-positive" style={{ width: `${(mix.arrived / mixTotal) * 100}%` }} />
+                ) : null}
+              </div>
             ) : null}
           </div>
-        ) : null}
-      </div>
 
-      {nextDeparture || nextArrival ? (
-        <div className="mb-9 flex flex-wrap gap-x-12 gap-y-4">
-          {nextDeparture ? (
-            <NextEvent label="Next departure" shipment={nextDeparture} date={nextDeparture.planned_etd!} />
+          {nextDeparture || nextArrival ? (
+            <div className="flex flex-wrap gap-x-12 gap-y-4 border-t border-nav-border pt-6">
+              {nextDeparture ? (
+                <NextEvent label="Next departure" shipment={nextDeparture} date={nextDeparture.planned_etd!} />
+              ) : null}
+              {nextArrival ? (
+                <NextEvent label="Next arrival" shipment={nextArrival} date={nextArrival.eta!} />
+              ) : null}
+            </div>
           ) : null}
-          {nextArrival ? <NextEvent label="Next arrival" shipment={nextArrival} date={nextArrival.eta!} /> : null}
         </div>
-      ) : null}
+      }
+    >
+      {open ? <NewShipmentForm onClose={() => setOpen(false)} /> : null}
 
       <ShipmentTable
         shipments={shipments}

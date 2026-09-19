@@ -5,50 +5,48 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * WhiteWind Logistics design system — v6: "Chart & Console."
+ * WhiteWind Logistics design system — v7: "Chart Console."
  *
- * Two typographic registers, not one. Editorial sans (Inter) carries
- * narrative and business content — page titles, client names, summaries.
- * Instrument mono (JetBrains Mono, the `.instrument` utility) carries
- * anything that is a precise reading rather than prose: MMSI, SOG, COG,
- * coordinates, shipment reference codes, AIS timestamps — the same way a
- * chart or a ship's instrumentation separates a label from a reading.
- * That split alone gives live/reference data a different texture than
- * static business data, without a single icon.
+ * The concept: WhiteWind is not a dashboard that happens to track ships —
+ * it is an instrument for reading global cargo movement, styled after the
+ * housing of real navigation equipment (ECDIS, radar, gyrocompass
+ * repeaters) wrapped around the printed lettering of nautical charts and
+ * shipping manifests. Two registers, applied consistently everywhere:
  *
- * Two surface registers, not one. Nearly the whole product is light —
- * paper canvas, ink text, restrained blue. But the two places that carry
- * genuinely live, second-by-second truth (the primary navigation, which
- * is "where you are in the app," and the AIS console on a shipment,
- * which is "where the vessel is on the earth") share one dark navy
- * register (`--nav`) with the same icy accent (`--nav-accent`) marking
- * "current position" in both. A shipment that is actually moving looks
- * different from a shipment that is merely scheduled, because it grows a
- * console; nothing else in the product does.
+ *   THE BEZEL — dark, fixed, structural. The sidebar and every page's
+ *   top bar + header band share one dark navy housing (`--nav`, the
+ *   `.bezel` utility). This is the instrument's frame: navigation,
+ *   page identity, and — on the two pages where it matters most
+ *   (dashboard, shipment detail) — the live operational summary itself.
+ *   It carries a barely-visible coordinate grid, the one texture in the
+ *   whole product, because a grid is how charts and radar actually
+ *   represent space, not decoration for its own sake.
  *
- * Colour is a family built from one blue hue, not one flat accent plus
- * grey: a mid blue for actions and the "underway" meaning, a pale wash
- * for large calm backdrops, a deep navy for the console register, and a
- * blue-gray "slate" for secondary instrument text. Neutrals stay true
- * warm-ink grays for body text, so the blue family still reads as
- * deliberate rather than diluted. Status colour (green / amber / red)
- * appears as exactly one signal per element, and severity has real
- * typographic weight behind it: critical is not styled like informational.
+ *   THE CHART — light, warm, paper-toned. Tables, forms, records: the
+ *   actual working surface you read and edit, always legible, always
+ *   calm, tuned for long sessions rather than drama.
  *
- * Two container primitives for everything that isn't the console: `.panel`
- * is a quiet surface (hairline border, faint lift, no shadow) reserved for
- * genuinely distinct objects — a table, a form, a live widget. `.panel-
- * lifted` is the only surface that gets real shadow, reserved for things
- * that actually float above the page — menus, dropdowns, modals. Most
- * content needs neither: whitespace, alignment and a label are enough.
- * Radius is deliberate and role-based: controls (buttons, inputs) use a
- * tighter radius than containers (panels, menus, the console).
+ * Three typefaces, not one, each doing a specific job — the same
+ * separation a real chart makes between a title cartouche, body copy and
+ * a coordinate reading:
+ *   — Fraunces (serif, engraved character) for page titles only.
+ *   — IBM Plex Sans (technical, engineered lineage) for every other word.
+ *   — Martian Mono (`.instrument`) for anything that is a reading rather
+ *     than prose: MMSI, SOG, COG, timestamps, reference codes, KPI counts.
+ *
+ * Colour stays one restrained blue family (a mid blue for action and
+ * "underway," a pale wash, a deep navy for the bezel, a blue-gray slate
+ * for secondary instrument text) plus green/amber/red used as exactly
+ * one signal per element. Shape is precise, not soft: a tight control
+ * radius and a slightly looser container radius, never the large soft
+ * rounding of a consumer app. Shadow exists only on things that actually
+ * float above the page — the bezel and the chart never get one.
  */
 
 @theme inline {
-  --font-sans:
-    "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", "Menlo", monospace;
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-serif: "Fraunces", ui-serif, Georgia, "Times New Roman", serif;
+  --font-mono: "Martian Mono", ui-monospace, "SF Mono", "Menlo", monospace;
 
   /* Type scale — deliberately small set of steps, each with its own
    * paired line-height and tracking, used directly as text-xs…text-3xl
@@ -64,20 +62,20 @@
   --text-lg--letter-spacing: -0.006em;
   --text-xl: 19px;
   --text-xl--line-height: 25px;
-  --text-xl--letter-spacing: -0.012em;
+  --text-xl--letter-spacing: -0.008em;
   --text-2xl: 23px;
   --text-2xl--line-height: 29px;
-  --text-2xl--letter-spacing: -0.016em;
+  --text-2xl--letter-spacing: -0.008em;
   --text-3xl: 30px;
   --text-3xl--line-height: 36px;
-  --text-3xl--letter-spacing: -0.02em;
+  --text-3xl--letter-spacing: -0.012em;
 
-  /* Radius — controls are tighter than containers on purpose; that ratio
-   * is what makes curvature read as intentional rather than decorative. */
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 14px;
-  --radius-xl: 14px;
+  /* Radius — precise and engineered, not soft. Controls are tighter than
+   * containers; the ratio is what makes curvature read as intentional. */
+  --radius-sm: 3px;
+  --radius-md: 5px;
+  --radius-lg: 8px;
+  --radius-xl: 8px;
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -135,17 +133,17 @@
 
 :root {
   /* Container radius — used directly by `.panel` / `.panel-lifted`. */
-  --radius: 14px;
+  --radius: 8px;
 
-  /* Warm-neutral canvas — "paper," not blue-tinted. */
-  --background: oklch(0.981 0.004 78);
+  /* Chart paper — a warm, lightly-toned canvas, not a sterile app white. */
+  --background: oklch(0.965 0.01 75);
   /* True ink — a neutral near-black, so text never competes with the
    * accent for attention. */
   --foreground: oklch(0.185 0.004 78);
   /* Surfaces lift a touch lighter than canvas — no border/shadow needed
    * to feel "above" it. */
-  --surface: oklch(0.997 0.001 78);
-  --subtle: oklch(0.958 0.004 78);
+  --surface: oklch(0.99 0.004 75);
+  --subtle: oklch(0.945 0.008 75);
   --card: var(--surface);
   --card-foreground: var(--foreground);
   --popover: var(--surface);
@@ -153,45 +151,45 @@
 
   /* Accent — a family of restrained blues built from one hue (241), not
    * one flat colour: a soft mid blue for actions and the "underway"
-   * meaning, a pale wash for large backdrops, a deep navy for moments
-   * that need real contrast, and a blue-gray "slate" for secondary
-   * instrument text — so the interface reads as one considered ocean
-   * palette rather than "one accent plus grey." */
+   * meaning, a pale wash for large calm backdrops, a deep navy for the
+   * bezel register, and a blue-gray "slate" for secondary instrument
+   * text — so the interface reads as one considered ocean palette
+   * rather than "one accent plus grey." */
   --primary: oklch(0.585 0.096 241);
   --primary-hover: oklch(0.52 0.1 241);
   --primary-foreground: oklch(0.99 0.002 241);
-  --primary-soft: oklch(0.958 0.018 241);
-  --primary-pale: oklch(0.975 0.01 241);
+  --primary-soft: oklch(0.945 0.02 241);
+  --primary-pale: oklch(0.965 0.012 241);
   --primary-deep: oklch(0.4 0.085 241);
   --slate: oklch(0.52 0.025 235);
   --navy: oklch(0.27 0.05 241);
 
-  --secondary: oklch(0.958 0.004 78);
+  --secondary: oklch(0.945 0.008 75);
   --secondary-foreground: var(--foreground);
-  --muted: oklch(0.958 0.004 78);
-  --muted-foreground: oklch(0.48 0.006 78);
-  --accent: oklch(0.958 0.004 78);
+  --muted: oklch(0.945 0.008 75);
+  --muted-foreground: oklch(0.475 0.008 78);
+  --accent: oklch(0.945 0.008 75);
   --accent-foreground: var(--foreground);
 
   /* One true red — also used for destructive actions, no duplicate hue. */
   --risk: oklch(0.515 0.16 26);
-  --risk-soft: oklch(0.958 0.022 26);
+  --risk-soft: oklch(0.945 0.026 26);
   --destructive: var(--risk);
   --destructive-foreground: oklch(0.99 0.002 78);
 
-  --border: oklch(0.9 0.005 78);
-  --input: oklch(0.9 0.005 78);
+  --border: oklch(0.878 0.009 75);
+  --input: oklch(0.878 0.009 75);
   --ring: var(--primary);
 
   /* Green — kept well clear of cyan (hue ~142, not ~152) so it never
    * reads as teal next to the blue accent. */
   --positive: oklch(0.5 0.095 142);
-  --positive-soft: oklch(0.955 0.02 142);
-  /* Amber — slightly desaturated to stay calm next to the new neutrals. */
+  --positive-soft: oklch(0.945 0.024 142);
+  /* Amber — brass-lamp warmth, slightly desaturated to stay calm. */
   --warning: oklch(0.63 0.098 70);
-  --warning-soft: oklch(0.955 0.022 70);
+  --warning-soft: oklch(0.945 0.026 70);
 
-  --tint-selected: oklch(0.964 0.014 241);
+  --tint-selected: oklch(0.95 0.018 241);
 
   --chart-1: var(--primary);
   --chart-2: var(--positive);
@@ -208,13 +206,11 @@
   --sidebar-border: var(--nav-border);
   --sidebar-ring: var(--ring);
 
-  /* Dark navigation shell — same restrained hue family as the accent,
-   * quiet and flat (no gradient, no glow), tuned deliberately for
-   * all-day legibility: a genuinely dark ground so lighter text has
-   * real headroom, a clearly brighter tone for the active item (not a
-   * near-invisible tint one step off the background), and a distinct
-   * pale accent hue used only for the active glyph/text so "you are
-   * here" reads as its own colour, not just "brighter". */
+  /* The bezel — same restrained hue family as the accent, quiet and
+   * flat, tuned for all-day legibility: a genuinely dark ground so
+   * lighter text has real headroom, a clearly brighter tone for the
+   * active nav item, and a distinct pale accent used only for "current
+   * position" — on the nav, and on a vessel's live AIS reading. */
   --nav: oklch(0.155 0.022 241);
   --nav-elevated: oklch(0.205 0.026 241);
   --nav-foreground: oklch(0.97 0.004 241);
@@ -281,20 +277,44 @@
 
 /* Instrument type — the mono half of the two-register type system, for
  * precise readings rather than prose: MMSI, SOG, COG, coordinates,
- * reference codes, AIS timestamps. */
+ * reference codes, AIS timestamps, KPI counts. */
 @utility instrument {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
 }
 
 /* The console register — dark, live, navigational. Reserved for genuinely
  * live telemetry (AIS) so it reads as a different kind of information
- * than the light "business" surfaces around it, never for static content. */
+ * than the light "chart" surfaces around it, never for static content. */
 @utility console {
   background-color: var(--color-nav);
   border: 1px solid var(--nav-border);
   border-radius: var(--radius);
+  color: var(--color-nav-foreground);
+}
+
+/* The bezel — the instrument's dark structural housing: sidebar, top bar,
+ * and (on the pages where it matters) the page header and its live
+ * summary. A barely-visible coordinate grid is the one texture in the
+ * product, because a grid is how charts represent space, not decoration. */
+@utility bezel {
+  background-color: var(--color-nav);
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      color-mix(in oklab, var(--nav-foreground) 5%, transparent) 0px,
+      color-mix(in oklab, var(--nav-foreground) 5%, transparent) 1px,
+      transparent 1px,
+      transparent 28px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      color-mix(in oklab, var(--nav-foreground) 5%, transparent) 0px,
+      color-mix(in oklab, var(--nav-foreground) 5%, transparent) 1px,
+      transparent 1px,
+      transparent 28px
+    );
   color: var(--color-nav-foreground);
 }
 

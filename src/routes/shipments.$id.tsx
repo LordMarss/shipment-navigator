@@ -341,7 +341,7 @@ function ShipmentDetail() {
           <Link
             to="/"
             aria-label="Back to shipments"
-            className="focus-ring -ml-1 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-subtle hover:text-foreground"
+            className="focus-ring -ml-1 rounded-md p-1.5 text-nav-muted-foreground transition-colors hover:bg-nav-elevated hover:text-nav-foreground"
           >
             <ArrowLeft className="size-4" />
           </Link>
@@ -357,6 +357,53 @@ function ShipmentDetail() {
             if (confirm("Delete this shipment and its documents?")) remove.mutate();
           }}
         />
+      }
+      headerExtra={
+        <div className="flex flex-col gap-6">
+          <div className="flex flex-wrap items-start gap-x-10 gap-y-5">
+            <HeaderStat
+              label="Status"
+              value={
+                <span className="inline-flex items-center gap-2">
+                  <span aria-hidden className={`size-2 shrink-0 rounded-full ${statusDot}`} />
+                  {shipment.status}
+                </span>
+              }
+            />
+            {showHealth ? (
+              <HeaderStat
+                label="Health"
+                value={
+                  <span className={`inline-flex items-center gap-2 ${health.level === "Attention" ? "text-warning" : "text-risk"}`}>
+                    <span aria-hidden className={`size-2 shrink-0 rounded-full ${healthDot}`} />
+                    {health.level}
+                  </span>
+                }
+              />
+            ) : null}
+            <HeaderStat label="ETA" value={formatEta(shipment.eta)} />
+            <HeaderStat label="Documents" value={`${docs.attached}/${docs.total}`} />
+            <HeaderStat label="Updated" value={relativeTime(lastStatusChange)} />
+          </div>
+
+          <RouteBar origin={shipment.origin} destination={shipment.destination} progress={routeProgress} />
+
+          {showHealth ? <p className="text-xs text-nav-muted-foreground">{health.reason}</p> : null}
+
+          {shipmentAlerts.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => setTab("alerts")}
+              className="flex items-center gap-2 border-t border-nav-border pt-5 text-left text-sm"
+            >
+              <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-risk" />
+              <span className="font-medium text-nav-foreground">
+                {shipmentAlerts.length} alert{shipmentAlerts.length === 1 ? "" : "s"} on this shipment
+              </span>
+              <span className="text-xs font-medium text-nav-accent">Review →</span>
+            </button>
+          ) : null}
+        </div>
       }
     >
       <div className="-mt-3 mb-6 flex gap-1 border-b border-border">
@@ -379,57 +426,6 @@ function ShipmentDetail() {
 
       {tab === "overview" ? (
         <div className="flex flex-col gap-9">
-          {/* Cockpit strip: the whole shipment at a glance, in the order it
-           * actually matters — current state, then real position along the
-           * route, then timing — before any panel asks you to read further. */}
-          <div className="flex flex-col gap-6 border-b border-border pb-6">
-            <div className="flex flex-wrap items-start gap-x-10 gap-y-5">
-              <HeaderStat
-                label="Status"
-                value={
-                  <span className="inline-flex items-center gap-2">
-                    <span aria-hidden className={`size-2 shrink-0 rounded-full ${statusDot}`} />
-                    {shipment.status}
-                  </span>
-                }
-              />
-              {showHealth ? (
-                <HeaderStat
-                  label="Health"
-                  value={
-                    <span className={`inline-flex items-center gap-2 ${health.level === "Attention" ? "text-warning" : "text-risk"}`}>
-                      <span aria-hidden className={`size-2 shrink-0 rounded-full ${healthDot}`} />
-                      {health.level}
-                    </span>
-                  }
-                />
-              ) : null}
-              <HeaderStat label="ETA" value={formatEta(shipment.eta)} />
-              <HeaderStat label="Documents" value={`${docs.attached}/${docs.total}`} />
-              <HeaderStat label="Updated" value={relativeTime(lastStatusChange)} />
-            </div>
-
-            <RouteBar origin={shipment.origin} destination={shipment.destination} progress={routeProgress} />
-          </div>
-
-          {showHealth ? (
-            <p className="-mt-4 text-xs text-muted-foreground">{health.reason}</p>
-          ) : null}
-
-          {shipmentAlerts.length > 0 ? (
-            <button
-              type="button"
-              onClick={() => setTab("alerts")}
-              className="-mt-4 flex items-center gap-2 text-left text-sm"
-            >
-              <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-risk" />
-              <span className="font-medium text-foreground">
-                {shipmentAlerts.length} alert{shipmentAlerts.length === 1 ? "" : "s"} on this shipment
-              </span>
-              <span className="text-xs font-medium text-primary">Review →</span>
-            </button>
-          ) : null}
-
           <section>
             <h2 className="label-xs mb-4">Lifecycle</h2>
             <LifecycleJourney status={shipment.status} legacyTerminal={legacyTerminal} currentIndex={currentIndex} />
@@ -496,7 +492,7 @@ function ShipmentDetail() {
                         {relativeTime(position.position_timestamp ?? position.updated_at)}
                       </span>
                     </div>
-                    <div className="mt-4 grid grid-cols-3 gap-4">
+                    <div className="mt-4 grid grid-cols-[0.75fr_0.75fr_1.3fr] gap-4">
                       <ConsoleSpeed sog={position.sog} />
                       <ConsoleHeading cog={position.cog} />
                       <ConsoleField label="Nav Status" value={navStatusLabel(position.nav_status)} />
@@ -800,7 +796,7 @@ function HeaderMenu({
     <div className="relative" ref={ref}>
       <button
         type="button"
-        className="focus-ring rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-subtle hover:text-foreground"
+        className="focus-ring rounded-md p-1.5 text-nav-muted-foreground transition-colors hover:bg-nav-elevated hover:text-nav-foreground"
         aria-label="More actions"
         onClick={() => setOpen((v) => !v)}
       >
@@ -843,8 +839,8 @@ function HeaderMenu({
 function HeaderStat({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
-      <span className="label-xs">{label}</span>
-      <span className="truncate text-lg font-semibold text-foreground">{value}</span>
+      <span className="text-[11px] font-medium uppercase tracking-[0.05em] text-nav-muted-foreground">{label}</span>
+      <span className="instrument truncate text-lg font-medium text-nav-foreground">{value}</span>
     </div>
   );
 }
@@ -920,27 +916,27 @@ function RouteBar({
   return (
     <div className="min-w-0">
       <div className="flex items-center justify-between gap-3">
-        <span className="min-w-0 truncate text-lg font-semibold text-foreground">{origin}</span>
-        <ArrowRight className="size-4 shrink-0 text-muted-foreground" />
-        <span className="min-w-0 truncate text-right text-lg font-semibold text-foreground">{destination}</span>
+        <span className="min-w-0 truncate text-lg font-semibold text-nav-foreground">{origin}</span>
+        <ArrowRight className="size-4 shrink-0 text-nav-muted-foreground" />
+        <span className="min-w-0 truncate text-right text-lg font-semibold text-nav-foreground">{destination}</span>
       </div>
-      <div className="relative mt-3 h-[3px] w-full rounded-full bg-border">
+      <div className="relative mt-3 h-[3px] w-full rounded-full bg-nav-border">
         {progress ? (
           <>
             <div
-              className="absolute inset-y-0 left-0 rounded-full bg-primary transition-[width] duration-700"
+              className="absolute inset-y-0 left-0 rounded-full bg-nav-accent transition-[width] duration-700"
               style={{ width: `${progress.pct * 100}%` }}
             />
             <div
               aria-hidden
-              className="live-pulse absolute top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary shadow-[0_0_6px_0_var(--primary)] transition-[left] duration-700"
+              className="live-pulse absolute top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-nav-accent shadow-[0_0_6px_0_var(--nav-accent)] transition-[left] duration-700"
               style={{ left: `${progress.pct * 100}%` }}
             />
           </>
         ) : null}
       </div>
       {progress ? (
-        <p className="instrument mt-2 text-xs text-muted-foreground">
+        <p className="instrument mt-2 text-xs text-nav-muted-foreground">
           {Math.round(progress.pct * 100)}% underway · {Math.round(progress.remainingKm).toLocaleString()} km to
           destination
         </p>

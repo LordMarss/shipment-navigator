@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { AppShell, Stat, btnGhost, btnPrimary, fieldClass } from "@/components/AppShell";
+import { AppShell, Stat, btnBezel, btnGhost, btnPrimary, fieldClass } from "@/components/AppShell";
 import { StatusPill } from "@/components/StatusPill";
 import { listShipments, shortId, updateShipment, type Shipment } from "@/lib/api";
 
@@ -65,18 +65,19 @@ function FleetMap() {
       description="Live AIS traffic. Track the vessel carrying any active shipment."
       actions={
         tracked ? (
-          <button className={btnGhost} onClick={() => setTracked(null)}>
+          <button className={btnBezel} onClick={() => setTracked(null)}>
             Back to full map
           </button>
         ) : null
       }
+      headerExtra={
+        <div className="flex flex-wrap items-start gap-x-10 gap-y-5">
+          <Stat label="Active Shipments" value={active.length} onBezel />
+          <Stat label="Tracked by AIS" value={trackedByAis} onBezel />
+          <Stat label="In Transit" value={inTransitCount} onBezel />
+        </div>
+      }
     >
-      <div className="mb-8 flex flex-wrap items-start gap-x-10 gap-y-5 border-b border-border pb-6">
-        <Stat label="Active Shipments" value={active.length} />
-        <Stat label="Tracked by AIS" value={trackedByAis} />
-        <Stat label="In Transit" value={inTransitCount} />
-      </div>
-
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
         <div className="panel overflow-hidden">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
