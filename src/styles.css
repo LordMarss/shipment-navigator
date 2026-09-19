@@ -5,52 +5,44 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * WhiteWind Logistics design system — v8: "Chart Console," rebalanced
- * for bright rooms.
+ * WhiteWind Logistics design system — v9: light blue throughout, one
+ * deliberate dark exception.
  *
- * The previous version made the whole top of every page — sidebar, top
- * bar and title band — one continuous dark instrument housing. In a
- * bright office that read as heavier than it needed to be, and the hard
- * seam into the light content below didn't feel like one considered
- * surface. This version keeps dark for exactly two things that earn it —
- * the sidebar (always visible, rarely lit directly) and the AIS console
- * on a shipment (genuinely live telemetry, meant to feel like a
- * different kind of information) — and rebuilds everything else as a
- * light, three-tier tonal system:
+ * Nearly the whole product — sidebar, top bar, every page's header band,
+ * tables, forms — is a considered light-blue-to-white system:
  *
- *   THE DECK — the sidebar. Dark, fixed, structural, carrying the same
- *   barely-visible coordinate grid as the console. The one place the
- *   product is unapologetically dark, because it's a fixed instrument
- *   panel at the edge of the screen, not a surface you read line by line.
- *
- *   THE ATMOSPHERE — the top bar and every page's header band. A pale,
- *   genuinely blue wash (`--atmosphere`), not white, not grey — the
- *   deliberate step between the dark deck and the white chart below it.
- *   Page identity and (on the dashboard and shipment detail) the live
- *   operational summary live here.
+ *   THE ATMOSPHERE — the sidebar, top bar and every page's header band.
+ *   A pale, genuinely blue wash (`--atmosphere`), not white, not grey,
+ *   carrying a barely-visible coordinate grid. Navigation and page
+ *   identity live here, and — on the dashboard and shipment detail —
+ *   the live operational summary too.
  *
  *   THE CHART — white paper. Tables, forms, records: the working
  *   surface, tuned for hours of reading rather than drama.
  *
- * Colour is one Ocean blue family, four roles: `--primary` (actions,
- * links, "underway," and every hover/hairline on it stays in-family),
- * `--primary-deep` (stronger emphasis — active nav, console accents —
- * meaningfully lighter than the old navy, never near-black),
- * `--atmosphere` (the pale wash above), and neutrals that stay a true
- * warm ink rather than blue-tinted, so text never competes with the
- * accent. Green/amber/red remain exactly one signal per element.
+ *   THE CONSOLE — the one deliberate dark exception, reserved
+ *   exclusively for genuinely live telemetry (a vessel's AIS reading).
+ *   With dark used nowhere else, it reads as unmistakably intentional —
+ *   "this one thing is live" — rather than a house style.
  *
- * Three typefaces: Fraunces (engraved serif) for page titles only, IBM
- * Plex Sans for everything else, Martian Mono (`.instrument`) for any
- * reading rather than prose — MMSI, SOG, COG, timestamps, reference
- * codes, KPI counts. Shape stays precise: a tight control radius, a
- * slightly looser container radius, shadow reserved for things that
- * actually float above the page.
+ * Colour is one Ocean blue family, three roles: `--primary` (actions,
+ * links, "underway," and every hover/hairline on it stays in-family),
+ * `--primary-deep` (stronger emphasis — the active nav pill, the brand
+ * mark, console accents — meaningfully lighter than a navy-black would
+ * be), and `--atmosphere` (the pale wash above, doing double duty as
+ * every hover/selected-state tint). Neutrals stay a true warm ink
+ * rather than blue-tinted, so text never competes with the accent.
+ * Green/amber/red remain exactly one signal per element.
+ *
+ * Two typefaces: IBM Plex Sans for every word on the page, Martian Mono
+ * (`.instrument`) for any reading rather than prose — MMSI, SOG, COG,
+ * timestamps, reference codes, KPI counts. Shape stays precise: a tight
+ * control radius, a slightly looser container radius, shadow reserved
+ * for things that actually float above the page.
  */
 
 @theme inline {
   --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-serif: "Fraunces", ui-serif, Georgia, "Times New Roman", serif;
   --font-mono: "Martian Mono", ui-monospace, "SF Mono", "Menlo", monospace;
 
   /* Type scale — deliberately small set of steps, each with its own
@@ -124,13 +116,11 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-nav: var(--nav);
-  --color-nav-elevated: var(--nav-elevated);
   --color-nav-foreground: var(--nav-foreground);
   --color-nav-muted-foreground: var(--nav-muted-foreground);
   --color-nav-active: var(--nav-active);
   --color-nav-active-foreground: var(--nav-active-foreground);
   --color-nav-accent: var(--nav-accent);
-  --color-nav-label: var(--nav-label);
   --color-nav-border: var(--nav-border);
 }
 
@@ -206,16 +196,15 @@
   --sidebar-border: var(--nav-border);
   --sidebar-ring: var(--ring);
 
-  /* The deck — the sidebar's dark register, and the AIS console's.
-   * Same hue as Ocean, tuned dark: a genuinely dark ground so lighter
-   * text has real headroom, a clearly brighter tone for the active nav
-   * item, and a distinct pale accent used only for "current position" —
-   * on the nav, and on a vessel's live AIS reading. */
+  /* The console's dark register — same hue as Ocean, tuned dark: a
+   * genuinely dark ground so lighter text has real headroom, and a
+   * distinct pale accent for a vessel's live AIS reading. `--nav-active`
+   * and `--nav-active-foreground` do double duty as the sidebar's solid
+   * active-item pill — a real, saturated colour block that reads
+   * intentionally regardless of what surface sits behind it. */
   --nav: oklch(0.148 0.024 231);
-  --nav-elevated: oklch(0.198 0.028 231);
   --nav-foreground: oklch(0.97 0.004 231);
   --nav-muted-foreground: oklch(0.735 0.02 231);
-  --nav-label: oklch(0.52 0.03 231);
   --nav-active: oklch(0.25 0.05 231);
   --nav-active-foreground: oklch(0.985 0.003 231);
   --nav-accent: oklch(0.78 0.09 231);
@@ -286,7 +275,7 @@
 
 /* The console — dark, live, navigational, reserved for genuinely live
  * telemetry (AIS) so it reads as a different kind of information than
- * the light chart surfaces around it. Shares the deck's coordinate grid. */
+ * the light surfaces around it — the one deliberate dark exception. */
 @utility console {
   background-color: var(--color-nav);
   background-image:
@@ -309,33 +298,9 @@
   color: var(--color-nav-foreground);
 }
 
-/* The deck — the sidebar's dark structural housing. Same coordinate grid
- * as the console, because they're the same idea (a live instrument
- * surface) at two different scales. */
-@utility deck {
-  background-color: var(--color-nav);
-  background-image:
-    repeating-linear-gradient(
-      0deg,
-      color-mix(in oklab, var(--nav-foreground) 5%, transparent) 0px,
-      color-mix(in oklab, var(--nav-foreground) 5%, transparent) 1px,
-      transparent 1px,
-      transparent 28px
-    ),
-    repeating-linear-gradient(
-      90deg,
-      color-mix(in oklab, var(--nav-foreground) 5%, transparent) 0px,
-      color-mix(in oklab, var(--nav-foreground) 5%, transparent) 1px,
-      transparent 1px,
-      transparent 28px
-    );
-  color: var(--color-nav-foreground);
-}
-
-/* The atmosphere — the pale blue wash for the top bar and every page's
- * header band: the deliberate step between the dark deck and the white
- * chart below it, carrying the same faint coordinate grid at a much
- * lower key so it reads on light without adding noise. */
+/* The atmosphere — the pale blue wash for the sidebar, top bar and every
+ * page's header band: the one considered light-blue surface, carrying a
+ * faint coordinate grid at a low key so it reads without adding noise. */
 @utility atmosphere {
   background-color: var(--color-atmosphere);
   background-image:
