@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { AppShell, Stat, btnPrimary } from "@/components/AppShell";
 import { NewShipmentForm } from "@/components/NewShipmentForm";
@@ -63,16 +63,31 @@ export const Route = createFileRoute("/")({
   component: Dashboard,
 });
 
-function greeting(date = new Date()) {
-  const hour = date.getHours();
+function greetingForHour(hour: number) {
   if (hour < 12) return "Good morning";
   if (hour < 18) return "Good afternoon";
   return "Good evening";
 }
 
+/** Time-of-day greeting, resolved only after mount. The server and the
+ * browser can render on opposite sides of the "morning/afternoon/evening"
+ * boundary a few milliseconds apart, which — if computed during the
+ * initial render — produces a text mismatch between the server-rendered
+ * HTML and the client's hydration pass. Resolving it in an effect keeps
+ * the first render identical on both sides; the real greeting appears a
+ * moment later, same as any other client-only value. */
+function useGreeting() {
+  const [greeting, setGreeting] = useState<string | null>(null);
+  useEffect(() => {
+    setGreeting(greetingForHour(new Date().getHours()));
+  }, []);
+  return greeting;
+}
+
 function Dashboard() {
   const [open, setOpen] = useState(false);
   const config = useMonitoringConfig();
+  const greeting = useGreeting();
 
   const { data: shipments = [], isLoading } = useQuery({
     queryKey: ["shipments"],
@@ -151,7 +166,7 @@ function Dashboard() {
 
   return (
     <AppShell
-      title={`${greeting()}, StimTech Solutions`}
+      title={`${greeting ?? "Welcome"}, StimTech Solutions`}
       {...(lastSync ? { description: `Monitoring last checked ${relativeTime(lastSync)}.` } : {})}
       actions={
         <button className={btnPrimary} onClick={() => setOpen((v) => !v)}>
