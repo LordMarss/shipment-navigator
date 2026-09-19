@@ -248,7 +248,7 @@ export function ShipmentTable({
                   <tr
                     key={s.id}
                     onClick={() => navigate({ to: "/shipments/$id", params: { id: s.id } })}
-                    className={`group cursor-pointer border-b border-l-2 border-border border-l-transparent transition-colors duration-150 last:border-b-0 hover:bg-subtle/60 ${accent}`}
+                    className={`group cursor-pointer border-b border-l-2 border-border border-l-transparent transition-colors duration-150 last:border-b-0 hover:bg-atmosphere/60 ${accent}`}
                   >
                     <td className="px-4 py-3 font-mono text-xs text-muted-foreground transition-colors group-hover:text-primary">
                       {shortId(s.id)}

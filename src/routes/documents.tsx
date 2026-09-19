@@ -83,7 +83,7 @@ function DocumentsPage() {
                 const attached = standard.filter((d) => d?.file_path).length;
                 const other = docs.filter((d) => !d.is_standard).length;
                 return (
-                  <tr key={s.id} className="transition-colors hover:bg-subtle/60">
+                  <tr key={s.id} className="transition-colors hover:bg-atmosphere/60">
                     <td className="px-4 py-2.5">
                       <Link
                         to="/shipments/$id"

@@ -68,10 +68,10 @@ export function AppShell({
   description?: string;
   eyebrow?: string;
   actions?: ReactNode;
-  /** Optional content rendered inside the dark header bezel, below the
+  /** Optional content rendered inside the pale atmosphere band, below the
    * title row — the page's live operational summary (KPI strip, cockpit
    * stats) rather than the working content itself, which always lives on
-   * the light chart surface below. */
+   * the white chart surface below. */
   headerExtra?: ReactNode;
   children: ReactNode;
   wide?: boolean;
@@ -91,22 +91,16 @@ export function AppShell({
       <div className="lg:pl-[248px]">
         <TopBar onMenu={() => setMobileNav(true)} />
 
-        {/* The bezel: the instrument's dark housing continues from the top
-         * bar into the page's identity and (where it matters) its live
-         * summary, before handing off to the light chart surface below. */}
-        <div className="bezel">
+        {/* The atmosphere: the deliberate pale-blue step between the dark
+         * deck (sidebar) and the white chart below — page identity and,
+         * where it matters, the live operational summary. */}
+        <div className="atmosphere border-b border-border">
           <div className={`mx-auto w-full px-6 pb-7 pt-7 sm:px-8 lg:px-10 ${maxW}`}>
             <div className="flex flex-wrap items-end justify-between gap-4">
               <div className="min-w-0">
-                {eyebrow ? (
-                  <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.05em] text-nav-muted-foreground">
-                    {eyebrow}
-                  </p>
-                ) : null}
-                <h1 className="font-serif text-3xl font-semibold text-nav-foreground">{title}</h1>
-                {description ? (
-                  <p className="mt-1.5 text-sm text-nav-muted-foreground">{description}</p>
-                ) : null}
+                {eyebrow ? <p className="label-xs mb-2">{eyebrow}</p> : null}
+                <h1 className="font-serif text-3xl font-semibold text-foreground">{title}</h1>
+                {description ? <p className="mt-1.5 text-sm text-muted-foreground">{description}</p> : null}
               </div>
               {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
             </div>
@@ -135,9 +129,9 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const exceptions = atRisk + delayed;
 
   const body = (
-    <div className="flex h-full flex-col bg-nav">
+    <div className="deck flex h-full flex-col">
       <div className="flex h-16 shrink-0 items-center gap-2.5 border-b border-nav-border px-5">
-        <span className="grid size-6 shrink-0 place-items-center rounded-md bg-navy text-nav-foreground">
+        <span className="grid size-6 shrink-0 place-items-center rounded-md bg-primary-deep text-nav-foreground">
           <Ship className="size-3.5" />
         </span>
         <span className="text-sm font-semibold tracking-[0.01em] text-nav-foreground">WhiteWind</span>
@@ -243,10 +237,10 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
 
 function TopBar({ onMenu }: { onMenu: () => void }) {
   return (
-    <header className="bezel sticky top-0 z-20 border-b border-nav-border">
+    <header className="atmosphere sticky top-0 z-20 border-b border-border">
       <div className="flex h-14 items-center gap-3 px-5 sm:px-6 lg:px-8">
         <button
-          className="focus-ring rounded-md p-2 text-nav-muted-foreground transition-colors hover:bg-nav-elevated hover:text-nav-foreground lg:hidden"
+          className="focus-ring rounded-md p-2 text-muted-foreground transition-colors hover:bg-surface lg:hidden"
           onClick={onMenu}
           aria-label="Open navigation"
         >
@@ -298,11 +292,11 @@ function GlobalSearch() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="focus-ring flex h-8 w-full max-w-[380px] items-center gap-2 rounded-md border border-nav-border bg-nav-elevated px-2.5 text-sm text-nav-muted-foreground transition-colors hover:border-nav-accent/40 hover:text-nav-foreground"
+        className="focus-ring flex h-8 w-full max-w-[380px] items-center gap-2 rounded-md border border-border bg-surface px-2.5 text-sm text-muted-foreground transition-colors hover:border-primary/35"
       >
         <Search className="size-3.5 shrink-0" />
         <span className="flex-1 truncate text-left">Search shipments, vessels, clients…</span>
-        <kbd className="instrument hidden shrink-0 items-center rounded border border-nav-border px-1.5 py-0.5 text-[10px] text-nav-muted-foreground sm:flex">
+        <kbd className="instrument hidden shrink-0 items-center rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground sm:flex">
           ⌘K
         </kbd>
       </button>
@@ -424,7 +418,7 @@ function NotificationsMenu() {
   return (
     <div ref={ref} className="relative">
       <button
-        className="focus-ring relative rounded-md p-2 text-nav-muted-foreground transition-colors hover:bg-nav-elevated hover:text-nav-foreground"
+        className="focus-ring relative rounded-md p-2 text-muted-foreground transition-colors hover:bg-surface hover:text-foreground"
         onClick={() => setOpen((v) => !v)}
         aria-label="Notifications"
       >
@@ -466,17 +460,17 @@ function WorkspaceMenu() {
   return (
     <div ref={ref} className="relative">
       <button
-        className="focus-ring flex items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-nav-elevated"
+        className="focus-ring flex items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-surface"
         onClick={() => setOpen((v) => !v)}
       >
         <span className="grid size-6 place-items-center rounded-md bg-primary text-[10px] font-semibold text-primary-foreground">
           ST
         </span>
         <span className="hidden leading-tight sm:block">
-          <span className="block text-xs font-medium text-nav-foreground">StimTech Solutions</span>
-          <span className="block text-xs text-nav-muted-foreground">Operations</span>
+          <span className="block text-xs font-medium text-foreground">StimTech Solutions</span>
+          <span className="block text-xs text-muted-foreground">Operations</span>
         </span>
-        <ChevronDown className="size-3.5 text-nav-muted-foreground" />
+        <ChevronDown className="size-3.5 text-muted-foreground" />
       </button>
       {open ? (
         <div className="panel-lifted animate-in absolute right-0 top-10 z-30 w-[220px] overflow-hidden p-1">
@@ -535,7 +529,7 @@ export function EmptyState({
 
 /**
  * A labelled reading, quiet by default — the single shared visual language
- * for "a KPI" used by the dashboard's bezel summary, Analytics and the
+ * for "a KPI" used by the dashboard's header summary, Analytics and the
  * fleet map, so the same concept never has to be re-invented per page.
  * The value is always instrument mono: a count is a reading, not prose.
  */
@@ -543,29 +537,15 @@ export function Stat({
   label,
   value,
   tone,
-  onBezel = false,
 }: {
   label: string;
   value: ReactNode;
   tone?: "risk";
-  /** True when rendered inside the dark header bezel rather than on the
-   * light chart surface — swaps to the bezel's own text colours. */
-  onBezel?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <span
-        className={
-          onBezel
-            ? "text-[11px] font-medium uppercase tracking-[0.05em] text-nav-muted-foreground"
-            : "label-xs"
-        }
-      >
-        {label}
-      </span>
-      <span
-        className={`instrument inline-flex items-center gap-2 text-2xl font-semibold ${onBezel ? "text-nav-foreground" : "text-foreground"}`}
-      >
+      <span className="label-xs">{label}</span>
+      <span className="instrument inline-flex items-center gap-2 text-2xl font-semibold text-foreground">
         {tone === "risk" ? <span aria-hidden className="size-[7px] rounded-full bg-risk" /> : null}
         {value}
       </span>
@@ -578,12 +558,6 @@ export const btnPrimary =
 
 export const btnGhost =
   "focus-ring inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-surface px-3.5 text-sm font-medium text-foreground transition-colors duration-150 hover:bg-subtle active:scale-[0.98] disabled:opacity-45";
-
-/** A ghost button styled for the dark bezel — used only in a page's
- * `actions` slot, which now renders inside the header bezel rather than
- * on the light chart surface. */
-export const btnBezel =
-  "focus-ring inline-flex h-9 items-center gap-1.5 rounded-md border border-nav-border bg-nav-elevated px-3.5 text-sm font-medium text-nav-foreground transition-colors duration-150 hover:border-nav-accent/40 active:scale-[0.98] disabled:opacity-45";
 
 export const btnDanger =
   "focus-ring inline-flex h-9 items-center gap-1.5 rounded-md border border-destructive/30 bg-surface px-3.5 text-sm font-medium text-destructive transition-colors duration-150 hover:bg-risk-soft active:scale-[0.98]";

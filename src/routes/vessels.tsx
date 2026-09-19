@@ -71,7 +71,7 @@ function VesselsPage() {
             </thead>
             <tbody className="divide-y divide-border">
               {withVessel.map((s) => (
-                <tr key={s.id} className="transition-colors hover:bg-subtle/60">
+                <tr key={s.id} className="transition-colors hover:bg-atmosphere/60">
                   <td className="px-4 py-2.5 font-medium">{s.vessel_name || "Unnamed vessel"}</td>
                   <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">
                     {s.vessel_mmsi || "—"}

@@ -341,7 +341,7 @@ function ShipmentDetail() {
           <Link
             to="/"
             aria-label="Back to shipments"
-            className="focus-ring -ml-1 rounded-md p-1.5 text-nav-muted-foreground transition-colors hover:bg-nav-elevated hover:text-nav-foreground"
+            className="focus-ring -ml-1 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-surface hover:text-foreground"
           >
             <ArrowLeft className="size-4" />
           </Link>
@@ -388,19 +388,19 @@ function ShipmentDetail() {
 
           <RouteBar origin={shipment.origin} destination={shipment.destination} progress={routeProgress} />
 
-          {showHealth ? <p className="text-xs text-nav-muted-foreground">{health.reason}</p> : null}
+          {showHealth ? <p className="text-xs text-muted-foreground">{health.reason}</p> : null}
 
           {shipmentAlerts.length > 0 ? (
             <button
               type="button"
               onClick={() => setTab("alerts")}
-              className="flex items-center gap-2 border-t border-nav-border pt-5 text-left text-sm"
+              className="flex items-center gap-2 border-t border-border pt-5 text-left text-sm"
             >
               <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-risk" />
-              <span className="font-medium text-nav-foreground">
+              <span className="font-medium text-foreground">
                 {shipmentAlerts.length} alert{shipmentAlerts.length === 1 ? "" : "s"} on this shipment
               </span>
-              <span className="text-xs font-medium text-nav-accent">Review →</span>
+              <span className="text-xs font-medium text-primary">Review →</span>
             </button>
           ) : null}
         </div>
@@ -796,7 +796,7 @@ function HeaderMenu({
     <div className="relative" ref={ref}>
       <button
         type="button"
-        className="focus-ring rounded-md p-1.5 text-nav-muted-foreground transition-colors hover:bg-nav-elevated hover:text-nav-foreground"
+        className="focus-ring rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-surface hover:text-foreground"
         aria-label="More actions"
         onClick={() => setOpen((v) => !v)}
       >
@@ -839,8 +839,8 @@ function HeaderMenu({
 function HeaderStat({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
-      <span className="text-[11px] font-medium uppercase tracking-[0.05em] text-nav-muted-foreground">{label}</span>
-      <span className="instrument truncate text-lg font-medium text-nav-foreground">{value}</span>
+      <span className="label-xs">{label}</span>
+      <span className="instrument truncate text-lg font-medium text-foreground">{value}</span>
     </div>
   );
 }
@@ -916,27 +916,27 @@ function RouteBar({
   return (
     <div className="min-w-0">
       <div className="flex items-center justify-between gap-3">
-        <span className="min-w-0 truncate text-lg font-semibold text-nav-foreground">{origin}</span>
-        <ArrowRight className="size-4 shrink-0 text-nav-muted-foreground" />
-        <span className="min-w-0 truncate text-right text-lg font-semibold text-nav-foreground">{destination}</span>
+        <span className="min-w-0 truncate text-lg font-semibold text-foreground">{origin}</span>
+        <ArrowRight className="size-4 shrink-0 text-muted-foreground" />
+        <span className="min-w-0 truncate text-right text-lg font-semibold text-foreground">{destination}</span>
       </div>
-      <div className="relative mt-3 h-[3px] w-full rounded-full bg-nav-border">
+      <div className="relative mt-3 h-[3px] w-full rounded-full bg-atmosphere-hover">
         {progress ? (
           <>
             <div
-              className="absolute inset-y-0 left-0 rounded-full bg-nav-accent transition-[width] duration-700"
+              className="absolute inset-y-0 left-0 rounded-full bg-primary transition-[width] duration-700"
               style={{ width: `${progress.pct * 100}%` }}
             />
             <div
               aria-hidden
-              className="live-pulse absolute top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-nav-accent shadow-[0_0_6px_0_var(--nav-accent)] transition-[left] duration-700"
+              className="live-pulse absolute top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary shadow-[0_0_6px_0_var(--primary)] transition-[left] duration-700"
               style={{ left: `${progress.pct * 100}%` }}
             />
           </>
         ) : null}
       </div>
       {progress ? (
-        <p className="instrument mt-2 text-xs text-nav-muted-foreground">
+        <p className="instrument mt-2 text-xs text-muted-foreground">
           {Math.round(progress.pct * 100)}% underway · {Math.round(progress.remainingKm).toLocaleString()} km to
           destination
         </p>

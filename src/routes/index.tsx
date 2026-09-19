@@ -30,10 +30,10 @@ function daysUntil(iso: string) {
 function NextEvent({ label, shipment, date }: { label: string; shipment: Shipment; date: string }) {
   return (
     <Link to="/shipments/$id" params={{ id: shipment.id }} className="flex flex-col gap-1.5 hover:opacity-75">
-      <span className="text-[11px] font-medium uppercase tracking-[0.05em] text-nav-muted-foreground">{label}</span>
+      <span className="label-xs">{label}</span>
       <span className="text-sm">
-        <span className="font-medium text-nav-foreground">{shipment.client_name}</span>
-        <span className="instrument text-nav-muted-foreground">
+        <span className="font-medium text-foreground">{shipment.client_name}</span>
+        <span className="instrument text-muted-foreground">
           {" "}
           · {formatEta(date)} · {daysUntil(date)}
         </span>
@@ -165,37 +165,35 @@ function Dashboard() {
             {stats.exceptions > 0 ? (
               <>
                 <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-risk" />
-                <span className="font-medium text-nav-foreground">
+                <span className="font-medium text-foreground">
                   {stats.exceptions} shipment{stats.exceptions === 1 ? "" : "s"} need attention
                 </span>
-                <Link to="/alerts" className="text-xs font-medium text-nav-accent hover:underline">
+                <Link to="/alerts" className="text-xs font-medium text-primary hover:underline">
                   Review →
                 </Link>
               </>
             ) : (
               <>
                 <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-positive" />
-                <span className="text-nav-muted-foreground">
-                  All shipments on track — nothing needs attention.
-                </span>
+                <span className="text-muted-foreground">All shipments on track — nothing needs attention.</span>
               </>
             )}
           </div>
 
           <div>
             <div className="flex flex-wrap items-start gap-x-10 gap-y-5">
-              <Stat label="Active" value={stats.active} onBezel />
-              <Stat label="In Transit" value={stats.inTransit} onBezel />
-              <Stat label="Approaching" value={stats.approaching} onBezel />
-              <Stat label="Arrived" value={stats.arrived} onBezel />
+              <Stat label="Active" value={stats.active} />
+              <Stat label="In Transit" value={stats.inTransit} />
+              <Stat label="Approaching" value={stats.approaching} />
+              <Stat label="Arrived" value={stats.arrived} />
             </div>
             {shipments.length > 0 ? (
-              <div className="mt-5 flex h-[3px] w-full overflow-hidden rounded-full bg-nav-border" aria-hidden>
+              <div className="mt-5 flex h-[3px] w-full overflow-hidden rounded-full bg-atmosphere-hover" aria-hidden>
                 {mix.other > 0 ? (
-                  <span className="bg-nav-muted-foreground/40" style={{ width: `${(mix.other / mixTotal) * 100}%` }} />
+                  <span className="bg-muted-foreground/35" style={{ width: `${(mix.other / mixTotal) * 100}%` }} />
                 ) : null}
                 {mix.inTransit > 0 ? (
-                  <span className="bg-nav-accent" style={{ width: `${(mix.inTransit / mixTotal) * 100}%` }} />
+                  <span className="bg-primary" style={{ width: `${(mix.inTransit / mixTotal) * 100}%` }} />
                 ) : null}
                 {mix.approaching > 0 ? (
                   <span className="bg-warning" style={{ width: `${(mix.approaching / mixTotal) * 100}%` }} />
@@ -208,7 +206,7 @@ function Dashboard() {
           </div>
 
           {nextDeparture || nextArrival ? (
-            <div className="flex flex-wrap gap-x-12 gap-y-4 border-t border-nav-border pt-6">
+            <div className="flex flex-wrap gap-x-12 gap-y-4 border-t border-border pt-6">
               {nextDeparture ? (
                 <NextEvent label="Next departure" shipment={nextDeparture} date={nextDeparture.planned_etd!} />
               ) : null}
@@ -261,7 +259,7 @@ function Dashboard() {
                       <Link
                         to="/shipments/$id"
                         params={{ id: shipment.id }}
-                        className="block transition-colors duration-150 hover:bg-subtle/60"
+                        className="block transition-colors duration-150 hover:bg-atmosphere/60"
                       >
                         {row}
                       </Link>
@@ -305,7 +303,7 @@ function Dashboard() {
                       <Link
                         to="/shipments/$id"
                         params={{ id: shipment.id }}
-                        className="block transition-colors duration-150 hover:bg-subtle/60"
+                        className="block transition-colors duration-150 hover:bg-atmosphere/60"
                       >
                         {content}
                       </Link>

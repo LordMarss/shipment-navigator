@@ -44,7 +44,7 @@ function AlertsPage() {
           alerts.map((a) => (
             <div
               key={a.id}
-              className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 transition-colors hover:bg-subtle/50"
+              className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 transition-colors hover:bg-atmosphere/50"
             >
               <span
                 aria-hidden

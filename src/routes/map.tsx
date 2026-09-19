@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { AppShell, Stat, btnBezel, btnGhost, btnPrimary, fieldClass } from "@/components/AppShell";
+import { AppShell, Stat, btnGhost, btnPrimary, fieldClass } from "@/components/AppShell";
 import { StatusPill } from "@/components/StatusPill";
 import { listShipments, shortId, updateShipment, type Shipment } from "@/lib/api";
 
@@ -65,16 +65,16 @@ function FleetMap() {
       description="Live AIS traffic. Track the vessel carrying any active shipment."
       actions={
         tracked ? (
-          <button className={btnBezel} onClick={() => setTracked(null)}>
+          <button className={btnGhost} onClick={() => setTracked(null)}>
             Back to full map
           </button>
         ) : null
       }
       headerExtra={
         <div className="flex flex-wrap items-start gap-x-10 gap-y-5">
-          <Stat label="Active Shipments" value={active.length} onBezel />
-          <Stat label="Tracked by AIS" value={trackedByAis} onBezel />
-          <Stat label="In Transit" value={inTransitCount} onBezel />
+          <Stat label="Active Shipments" value={active.length} />
+          <Stat label="Tracked by AIS" value={trackedByAis} />
+          <Stat label="In Transit" value={inTransitCount} />
         </div>
       }
     >
@@ -123,7 +123,7 @@ function FleetMap() {
                   <li
                     key={s.id}
                     className={`border-l-2 px-4 py-3 transition-colors duration-150 ${
-                      isTracked ? "border-l-primary bg-tint-selected/40" : "border-l-transparent hover:bg-subtle/60"
+                      isTracked ? "border-l-primary bg-tint-selected/40" : "border-l-transparent hover:bg-atmosphere/60"
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2">

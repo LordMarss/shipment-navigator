@@ -5,42 +5,47 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * WhiteWind Logistics design system — v7: "Chart Console."
+ * WhiteWind Logistics design system — v8: "Chart Console," rebalanced
+ * for bright rooms.
  *
- * The concept: WhiteWind is not a dashboard that happens to track ships —
- * it is an instrument for reading global cargo movement, styled after the
- * housing of real navigation equipment (ECDIS, radar, gyrocompass
- * repeaters) wrapped around the printed lettering of nautical charts and
- * shipping manifests. Two registers, applied consistently everywhere:
+ * The previous version made the whole top of every page — sidebar, top
+ * bar and title band — one continuous dark instrument housing. In a
+ * bright office that read as heavier than it needed to be, and the hard
+ * seam into the light content below didn't feel like one considered
+ * surface. This version keeps dark for exactly two things that earn it —
+ * the sidebar (always visible, rarely lit directly) and the AIS console
+ * on a shipment (genuinely live telemetry, meant to feel like a
+ * different kind of information) — and rebuilds everything else as a
+ * light, three-tier tonal system:
  *
- *   THE BEZEL — dark, fixed, structural. The sidebar and every page's
- *   top bar + header band share one dark navy housing (`--nav`, the
- *   `.bezel` utility). This is the instrument's frame: navigation,
- *   page identity, and — on the two pages where it matters most
- *   (dashboard, shipment detail) — the live operational summary itself.
- *   It carries a barely-visible coordinate grid, the one texture in the
- *   whole product, because a grid is how charts and radar actually
- *   represent space, not decoration for its own sake.
+ *   THE DECK — the sidebar. Dark, fixed, structural, carrying the same
+ *   barely-visible coordinate grid as the console. The one place the
+ *   product is unapologetically dark, because it's a fixed instrument
+ *   panel at the edge of the screen, not a surface you read line by line.
  *
- *   THE CHART — light, warm, paper-toned. Tables, forms, records: the
- *   actual working surface you read and edit, always legible, always
- *   calm, tuned for long sessions rather than drama.
+ *   THE ATMOSPHERE — the top bar and every page's header band. A pale,
+ *   genuinely blue wash (`--atmosphere`), not white, not grey — the
+ *   deliberate step between the dark deck and the white chart below it.
+ *   Page identity and (on the dashboard and shipment detail) the live
+ *   operational summary live here.
  *
- * Three typefaces, not one, each doing a specific job — the same
- * separation a real chart makes between a title cartouche, body copy and
- * a coordinate reading:
- *   — Fraunces (serif, engraved character) for page titles only.
- *   — IBM Plex Sans (technical, engineered lineage) for every other word.
- *   — Martian Mono (`.instrument`) for anything that is a reading rather
- *     than prose: MMSI, SOG, COG, timestamps, reference codes, KPI counts.
+ *   THE CHART — white paper. Tables, forms, records: the working
+ *   surface, tuned for hours of reading rather than drama.
  *
- * Colour stays one restrained blue family (a mid blue for action and
- * "underway," a pale wash, a deep navy for the bezel, a blue-gray slate
- * for secondary instrument text) plus green/amber/red used as exactly
- * one signal per element. Shape is precise, not soft: a tight control
- * radius and a slightly looser container radius, never the large soft
- * rounding of a consumer app. Shadow exists only on things that actually
- * float above the page — the bezel and the chart never get one.
+ * Colour is one Ocean blue family, four roles: `--primary` (actions,
+ * links, "underway," and every hover/hairline on it stays in-family),
+ * `--primary-deep` (stronger emphasis — active nav, console accents —
+ * meaningfully lighter than the old navy, never near-black),
+ * `--atmosphere` (the pale wash above), and neutrals that stay a true
+ * warm ink rather than blue-tinted, so text never competes with the
+ * accent. Green/amber/red remain exactly one signal per element.
+ *
+ * Three typefaces: Fraunces (engraved serif) for page titles only, IBM
+ * Plex Sans for everything else, Martian Mono (`.instrument`) for any
+ * reading rather than prose — MMSI, SOG, COG, timestamps, reference
+ * codes, KPI counts. Shape stays precise: a tight control radius, a
+ * slightly looser container radius, shadow reserved for things that
+ * actually float above the page.
  */
 
 @theme inline {
@@ -88,11 +93,9 @@
   --color-primary: var(--primary);
   --color-primary-hover: var(--primary-hover);
   --color-primary-foreground: var(--primary-foreground);
-  --color-primary-soft: var(--primary-soft);
-  --color-primary-pale: var(--primary-pale);
   --color-primary-deep: var(--primary-deep);
-  --color-slate: var(--slate);
-  --color-navy: var(--navy);
+  --color-atmosphere: var(--atmosphere);
+  --color-atmosphere-hover: var(--atmosphere-hover);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
@@ -135,40 +138,37 @@
   /* Container radius — used directly by `.panel` / `.panel-lifted`. */
   --radius: 8px;
 
-  /* Chart paper — a warm, lightly-toned canvas, not a sterile app white. */
-  --background: oklch(0.965 0.01 75);
+  /* White paper canvas — brighter than the previous warm tan tone now
+   * that dark no longer dominates the top of the screen. */
+  --background: oklch(0.978 0.005 71);
   /* True ink — a neutral near-black, so text never competes with the
    * accent for attention. */
   --foreground: oklch(0.185 0.004 78);
-  /* Surfaces lift a touch lighter than canvas — no border/shadow needed
-   * to feel "above" it. */
-  --surface: oklch(0.99 0.004 75);
-  --subtle: oklch(0.945 0.008 75);
+  --surface: oklch(0.996 0.002 71);
+  --subtle: oklch(0.951 0.007 71);
   --card: var(--surface);
   --card-foreground: var(--foreground);
   --popover: var(--surface);
   --popover-foreground: var(--foreground);
 
-  /* Accent — a family of restrained blues built from one hue (241), not
-   * one flat colour: a soft mid blue for actions and the "underway"
-   * meaning, a pale wash for large calm backdrops, a deep navy for the
-   * bezel register, and a blue-gray "slate" for secondary instrument
-   * text — so the interface reads as one considered ocean palette
-   * rather than "one accent plus grey." */
-  --primary: oklch(0.585 0.096 241);
-  --primary-hover: oklch(0.52 0.1 241);
-  --primary-foreground: oklch(0.99 0.002 241);
-  --primary-soft: oklch(0.945 0.02 241);
-  --primary-pale: oklch(0.965 0.012 241);
-  --primary-deep: oklch(0.4 0.085 241);
-  --slate: oklch(0.52 0.025 235);
-  --navy: oklch(0.27 0.05 241);
+  /* Ocean — one blue family, four roles. A lighter, more atmospheric mid
+   * blue than before for actions and links; a "deep" tone for stronger
+   * emphasis that stays a genuine blue rather than sliding to near-black
+   * navy; a pale wash reserved for the atmosphere band and hover/selected
+   * states, so those two things are visibly the same idea everywhere. */
+  --primary: oklch(0.6 0.105 231);
+  --primary-hover: oklch(0.525 0.11 230);
+  --primary-foreground: oklch(0.99 0.002 231);
+  --primary-deep: oklch(0.42 0.115 228);
 
-  --secondary: oklch(0.945 0.008 75);
+  --atmosphere: oklch(0.964 0.017 231);
+  --atmosphere-hover: oklch(0.932 0.028 231);
+
+  --secondary: oklch(0.951 0.007 71);
   --secondary-foreground: var(--foreground);
-  --muted: oklch(0.945 0.008 75);
+  --muted: oklch(0.951 0.007 71);
   --muted-foreground: oklch(0.475 0.008 78);
-  --accent: oklch(0.945 0.008 75);
+  --accent: oklch(0.951 0.007 71);
   --accent-foreground: var(--foreground);
 
   /* One true red — also used for destructive actions, no duplicate hue. */
@@ -177,19 +177,19 @@
   --destructive: var(--risk);
   --destructive-foreground: oklch(0.99 0.002 78);
 
-  --border: oklch(0.878 0.009 75);
-  --input: oklch(0.878 0.009 75);
+  --border: oklch(0.88 0.008 71);
+  --input: oklch(0.88 0.008 71);
   --ring: var(--primary);
 
-  /* Green — kept well clear of cyan (hue ~142, not ~152) so it never
-   * reads as teal next to the blue accent. */
+  /* Green — kept well clear of cyan so it never reads as teal next to
+   * the blue accent. */
   --positive: oklch(0.5 0.095 142);
   --positive-soft: oklch(0.945 0.024 142);
   /* Amber — brass-lamp warmth, slightly desaturated to stay calm. */
   --warning: oklch(0.63 0.098 70);
   --warning-soft: oklch(0.945 0.026 70);
 
-  --tint-selected: oklch(0.95 0.018 241);
+  --tint-selected: var(--atmosphere-hover);
 
   --chart-1: var(--primary);
   --chart-2: var(--positive);
@@ -206,20 +206,20 @@
   --sidebar-border: var(--nav-border);
   --sidebar-ring: var(--ring);
 
-  /* The bezel — same restrained hue family as the accent, quiet and
-   * flat, tuned for all-day legibility: a genuinely dark ground so
-   * lighter text has real headroom, a clearly brighter tone for the
-   * active nav item, and a distinct pale accent used only for "current
-   * position" — on the nav, and on a vessel's live AIS reading. */
-  --nav: oklch(0.155 0.022 241);
-  --nav-elevated: oklch(0.205 0.026 241);
-  --nav-foreground: oklch(0.97 0.004 241);
-  --nav-muted-foreground: oklch(0.735 0.02 241);
-  --nav-label: oklch(0.52 0.03 241);
-  --nav-active: oklch(0.255 0.05 241);
-  --nav-active-foreground: oklch(0.985 0.003 241);
-  --nav-accent: oklch(0.8 0.075 214);
-  --nav-border: oklch(0.235 0.028 241);
+  /* The deck — the sidebar's dark register, and the AIS console's.
+   * Same hue as Ocean, tuned dark: a genuinely dark ground so lighter
+   * text has real headroom, a clearly brighter tone for the active nav
+   * item, and a distinct pale accent used only for "current position" —
+   * on the nav, and on a vessel's live AIS reading. */
+  --nav: oklch(0.148 0.024 231);
+  --nav-elevated: oklch(0.198 0.028 231);
+  --nav-foreground: oklch(0.97 0.004 231);
+  --nav-muted-foreground: oklch(0.735 0.02 231);
+  --nav-label: oklch(0.52 0.03 231);
+  --nav-active: oklch(0.25 0.05 231);
+  --nav-active-foreground: oklch(0.985 0.003 231);
+  --nav-accent: oklch(0.78 0.09 231);
+  --nav-border: oklch(0.228 0.03 231);
 
   /* Motion — a single snappy-start/soft-landing curve for hover/press. */
   --ease-premium: cubic-bezier(0.16, 1, 0.3, 1);
@@ -284,21 +284,35 @@
   letter-spacing: -0.02em;
 }
 
-/* The console register — dark, live, navigational. Reserved for genuinely
- * live telemetry (AIS) so it reads as a different kind of information
- * than the light "chart" surfaces around it, never for static content. */
+/* The console — dark, live, navigational, reserved for genuinely live
+ * telemetry (AIS) so it reads as a different kind of information than
+ * the light chart surfaces around it. Shares the deck's coordinate grid. */
 @utility console {
   background-color: var(--color-nav);
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      color-mix(in oklab, var(--nav-foreground) 5%, transparent) 0px,
+      color-mix(in oklab, var(--nav-foreground) 5%, transparent) 1px,
+      transparent 1px,
+      transparent 28px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      color-mix(in oklab, var(--nav-foreground) 5%, transparent) 0px,
+      color-mix(in oklab, var(--nav-foreground) 5%, transparent) 1px,
+      transparent 1px,
+      transparent 28px
+    );
   border: 1px solid var(--nav-border);
   border-radius: var(--radius);
   color: var(--color-nav-foreground);
 }
 
-/* The bezel — the instrument's dark structural housing: sidebar, top bar,
- * and (on the pages where it matters) the page header and its live
- * summary. A barely-visible coordinate grid is the one texture in the
- * product, because a grid is how charts represent space, not decoration. */
-@utility bezel {
+/* The deck — the sidebar's dark structural housing. Same coordinate grid
+ * as the console, because they're the same idea (a live instrument
+ * surface) at two different scales. */
+@utility deck {
   background-color: var(--color-nav);
   background-image:
     repeating-linear-gradient(
@@ -316,6 +330,30 @@
       transparent 28px
     );
   color: var(--color-nav-foreground);
+}
+
+/* The atmosphere — the pale blue wash for the top bar and every page's
+ * header band: the deliberate step between the dark deck and the white
+ * chart below it, carrying the same faint coordinate grid at a much
+ * lower key so it reads on light without adding noise. */
+@utility atmosphere {
+  background-color: var(--color-atmosphere);
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      color-mix(in oklab, var(--foreground) 4%, transparent) 0px,
+      color-mix(in oklab, var(--foreground) 4%, transparent) 1px,
+      transparent 1px,
+      transparent 28px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      color-mix(in oklab, var(--foreground) 4%, transparent) 0px,
+      color-mix(in oklab, var(--foreground) 4%, transparent) 1px,
+      transparent 1px,
+      transparent 28px
+    );
+  color: var(--color-foreground);
 }
 
 @utility label-xs {

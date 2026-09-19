@@ -120,7 +120,7 @@ function AnalyticsPage() {
                 {byClient.map(([client, row]) => (
                   <li
                     key={client}
-                    className="flex items-center justify-between py-2 text-sm transition-colors hover:bg-subtle/50"
+                    className="flex items-center justify-between py-2 text-sm transition-colors hover:bg-atmosphere/50"
                   >
                     <span className="truncate font-medium">{client}</span>
                     <span className="ml-3 shrink-0 text-muted-foreground">
