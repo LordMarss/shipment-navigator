@@ -5,39 +5,50 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * WhiteWind Logistics design system — v5.
+ * WhiteWind Logistics design system — v6: "Chart & Console."
  *
- * Identity: ocean, movement, precision, visibility. A shipment is a
- * position moving along a route toward a known point — the interface
- * says that visually wherever it can (a journey line instead of a
- * generic progress bar, a heading arrow instead of a bare COG number,
- * directional route text) rather than through decoration.
+ * Two typographic registers, not one. Editorial sans (Inter) carries
+ * narrative and business content — page titles, client names, summaries.
+ * Instrument mono (JetBrains Mono, the `.instrument` utility) carries
+ * anything that is a precise reading rather than prose: MMSI, SOG, COG,
+ * coordinates, shipment reference codes, AIS timestamps — the same way a
+ * chart or a ship's instrumentation separates a label from a reading.
+ * That split alone gives live/reference data a different texture than
+ * static business data, without a single icon.
+ *
+ * Two surface registers, not one. Nearly the whole product is light —
+ * paper canvas, ink text, restrained blue. But the two places that carry
+ * genuinely live, second-by-second truth (the primary navigation, which
+ * is "where you are in the app," and the AIS console on a shipment,
+ * which is "where the vessel is on the earth") share one dark navy
+ * register (`--nav`) with the same icy accent (`--nav-accent`) marking
+ * "current position" in both. A shipment that is actually moving looks
+ * different from a shipment that is merely scheduled, because it grows a
+ * console; nothing else in the product does.
  *
  * Colour is a family built from one blue hue, not one flat accent plus
  * grey: a mid blue for actions and the "underway" meaning, a pale wash
- * for large calm backdrops, a deep navy for moments needing real
- * contrast, and a blue-gray "slate" for secondary instrument text.
- * Neutrals stay true warm-ink grays for body text, so the blue family
- * still reads as deliberate rather than diluted. Status colour (green /
- * amber / red) appears as exactly one signal per element — a dot or a
- * text colour — and severity has real typographic weight behind it:
- * critical is not styled the same as informational.
+ * for large calm backdrops, a deep navy for the console register, and a
+ * blue-gray "slate" for secondary instrument text. Neutrals stay true
+ * warm-ink grays for body text, so the blue family still reads as
+ * deliberate rather than diluted. Status colour (green / amber / red)
+ * appears as exactly one signal per element, and severity has real
+ * typographic weight behind it: critical is not styled like informational.
  *
- * Two container primitives only: `.panel` is a quiet surface (a hairline
- * border and a faint background shift, no shadow) reserved for things
- * that are genuinely distinct objects — a table, a form, a live widget.
- * `.panel-lifted` is the only surface that gets real shadow, reserved for
- * things that actually float above the page — menus, dropdowns, modals.
- * Most content needs neither: whitespace, alignment and a label are
- * enough. Radius is deliberate and role-based: controls (buttons, inputs)
- * use a tighter radius than containers (panels, menus), and pills are
- * used only for true status badges, not as a default label shape. No
- * gradients, no glow shadows, no coloured icon chips.
+ * Two container primitives for everything that isn't the console: `.panel`
+ * is a quiet surface (hairline border, faint lift, no shadow) reserved for
+ * genuinely distinct objects — a table, a form, a live widget. `.panel-
+ * lifted` is the only surface that gets real shadow, reserved for things
+ * that actually float above the page — menus, dropdowns, modals. Most
+ * content needs neither: whitespace, alignment and a label are enough.
+ * Radius is deliberate and role-based: controls (buttons, inputs) use a
+ * tighter radius than containers (panels, menus, the console).
  */
 
 @theme inline {
   --font-sans:
     "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", "Menlo", monospace;
 
   /* Type scale — deliberately small set of steps, each with its own
    * paired line-height and tracking, used directly as text-xs…text-3xl
@@ -266,6 +277,25 @@
   box-shadow:
     0 4px 12px -4px color-mix(in oklab, var(--foreground) 10%, transparent),
     0 16px 32px -12px color-mix(in oklab, var(--foreground) 16%, transparent);
+}
+
+/* Instrument type — the mono half of the two-register type system, for
+ * precise readings rather than prose: MMSI, SOG, COG, coordinates,
+ * reference codes, AIS timestamps. */
+@utility instrument {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* The console register — dark, live, navigational. Reserved for genuinely
+ * live telemetry (AIS) so it reads as a different kind of information
+ * than the light "business" surfaces around it, never for static content. */
+@utility console {
+  background-color: var(--color-nav);
+  border: 1px solid var(--nav-border);
+  border-radius: var(--radius);
+  color: var(--color-nav-foreground);
 }
 
 @utility label-xs {

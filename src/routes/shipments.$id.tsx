@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -41,6 +41,7 @@ import {
 } from "@/lib/api";
 import { deriveVesselCondition, isAisFresh, vesselConditionLabel } from "@/lib/aisAutomation";
 import { deriveAutomation } from "@/lib/autoStatus";
+import { haversineDistanceKm } from "@/lib/geo";
 import {
   alertSeverity,
   docsFor,
@@ -178,6 +179,31 @@ function ShipmentDetail() {
     queryFn: () => getVesselPositionForShipment({ vessel_mmsi: shipment?.vessel_mmsi ?? null }),
     enabled: Boolean(shipment?.vessel_mmsi),
   });
+  const portsById = useMemo(() => new Map(ports.map((p) => [p.id, p])), [ports]);
+
+  // Real great-circle progress along the voyage — only rendered when we
+  // actually have structured origin/destination ports and a live position
+  // to measure from; never estimated or faked otherwise.
+  const originPort = shipment?.origin_port_id ? portsById.get(shipment.origin_port_id) : undefined;
+  const destPort = shipment?.destination_port_id ? portsById.get(shipment.destination_port_id) : undefined;
+  const routeProgress = useMemo(() => {
+    if (!originPort || !destPort) return null;
+    const totalKm = haversineDistanceKm(
+      originPort.latitude,
+      originPort.longitude,
+      destPort.latitude,
+      destPort.longitude,
+    );
+    if (totalKm < 1 || !position) return null;
+    const remainingKm = haversineDistanceKm(
+      position.latitude,
+      position.longitude,
+      destPort.latitude,
+      destPort.longitude,
+    );
+    const pct = Math.max(0, Math.min(1, 1 - remainingKm / totalKm));
+    return { pct, totalKm, remainingKm };
+  }, [originPort, destPort, position]);
 
   const [draft, setDraft] = useState<Shipment | null>(null);
   const [dates, setDates] = useState<DateDraft | null>(null);
@@ -354,43 +380,36 @@ function ShipmentDetail() {
       {tab === "overview" ? (
         <div className="flex flex-col gap-9">
           {/* Cockpit strip: the whole shipment at a glance, in the order it
-           * actually matters — current state, then route, then timing —
-           * before any panel asks you to read further. */}
-          <div className="flex flex-wrap items-start gap-x-10 gap-y-5 border-b border-border pb-6">
-            <HeaderStat
-              label="Status"
-              value={
-                <span className="inline-flex items-center gap-2">
-                  <span aria-hidden className={`size-2 shrink-0 rounded-full ${statusDot}`} />
-                  {shipment.status}
-                </span>
-              }
-            />
-            <HeaderStat
-              label="Route"
-              value={
-                <span className="inline-flex items-center gap-1.5">
-                  <span className="truncate">{shipment.origin}</span>
-                  <ArrowRight className="size-4 shrink-0 text-muted-foreground" />
-                  <span className="truncate">{shipment.destination}</span>
-                </span>
-              }
-            />
-            {showHealth ? (
+           * actually matters — current state, then real position along the
+           * route, then timing — before any panel asks you to read further. */}
+          <div className="flex flex-col gap-6 border-b border-border pb-6">
+            <div className="flex flex-wrap items-start gap-x-10 gap-y-5">
               <HeaderStat
-                label="Health"
+                label="Status"
                 value={
-                  <span className={`inline-flex items-center gap-2 ${health.level === "Attention" ? "text-warning" : "text-risk"}`}>
-                    <span aria-hidden className={`size-2 shrink-0 rounded-full ${healthDot}`} />
-                    {health.level}
+                  <span className="inline-flex items-center gap-2">
+                    <span aria-hidden className={`size-2 shrink-0 rounded-full ${statusDot}`} />
+                    {shipment.status}
                   </span>
                 }
               />
-            ) : null}
-            <HeaderStat label="Vessel" value={shipment.vessel_name ?? "Unassigned"} />
-            <HeaderStat label="ETA" value={formatEta(shipment.eta)} />
-            <HeaderStat label="Documents" value={`${docs.attached}/${docs.total}`} />
-            <HeaderStat label="Updated" value={relativeTime(lastStatusChange)} />
+              {showHealth ? (
+                <HeaderStat
+                  label="Health"
+                  value={
+                    <span className={`inline-flex items-center gap-2 ${health.level === "Attention" ? "text-warning" : "text-risk"}`}>
+                      <span aria-hidden className={`size-2 shrink-0 rounded-full ${healthDot}`} />
+                      {health.level}
+                    </span>
+                  }
+                />
+              ) : null}
+              <HeaderStat label="ETA" value={formatEta(shipment.eta)} />
+              <HeaderStat label="Documents" value={`${docs.attached}/${docs.total}`} />
+              <HeaderStat label="Updated" value={relativeTime(lastStatusChange)} />
+            </div>
+
+            <RouteBar origin={shipment.origin} destination={shipment.destination} progress={routeProgress} />
           </div>
 
           {showHealth ? (
@@ -450,7 +469,7 @@ function ShipmentDetail() {
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {shipment.carrier ? `${shipment.carrier} · ` : ""}
-                      MMSI {shipment.vessel_mmsi ?? "—"}
+                      MMSI <span className="instrument">{shipment.vessel_mmsi ?? "—"}</span>
                       {conditionLabel ? " · " : ""}
                       {conditionLabel ? (
                         <VesselConditionBadge condition={vesselCondition} label={conditionLabel} />
@@ -463,37 +482,32 @@ function ShipmentDetail() {
               )}
 
               {shipment.vessel_mmsi ? (
-                <div
-                  className={`mt-4 rounded-lg border p-3.5 ${
-                    position && hasFreshAis ? "border-primary/25 bg-primary-pale" : "border-border bg-subtle/60"
-                  }`}
-                >
-                  {position ? (
-                    <>
-                      <div className="mb-3.5 flex items-center justify-between">
-                        <span className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.06em] text-foreground">
-                          <span
-                            className={`size-1.5 rounded-full ${hasFreshAis ? "bg-primary live-pulse" : "bg-muted-foreground/50"}`}
-                            aria-hidden
-                          />
-                          {hasFreshAis ? "Live AIS" : "AIS · stale"}
-                        </span>
-                        <span className="text-xs text-slate">
-                          {relativeTime(position.position_timestamp ?? position.updated_at)}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-3 gap-4">
-                        <SpeedReadout sog={position.sog} />
-                        <HeadingReadout cog={position.cog} />
-                        <AisRow icon={MapPin} label="Nav Status" value={navStatusLabel(position.nav_status)} />
-                      </div>
-                    </>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">
-                      No AIS position received yet for MMSI {shipment.vessel_mmsi}.
-                    </p>
-                  )}
-                </div>
+                position ? (
+                  <div className="console mt-4 p-4">
+                    <div className="flex items-center justify-between">
+                      <span className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.07em] text-nav-foreground">
+                        <span
+                          className={`size-1.5 rounded-full ${hasFreshAis ? "bg-nav-accent live-pulse" : "bg-nav-muted-foreground"}`}
+                          aria-hidden
+                        />
+                        {hasFreshAis ? "Live Position" : "Last Known Position"}
+                      </span>
+                      <span className="instrument text-xs text-nav-muted-foreground">
+                        {relativeTime(position.position_timestamp ?? position.updated_at)}
+                      </span>
+                    </div>
+                    <div className="mt-4 grid grid-cols-3 gap-4">
+                      <ConsoleSpeed sog={position.sog} />
+                      <ConsoleHeading cog={position.cog} />
+                      <ConsoleField label="Nav Status" value={navStatusLabel(position.nav_status)} />
+                    </div>
+                  </div>
+                ) : (
+                  <p className="mt-4 rounded-lg border border-border bg-subtle/60 p-3.5 text-xs text-muted-foreground">
+                    No AIS position received yet for MMSI{" "}
+                    <span className="instrument">{shipment.vessel_mmsi}</span>.
+                  </p>
+                )
               ) : null}
 
               <button
@@ -835,43 +849,34 @@ function HeaderStat({ label, value }: { label: string; value: ReactNode }) {
   );
 }
 
-function AisRow({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: ComponentType<{ className?: string }>;
-  label: string;
-  value: string;
-}) {
+/** A field inside the console — the dark, live register. Label in small
+ * caps, value in instrument mono, both tuned for the nav palette rather
+ * than the page's light "business" colours. */
+function ConsoleField({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
-      <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Icon className="size-3 shrink-0" />
-        {label}
-      </p>
-      <p className="mt-1 truncate text-base font-semibold tabular-nums text-foreground">{value}</p>
+      <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-nav-muted-foreground">{label}</p>
+      <p className="instrument mt-1 truncate text-base font-medium text-nav-foreground">{value}</p>
     </div>
   );
 }
 
-/** Speed over ground as an instrument, not just a number — a bounded bar
- * (0–28kn, the range that covers virtually every cargo vessel) makes
- * "fast" or "slow" legible at a glance without a fake precision decimal
- * chart. */
-function SpeedReadout({ sog }: { sog: number | null }) {
+/** Speed over ground as an instrument, not just a number — a bounded,
+ * glowing gauge (0–28kn, the range that covers virtually every cargo
+ * vessel) makes "fast" or "slow" legible at a glance. */
+function ConsoleSpeed({ sog }: { sog: number | null }) {
   const pct = sog != null ? Math.max(0, Math.min(100, (sog / 28) * 100)) : 0;
   return (
     <div className="min-w-0">
-      <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <ArrowUp className="size-3 shrink-0" />
-        SOG
-      </p>
-      <p className="mt-1 truncate text-base font-semibold tabular-nums text-foreground">
+      <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-nav-muted-foreground">SOG</p>
+      <p className="instrument mt-1 truncate text-base font-medium text-nav-foreground">
         {sog != null ? `${sog.toFixed(1)} kn` : "—"}
       </p>
-      <div className="mt-1.5 h-[3px] w-full overflow-hidden rounded-full bg-border/60">
-        <div className="h-full rounded-full bg-primary transition-[width] duration-500" style={{ width: `${pct}%` }} />
+      <div className="mt-2 h-[3px] w-full overflow-hidden rounded-full bg-nav-border">
+        <div
+          className="h-full rounded-full bg-nav-accent shadow-[0_0_6px_0_var(--nav-accent)] transition-[width] duration-500"
+          style={{ width: `${pct}%` }}
+        />
       </div>
     </div>
   );
@@ -880,19 +885,66 @@ function SpeedReadout({ sog }: { sog: number | null }) {
 /** Course over ground as a heading, not just a number — the arrow rotates
  * to the vessel's real bearing (0° = due north, clockwise), so direction
  * of travel is visible without reading a degree symbol. */
-function HeadingReadout({ cog }: { cog: number | null }) {
+function ConsoleHeading({ cog }: { cog: number | null }) {
   return (
     <div className="min-w-0">
-      <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+      <p className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.08em] text-nav-muted-foreground">
         <ArrowUp
-          className="size-3 shrink-0 text-primary transition-transform duration-500"
+          className="size-3 shrink-0 text-nav-accent transition-transform duration-500"
           style={cog != null ? { transform: `rotate(${cog}deg)` } : undefined}
         />
         COG
       </p>
-      <p className="mt-1 truncate text-base font-semibold tabular-nums text-foreground">
+      <p className="instrument mt-1 truncate text-base font-medium text-nav-foreground">
         {cog != null ? `${cog}°` : "—"}
       </p>
+    </div>
+  );
+}
+
+/** The route as real distance, not decoration: when the shipment has
+ * structured origin/destination ports and a live position, the fill and
+ * marker reflect actual great-circle progress toward the destination —
+ * a vessel crossing genuine distance, not a stand-in percentage. Falls
+ * back to a plain endpoints line when that data isn't available, rather
+ * than estimating. */
+function RouteBar({
+  origin,
+  destination,
+  progress,
+}: {
+  origin: string;
+  destination: string;
+  progress: { pct: number; totalKm: number; remainingKm: number } | null;
+}) {
+  return (
+    <div className="min-w-0">
+      <div className="flex items-center justify-between gap-3">
+        <span className="min-w-0 truncate text-lg font-semibold text-foreground">{origin}</span>
+        <ArrowRight className="size-4 shrink-0 text-muted-foreground" />
+        <span className="min-w-0 truncate text-right text-lg font-semibold text-foreground">{destination}</span>
+      </div>
+      <div className="relative mt-3 h-[3px] w-full rounded-full bg-border">
+        {progress ? (
+          <>
+            <div
+              className="absolute inset-y-0 left-0 rounded-full bg-primary transition-[width] duration-700"
+              style={{ width: `${progress.pct * 100}%` }}
+            />
+            <div
+              aria-hidden
+              className="live-pulse absolute top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary shadow-[0_0_6px_0_var(--primary)] transition-[left] duration-700"
+              style={{ left: `${progress.pct * 100}%` }}
+            />
+          </>
+        ) : null}
+      </div>
+      {progress ? (
+        <p className="instrument mt-2 text-xs text-muted-foreground">
+          {Math.round(progress.pct * 100)}% underway · {Math.round(progress.remainingKm).toLocaleString()} km to
+          destination
+        </p>
+      ) : null}
     </div>
   );
 }
