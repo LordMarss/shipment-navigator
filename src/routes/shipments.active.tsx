@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 
 import { AppShell } from "@/components/AppShell";
 import { ShipmentTable } from "@/components/ShipmentTable";
-import { listAllDocuments, listShipments } from "@/lib/api";
+import { listAllDocuments, listShipments, listVesselPositionsByMmsi } from "@/lib/api";
 
 export const Route = createFileRoute("/shipments/active")({
   head: () => ({
@@ -30,6 +31,16 @@ function ActiveShipments() {
     queryFn: listAllDocuments,
   });
   const active = shipments.filter((s) => s.status !== "Delivered");
+  const mmsis = useMemo(
+    () => active.map((s) => s.vessel_mmsi).filter((m): m is string => Boolean(m)),
+    [active],
+  );
+  const { data: positions } = useQuery({
+    queryKey: ["vesselPositions", mmsis],
+    queryFn: () => listVesselPositionsByMmsi(mmsis),
+    enabled: mmsis.length > 0,
+    refetchInterval: 45_000,
+  });
 
   return (
     <AppShell
@@ -41,6 +52,7 @@ function ActiveShipments() {
       <ShipmentTable
         shipments={active}
         documents={documents}
+        positions={positions}
         isLoading={isLoading}
         emptyTitle="No active shipments"
         emptyDescription="Every shipment on record has been delivered."

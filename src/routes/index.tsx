@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 
-import { AppShell, Stat, btnPrimary } from "@/components/AppShell";
+import { AppShell, btnPrimary } from "@/components/AppShell";
 import { NewShipmentForm } from "@/components/NewShipmentForm";
 import { ShipmentTable } from "@/components/ShipmentTable";
 import { SeverityBadge, SourceTag } from "@/components/StatusPill";
@@ -14,9 +14,17 @@ import {
   listAllEvents,
   listAlerts,
   listShipments,
+  listVesselPositionsByMmsi,
   type Shipment,
 } from "@/lib/api";
+import { deriveVesselCondition } from "@/lib/aisAutomation";
 import { alertSeverity, kpis, relativeTime, SEVERITY_LABEL, type Severity } from "@/lib/lifecycle";
+
+const SEVERITY_ROW_BORDER: Record<Severity, string> = {
+  critical: "border-l-risk",
+  attention: "border-l-warning",
+  informational: "border-l-transparent",
+};
 
 /** "in 3 days" / "tomorrow" / "today" — the future-facing counterpart to
  * `relativeTime`, which only ever looks backward. */
@@ -106,6 +114,20 @@ function Dashboard() {
     queryFn: () => listAllEvents(6),
   });
 
+  const mmsis = useMemo(
+    () => shipments.map((s) => s.vessel_mmsi).filter((m): m is string => Boolean(m)),
+    [shipments],
+  );
+  // Live telemetry for the whole fleet in one query — powers "Moving" below
+  // and the inline speed reading in the table, refreshed on an interval so
+  // a vessel that starts moving is reflected without a manual reload.
+  const { data: positions } = useQuery({
+    queryKey: ["vesselPositions", mmsis],
+    queryFn: () => listVesselPositionsByMmsi(mmsis),
+    enabled: mmsis.length > 0,
+    refetchInterval: 45_000,
+  });
+
   // The automated status pipeline runs server-side on a schedule, so nothing is
   // driven from the browser here. This only reports when it last ran.
   const lastSync = shipments
@@ -115,17 +137,47 @@ function Dashboard() {
     .pop();
 
   const stats = useMemo(() => {
-    const countByStatus = (status: string) => shipments.filter((s) => s.status === status).length;
     const active = shipments.filter((s) => !isLegacyStatus(s.status) && s.status !== "Arrived").length;
     const { atRisk, delayed } = kpis(shipments, documents, config);
-    return {
-      active,
-      inTransit: countByStatus("In Transit"),
-      approaching: countByStatus("Approaching Destination"),
-      arrived: countByStatus("Arrived"),
-      exceptions: atRisk + delayed,
-    };
+    return { active, exceptions: atRisk + delayed };
   }, [shipments, documents, config]);
+
+  // "Moving" is read from real AIS telemetry, not the status field — a
+  // shipment can say "In Transit" for days between position reports, but
+  // this only counts a vessel confirmed underway right now.
+  const moving = useMemo(() => {
+    if (!positions) return [];
+    return shipments.filter((s) => {
+      if (!s.vessel_mmsi) return false;
+      const position = positions.get(s.vessel_mmsi) ?? null;
+      return deriveVesselCondition(s, position).kind === "underway";
+    });
+  }, [shipments, positions]);
+
+  const arrivingSoon = useMemo(() => {
+    const now = Date.now();
+    const horizon = now + 3 * 86_400_000;
+    return shipments.filter((s) => {
+      if (s.status === "Arrived" || s.status === "Delivered" || !s.eta) return false;
+      const t = new Date(s.eta).getTime();
+      return t > now && t <= horizon;
+    });
+  }, [shipments]);
+
+  // ETAs that were revised in the last 24 hours — read from the same alert
+  // feed the Exceptions panel already uses, so this never disagrees with
+  // what "an ETA changed" means elsewhere in the product.
+  const changedShipmentIds = useMemo(() => {
+    const cutoff = Date.now() - 24 * 3_600_000;
+    const ids = new Set<string>();
+    for (const a of alerts) {
+      if (!a.shipment_id) continue;
+      if (!a.message.toLowerCase().includes("eta changed")) continue;
+      if (new Date(a.created_at).getTime() < cutoff) continue;
+      ids.add(a.shipment_id);
+    }
+    return ids;
+  }, [alerts]);
 
   const topAlerts = useMemo(() => {
     const scored = alerts.map((a) => ({ alert: a, severity: alertSeverity(a) }));
@@ -134,15 +186,6 @@ function Dashboard() {
   }, [alerts]);
 
   const shipmentById = useMemo(() => new Map(shipments.map((s) => [s.id, s])), [shipments]);
-
-  // A clean, mutually-exclusive partition of every shipment for the mix
-  // bar below — not the overlapping "active" bucket used for the number,
-  // so the segments always sum to the full shipment count.
-  const mix = useMemo(() => {
-    const other = Math.max(0, shipments.length - stats.inTransit - stats.approaching - stats.arrived);
-    return { other, inTransit: stats.inTransit, approaching: stats.approaching, arrived: stats.arrived };
-  }, [shipments.length, stats]);
-  const mixTotal = shipments.length || 1;
 
   const nextDeparture = useMemo(() => {
     const now = Date.now();
@@ -195,30 +238,18 @@ function Dashboard() {
             )}
           </div>
 
-          <div>
-            <div className="flex flex-wrap items-start gap-x-10 gap-y-5">
-              <Stat label="Active" value={stats.active} />
-              <Stat label="In Transit" value={stats.inTransit} />
-              <Stat label="Approaching" value={stats.approaching} />
-              <Stat label="Arrived" value={stats.arrived} />
-            </div>
-            {shipments.length > 0 ? (
-              <div className="mt-5 flex h-[3px] w-full overflow-hidden rounded-full bg-atmosphere-hover" aria-hidden>
-                {mix.other > 0 ? (
-                  <span className="bg-muted-foreground/35" style={{ width: `${(mix.other / mixTotal) * 100}%` }} />
-                ) : null}
-                {mix.inTransit > 0 ? (
-                  <span className="bg-primary" style={{ width: `${(mix.inTransit / mixTotal) * 100}%` }} />
-                ) : null}
-                {mix.approaching > 0 ? (
-                  <span className="bg-warning" style={{ width: `${(mix.approaching / mixTotal) * 100}%` }} />
-                ) : null}
-                {mix.arrived > 0 ? (
-                  <span className="bg-positive" style={{ width: `${(mix.arrived / mixTotal) * 100}%` }} />
-                ) : null}
-              </div>
-            ) : null}
-          </div>
+          <FleetStatusBand
+            moving={moving.length}
+            arriving={arrivingSoon.length}
+            atRisk={stats.exceptions}
+            changed={changedShipmentIds.size}
+          />
+
+          {moving.length > 0 && positions ? (
+            <LiveFleetRail
+              vessels={moving.map((s) => ({ shipment: s, position: positions.get(s.vessel_mmsi!)! }))}
+            />
+          ) : null}
 
           {nextDeparture || nextArrival ? (
             <div className="flex flex-wrap gap-x-12 gap-y-4 border-t border-border pt-6">
@@ -239,6 +270,7 @@ function Dashboard() {
         shipments={shipments}
         documents={documents}
         alerts={alerts}
+        positions={positions}
         isLoading={isLoading}
         showClient={false}
         showLandedCost={false}
@@ -246,7 +278,7 @@ function Dashboard() {
       />
 
       <div className="mt-9 grid gap-8 lg:grid-cols-2">
-        <section>
+        <section className="min-w-0">
           <div className="mb-2.5 flex items-center justify-between">
             <h2 className="label-xs">Exceptions</h2>
             <Link to="/alerts" className="text-xs font-medium text-primary hover:underline">
@@ -260,7 +292,7 @@ function Dashboard() {
               {topAlerts.map(({ alert, severity }) => {
                 const shipment = alert.shipment_id ? shipmentById.get(alert.shipment_id) : undefined;
                 const row = (
-                  <div className="flex items-center gap-3 py-2.5">
+                  <div className={`flex items-center gap-3 border-l-2 py-2.5 pl-3 ${SEVERITY_ROW_BORDER[severity]}`}>
                     <SeverityBadge severity={severity} label={SEVERITY_LABEL[severity]} />
                     <p className="min-w-0 flex-1 truncate text-sm text-foreground">{alert.message}</p>
                     <span className="shrink-0 text-xs text-muted-foreground">
@@ -288,7 +320,7 @@ function Dashboard() {
           )}
         </section>
 
-        <section>
+        <section className="min-w-0">
           <h2 className="label-xs mb-2.5">Recent activity</h2>
           {events.length === 0 ? (
             <p className="text-sm text-muted-foreground">No recent activity yet.</p>
@@ -333,5 +365,106 @@ function Dashboard() {
         </section>
       </div>
     </AppShell>
+  );
+}
+
+const FLEET_STAT_TONE: Record<"primary" | "risk" | "warning" | "foreground" | "muted", string> = {
+  primary: "text-primary-deep",
+  risk: "text-risk",
+  warning: "text-warning",
+  foreground: "text-foreground",
+  muted: "text-muted-foreground/55",
+};
+
+/**
+ * The dashboard's command-centre strip: four operational readings a
+ * shipping coordinator actually needs at a glance, replacing a flat count
+ * of every lifecycle stage. Each block is quiet when its count is zero and
+ * only picks up colour when there's something to act on — attention is
+ * earned, not applied uniformly.
+ */
+function FleetStatusBand({
+  moving,
+  arriving,
+  atRisk,
+  changed,
+}: {
+  moving: number;
+  arriving: number;
+  atRisk: number;
+  changed: number;
+}) {
+  return (
+    <div className="flex flex-wrap items-stretch gap-x-8 gap-y-5">
+      <FleetStatusItem label="Moving" hint="Underway now" value={moving} tone={moving > 0 ? "primary" : "muted"} live={moving > 0} />
+      <span className="divider-fade hidden sm:block" aria-hidden />
+      <FleetStatusItem label="Arriving soon" hint="Within 3 days" value={arriving} tone={arriving > 0 ? "foreground" : "muted"} />
+      <span className="divider-fade hidden sm:block" aria-hidden />
+      <FleetStatusItem label="At risk" hint="Health flagged" value={atRisk} tone={atRisk > 0 ? "risk" : "muted"} />
+      <span className="divider-fade hidden sm:block" aria-hidden />
+      <FleetStatusItem label="Changed today" hint="ETA revised" value={changed} tone={changed > 0 ? "warning" : "muted"} />
+    </div>
+  );
+}
+
+function FleetStatusItem({
+  label,
+  hint,
+  value,
+  tone,
+  live = false,
+}: {
+  label: string;
+  hint: string;
+  value: number;
+  tone: "primary" | "risk" | "warning" | "foreground" | "muted";
+  live?: boolean;
+}) {
+  return (
+    <div className="flex min-w-[108px] flex-col gap-1.5">
+      <span className="label-xs inline-flex items-center gap-1.5">
+        {live ? (
+          <span aria-hidden className="ping-live relative inline-block size-1.5 shrink-0 rounded-full bg-primary text-primary" />
+        ) : null}
+        {label}
+      </span>
+      <span className={`instrument text-4xl font-semibold ${FLEET_STAT_TONE[tone]}`}>{value}</span>
+      <span className="text-xs text-muted-foreground">{hint}</span>
+    </div>
+  );
+}
+
+/**
+ * A live glimpse of the fleet, not just a count — every vessel AIS
+ * confirms is underway right now, with its real speed. Renders nothing
+ * when nothing is moving, so this row of the interface disappears the
+ * moment it has nothing live to report rather than sitting there empty.
+ */
+function LiveFleetRail({
+  vessels,
+}: {
+  vessels: { shipment: Shipment; position: { sog: number | null } }[];
+}) {
+  return (
+    <div className="border-t border-border pt-6">
+      <p className="label-xs mb-2.5">Underway right now</p>
+      <div className="flex flex-wrap gap-2">
+        {vessels.map(({ shipment, position }) => (
+          <Link
+            key={shipment.id}
+            to="/shipments/$id"
+            params={{ id: shipment.id }}
+            className="chip transition-colors hover:border-primary/40"
+          >
+            <span aria-hidden className="ping-live relative inline-block size-1.5 shrink-0 rounded-full bg-primary text-primary" />
+            <span className="font-medium text-foreground">{shipment.vessel_name ?? "Vessel"}</span>
+            <span className="instrument text-muted-foreground">
+              {position.sog != null ? `${position.sog.toFixed(1)} kn` : "—"}
+            </span>
+            <span className="text-muted-foreground/60">→ {shipment.destination}</span>
+          </Link>
+        ))}
+      </div>
+    </div>
   );
 }

@@ -4,9 +4,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   ArrowLeft,
   ArrowRight,
-  ArrowUp,
   ChevronRight,
-  MapPin,
   MoreHorizontal,
   RotateCcw,
   Ship,
@@ -45,6 +43,7 @@ import { haversineDistanceKm } from "@/lib/geo";
 import {
   alertSeverity,
   docsFor,
+  drift,
   formatDayTime,
   monitoringInfo,
   navStatusLabel,
@@ -178,6 +177,9 @@ function ShipmentDetail() {
     queryKey: ["vesselPosition", shipment?.vessel_mmsi ?? null],
     queryFn: () => getVesselPositionForShipment({ vessel_mmsi: shipment?.vessel_mmsi ?? null }),
     enabled: Boolean(shipment?.vessel_mmsi),
+    // A vessel that's moving should feel alive: poll for a fresher AIS
+    // read instead of only ever showing what was there on page load.
+    refetchInterval: 30_000,
   });
   const portsById = useMemo(() => new Map(ports.map((p) => [p.id, p])), [ports]);
 
@@ -217,6 +219,9 @@ function ShipmentDetail() {
   const [overrideOpen, setOverrideOpen] = useState(false);
   const [overrideStatus, setOverrideStatus] = useState<ActiveShipmentStatus>("Scheduled");
   const [overrideReason, setOverrideReason] = useState("");
+  // Editing is occasional; monitoring is constant. The form stays out of
+  // the way until someone actually needs to change something.
+  const [editOpen, setEditOpen] = useState(false);
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ["shipment", id] });
@@ -319,6 +324,9 @@ function ShipmentDetail() {
   const docs = docsFor(documents, shipment.id);
   const health = shipmentHealth(shipment, docs, config);
   const hasFreshAis = isAisFresh(position ?? null, Date.now());
+  // ETA as a live variable, not a fixed date: how far the current estimate
+  // has moved from the original plan, if it has moved at all.
+  const etaDrift = drift(shipment.planned_eta, shipment.eta);
   const decision = deriveAutomation(shipment, config, hasFreshAis);
   const vesselCondition = deriveVesselCondition(shipment, position ?? null);
   const conditionLabel = vesselConditionLabel(vesselCondition);
@@ -381,7 +389,26 @@ function ShipmentDetail() {
                 }
               />
             ) : null}
-            <HeaderStat label="ETA" value={formatEta(shipment.eta)} />
+            <HeaderStat
+              label="ETA"
+              value={
+                <span className="inline-flex items-center gap-2">
+                  {formatEta(shipment.eta)}
+                  {etaDrift && etaDrift.hours !== 0 ? (
+                    <span
+                      className={`instrument rounded px-1.5 py-0.5 text-xs font-semibold ${
+                        etaDrift.tone === "late" ? "bg-warning-soft text-warning" : "bg-positive-soft text-positive"
+                      }`}
+                    >
+                      {etaDrift.tone === "late" ? "+" : "−"}
+                      {Math.abs(etaDrift.hours) >= 48
+                        ? `${Math.round(Math.abs(etaDrift.hours) / 24)}d`
+                        : `${Math.abs(etaDrift.hours)}h`}
+                    </span>
+                  ) : null}
+                </span>
+              }
+            />
             <HeaderStat label="Documents" value={`${docs.attached}/${docs.total}`} />
             <HeaderStat label="Updated" value={relativeTime(lastStatusChange)} />
           </div>
@@ -440,8 +467,11 @@ function ShipmentDetail() {
             </div>
           </section>
 
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.4fr_1fr]">
-            <section className="panel p-5">
+          {/* The dominant instrument on this page — full width, because
+           * position and telemetry are what someone monitoring a shipment
+           * needs almost no effort to read. Notes, history and editing are
+           * all secondary to this, and are composed that way below. */}
+          <section className="panel p-5">
               <div className="flex items-center justify-between">
                 <h2 className="label-xs">Vessel &amp; Live Position</h2>
                 {shipment.vessel_mmsi ? (
@@ -479,11 +509,11 @@ function ShipmentDetail() {
 
               {shipment.vessel_mmsi ? (
                 position ? (
-                  <div className="console mt-4 p-4">
+                  <div className="console mt-4 p-5">
                     <div className="flex items-center justify-between">
                       <span className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.07em] text-nav-foreground">
                         <span
-                          className={`size-1.5 rounded-full ${hasFreshAis ? "bg-nav-accent live-pulse" : "bg-nav-muted-foreground"}`}
+                          className={`relative inline-block size-1.5 rounded-full ${hasFreshAis ? "ping-live bg-nav-accent text-nav-accent" : "bg-nav-muted-foreground"}`}
                           aria-hidden
                         />
                         {hasFreshAis ? "Live Position" : "Last Known Position"}
@@ -492,10 +522,13 @@ function ShipmentDetail() {
                         {relativeTime(position.position_timestamp ?? position.updated_at)}
                       </span>
                     </div>
-                    <div className="mt-4 grid grid-cols-[0.75fr_0.75fr_1.3fr] gap-4">
-                      <ConsoleSpeed sog={position.sog} />
-                      <ConsoleHeading cog={position.cog} />
-                      <ConsoleField label="Nav Status" value={navStatusLabel(position.nav_status)} />
+                    <div className="mt-5 flex items-center gap-5">
+                      <CompassRose cog={position.cog} />
+                      <div className="grid flex-1 grid-cols-2 gap-4 sm:grid-cols-3">
+                        <ConsoleSpeed sog={position.sog} />
+                        <ConsoleField label="COG" value={position.cog != null ? `${position.cog}°` : "—"} />
+                        <ConsoleField label="Nav Status" value={navStatusLabel(position.nav_status)} />
+                      </div>
                     </div>
                   </div>
                 ) : (
@@ -575,9 +608,12 @@ function ShipmentDetail() {
                   </div>
                 </div>
               ) : null}
-            </section>
+          </section>
 
-            <div className="flex flex-col gap-6">
+          {/* Secondary rail — quieter by design (Change History carries no
+           * panel border at all) so the contrast between "instrument" and
+           * "record" is visible, not just implied. */}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               <ShipmentNotes shipmentId={id} />
 
               <section>
@@ -608,17 +644,29 @@ function ShipmentDetail() {
                   </ol>
                 )}
               </section>
-            </div>
           </div>
 
-          <form
-            className="panel p-5"
-            onSubmit={(e) => {
-              e.preventDefault();
-              save.mutate();
-            }}
-          >
-            <h2 className="label-xs mb-3">Shipment Information</h2>
+          <div className="border-t border-border pt-6">
+            <button
+              type="button"
+              onClick={() => setEditOpen((v) => !v)}
+              className="flex w-full items-center justify-between text-left"
+            >
+              <span className="label-xs">Shipment Information</span>
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-primary">
+                {editOpen ? "Hide" : "Edit details"}
+                <ChevronRight className={`size-3.5 transition-transform duration-200 ${editOpen ? "rotate-90" : ""}`} />
+              </span>
+            </button>
+
+            {editOpen ? (
+              <form
+                className="panel mt-4 p-5"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  save.mutate();
+                }}
+              >
             <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
               <Field label="Client">
                 <input
@@ -722,7 +770,9 @@ function ShipmentDetail() {
                 {save.isPending ? "Saving…" : "Save changes"}
               </button>
             </div>
-          </form>
+              </form>
+            ) : null}
+          </div>
         </div>
       ) : null}
 
@@ -878,22 +928,41 @@ function ConsoleSpeed({ sog }: { sog: number | null }) {
   );
 }
 
-/** Course over ground as a heading, not just a number — the arrow rotates
- * to the vessel's real bearing (0° = due north, clockwise), so direction
- * of travel is visible without reading a degree symbol. */
-function ConsoleHeading({ cog }: { cog: number | null }) {
+/** Course over ground as a heading on an actual compass face, not just a
+ * number — a fixed ring of cardinal points with a needle that rotates to
+ * the vessel's real bearing (0° = north, clockwise). The one place this
+ * interface borrows a literal nautical instrument, because here it's
+ * doing real work: showing direction of travel at a glance. */
+function CompassRose({ cog }: { cog: number | null }) {
   return (
-    <div className="min-w-0">
-      <p className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.08em] text-nav-muted-foreground">
-        <ArrowUp
-          className="size-3 shrink-0 text-nav-accent transition-transform duration-500"
-          style={cog != null ? { transform: `rotate(${cog}deg)` } : undefined}
+    <div
+      className="relative grid size-14 shrink-0 place-items-center rounded-full border border-nav-border"
+      role="img"
+      aria-label={cog != null ? `Heading ${cog} degrees` : "Heading unknown"}
+    >
+      <span className="absolute top-1 text-[8px] font-semibold text-nav-muted-foreground">N</span>
+      <span className="absolute bottom-1 text-[8px] text-nav-muted-foreground/50">S</span>
+      <span className="absolute left-1.5 text-[8px] text-nav-muted-foreground/50">W</span>
+      <span className="absolute right-1.5 text-[8px] text-nav-muted-foreground/50">E</span>
+      <svg
+        viewBox="0 0 56 56"
+        className={`size-full transition-transform duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${cog == null ? "opacity-30" : ""}`}
+        style={{ transform: `rotate(${cog ?? 0}deg)` }}
+        aria-hidden
+      >
+        <line x1="28" y1="10" x2="28" y2="28" stroke="var(--color-nav-accent)" strokeWidth="2" strokeLinecap="round" />
+        <line
+          x1="28"
+          y1="28"
+          x2="28"
+          y2="42"
+          stroke="var(--color-nav-muted-foreground)"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          opacity="0.5"
         />
-        COG
-      </p>
-      <p className="instrument mt-1 truncate text-base font-medium text-nav-foreground">
-        {cog != null ? `${cog}°` : "—"}
-      </p>
+        <circle cx="28" cy="28" r="2.5" fill="var(--color-nav-accent)" />
+      </svg>
     </div>
   );
 }
@@ -904,6 +973,10 @@ function ConsoleHeading({ cog }: { cog: number | null }) {
  * a vessel crossing genuine distance, not a stand-in percentage. Falls
  * back to a plain endpoints line when that data isn't available, rather
  * than estimating. */
+/** The route draws itself in on load rather than appearing pre-filled —
+ * the one moment on this page that's purely there to delight: the course
+ * is charted before your eyes, exactly once per visit, then settles into
+ * an ordinary live-updating bar. */
 function RouteBar({
   origin,
   destination,
@@ -913,6 +986,13 @@ function RouteBar({
   destination: string;
   progress: { pct: number; totalKm: number; remainingKm: number } | null;
 }) {
+  const [animatedPct, setAnimatedPct] = useState(0);
+  useEffect(() => {
+    if (!progress) return;
+    const raf = requestAnimationFrame(() => setAnimatedPct(progress.pct));
+    return () => cancelAnimationFrame(raf);
+  }, [progress?.pct]);
+
   return (
     <div className="min-w-0">
       <div className="flex items-center justify-between gap-3">
@@ -924,13 +1004,13 @@ function RouteBar({
         {progress ? (
           <>
             <div
-              className="absolute inset-y-0 left-0 rounded-full bg-primary transition-[width] duration-700"
-              style={{ width: `${progress.pct * 100}%` }}
+              className="absolute inset-y-0 left-0 rounded-full bg-primary transition-[width] duration-[1400ms] ease-[cubic-bezier(0.16,1,0.3,1)]"
+              style={{ width: `${animatedPct * 100}%` }}
             />
             <div
               aria-hidden
-              className="live-pulse absolute top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary shadow-[0_0_6px_0_var(--primary)] transition-[left] duration-700"
-              style={{ left: `${progress.pct * 100}%` }}
+              className="ping-live absolute top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary text-primary shadow-[0_0_6px_0_var(--primary)] transition-[left] duration-[1400ms] ease-[cubic-bezier(0.16,1,0.3,1)]"
+              style={{ left: `${animatedPct * 100}%` }}
             />
           </>
         ) : null}

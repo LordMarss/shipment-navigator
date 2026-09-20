@@ -14,7 +14,9 @@ import {
   type Shipment,
   type ShipmentDocument,
   type ShipmentStatus,
+  type VesselPosition,
 } from "@/lib/api";
+import { deriveVesselCondition } from "@/lib/aisAutomation";
 import { alertSeverity, relativeTime, SEVERITY_LABEL, shipmentHealth, type Severity } from "@/lib/lifecycle";
 import { docsFor } from "@/lib/insights";
 import { useMonitoringConfig } from "@/hooks/useMonitoringConfig";
@@ -43,6 +45,7 @@ export function ShipmentTable({
   shipments,
   documents,
   alerts,
+  positions,
   isLoading,
   showClient = true,
   showLandedCost = true,
@@ -55,6 +58,10 @@ export function ShipmentTable({
   documents: ShipmentDocument[];
   /** Optional — when passed, an "Alerts" column shows each shipment's worst open alert. */
   alerts?: Alert[];
+  /** Optional live AIS telemetry, keyed by MMSI — when passed, a vessel
+   * confirmed underway shows a live speed reading right in its row instead
+   * of the table only ever showing a static lifecycle status. */
+  positions?: Map<string, VesselPosition> | undefined;
   isLoading?: boolean;
   /** Default true, matching the existing /shipments/* list pages. */
   showClient?: boolean;
@@ -243,12 +250,19 @@ export function ShipmentTable({
                 const shipmentAlert = alerts ? alertsByShipment.get(s.id) : undefined;
                 const health = shipmentHealth(s, docs, config);
                 const showHealth = health.level !== "On Track" && health.level !== "Delivered";
+                const isRiskRow = showHealth && (health.level === "At Risk" || health.level === "Delayed");
                 const accent = ROW_ACCENT[statusAccent(s.status)];
+                const position = s.vessel_mmsi ? (positions?.get(s.vessel_mmsi) ?? null) : null;
+                const condition = positions && s.vessel_mmsi ? deriveVesselCondition(s, position) : null;
                 return (
                   <tr
                     key={s.id}
                     onClick={() => navigate({ to: "/shipments/$id", params: { id: s.id } })}
-                    className={`group cursor-pointer border-b border-l-2 border-border border-l-transparent transition-colors duration-150 last:border-b-0 hover:bg-atmosphere/60 ${accent}`}
+                    className={`group cursor-pointer border-b border-l-2 border-border transition-colors duration-150 last:border-b-0 ${
+                      isRiskRow
+                        ? "border-l-risk bg-risk/[0.035] hover:bg-risk/[0.07]"
+                        : `border-l-transparent hover:bg-atmosphere/60 ${accent}`
+                    }`}
                   >
                     <td className="px-4 py-3 font-mono text-xs text-muted-foreground transition-colors group-hover:text-primary">
                       {shortId(s.id)}
@@ -259,9 +273,18 @@ export function ShipmentTable({
                     </td>
                     <td className="px-4 py-3">
                       {s.vessel_name ? (
-                        <span className="inline-flex items-center gap-1.5 text-foreground">
+                        <span className="inline-flex items-center gap-2 text-foreground">
                           <Ship className="size-3 shrink-0 text-muted-foreground/70" />
                           {s.vessel_name}
+                          {condition?.kind === "underway" ? (
+                            <span className="instrument inline-flex items-center gap-1.5 text-xs text-primary">
+                              <span
+                                aria-hidden
+                                className="ping-live relative inline-block size-1 shrink-0 rounded-full bg-primary text-primary"
+                              />
+                              {position?.sog != null ? `${position.sog.toFixed(1)} kn` : "underway"}
+                            </span>
+                          ) : null}
                         </span>
                       ) : (
                         <span className="text-muted-foreground/70">—</span>

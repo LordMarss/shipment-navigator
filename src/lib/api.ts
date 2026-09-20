@@ -336,6 +336,23 @@ export async function getVesselPositionForShipment(
 }
 
 /**
+ * Latest AIS positions for a set of vessels in one query, keyed by MMSI —
+ * the batch counterpart to `getVesselPositionForShipment`, used wherever a
+ * page needs live telemetry for many shipments at once (the dashboard's
+ * fleet status, an operational table) without one query per row.
+ */
+export async function listVesselPositionsByMmsi(
+  mmsis: string[],
+  db: Db = supabase,
+): Promise<Map<string, VesselPosition>> {
+  const unique = Array.from(new Set(mmsis.filter(Boolean)));
+  if (unique.length === 0) return new Map();
+  const { data, error } = await db.from("vessel_positions").select("*").in("mmsi", unique);
+  if (error) throw error;
+  return new Map((data as VesselPosition[]).map((p) => [p.mmsi, p]));
+}
+
+/**
  * Structured port reference data (seeded, MVP-accurate coordinates — see
  * the migration for sourcing notes). Read-only from the client; nothing
  * here writes to `ports`.
