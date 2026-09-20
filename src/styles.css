@@ -299,10 +299,15 @@
 }
 
 /* The atmosphere — the pale blue wash for the sidebar, top bar and every
- * page's header band: the one considered light-blue surface, carrying a
- * faint coordinate grid at a low key so it reads without adding noise. */
+ * page's header band: the one considered light-blue surface. */
 @utility atmosphere {
   background-color: var(--color-atmosphere);
+  color: var(--color-foreground);
+}
+
+/* The faint coordinate grid laid over the atmosphere in the top bar and
+ * page header — kept off the sidebar so its solid nav items stay clean. */
+@utility atmosphere-grid {
   background-image:
     repeating-linear-gradient(
       0deg,
@@ -318,7 +323,6 @@
       transparent 1px,
       transparent 28px
     );
-  color: var(--color-foreground);
 }
 
 @utility label-xs {

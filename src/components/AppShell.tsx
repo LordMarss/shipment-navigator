@@ -94,7 +94,7 @@ export function AppShell({
         {/* The atmosphere: the deliberate pale-blue step between the dark
          * deck (sidebar) and the white chart below — page identity and,
          * where it matters, the live operational summary. */}
-        <div className="atmosphere border-b border-border">
+        <div className="atmosphere atmosphere-grid border-b border-border">
           <div className={`mx-auto w-full px-6 pb-7 pt-7 sm:px-8 lg:px-10 ${maxW}`}>
             <div className="flex flex-wrap items-end justify-between gap-4">
               <div className="min-w-0">
@@ -233,7 +233,7 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
 
 function TopBar({ onMenu }: { onMenu: () => void }) {
   return (
-    <header className="atmosphere sticky top-0 z-20 border-b border-border">
+    <header className="atmosphere atmosphere-grid sticky top-0 z-20 border-b border-border">
       <div className="flex h-14 items-center gap-3 px-5 sm:px-6 lg:px-8">
         <button
           className="focus-ring rounded-md p-2 text-muted-foreground transition-colors hover:bg-surface lg:hidden"
