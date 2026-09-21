@@ -147,6 +147,7 @@ export type Database = {
       }
       ports: {
         Row: {
+          active: boolean
           country: string | null
           created_at: string
           geofence_radius_km: number
@@ -154,9 +155,14 @@ export type Database = {
           latitude: number
           longitude: number
           name: string
+          port_type: string
+          source: string
+          source_identifier: string | null
           unlocode: string | null
+          updated_at: string
         }
         Insert: {
+          active?: boolean
           country?: string | null
           created_at?: string
           geofence_radius_km?: number
@@ -164,9 +170,14 @@ export type Database = {
           latitude: number
           longitude: number
           name: string
+          port_type?: string
+          source?: string
+          source_identifier?: string | null
           unlocode?: string | null
+          updated_at?: string
         }
         Update: {
+          active?: boolean
           country?: string | null
           created_at?: string
           geofence_radius_km?: number
@@ -174,7 +185,11 @@ export type Database = {
           latitude?: number
           longitude?: number
           name?: string
+          port_type?: string
+          source?: string
+          source_identifier?: string | null
           unlocode?: string | null
+          updated_at?: string
         }
         Relationships: []
       }

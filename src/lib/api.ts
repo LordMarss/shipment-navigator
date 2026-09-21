@@ -365,11 +365,29 @@ export type Port = {
   latitude: number;
   longitude: number;
   geofence_radius_km: number;
+  /** Coarse category derived from the source data (container/cargo/terminal/
+   * fishing/ferry/military/general) — never guessed beyond what the source
+   * actually states; 'general' means the source gave no strong signal. */
+  port_type: string;
+  /** Where this row's data comes from — 'nga_wpi' (NGA World Port Index) or
+   * 'manual_seed' (the original hand-curated seed, for the handful of major
+   * ports the automated import couldn't confidently match/improve). */
+  source: string;
+  /** Natural key back to the source record (e.g. a WPI row id) — lets a
+   * re-import upsert instead of duplicating. Null for hand-seeded rows. */
+  source_identifier: string | null;
+  /** Soft-disable flag: a bad/duplicate port can be retired without
+   * deleting it, which would break any shipment still referencing it. */
+  active: boolean;
   created_at: string;
+  updated_at: string;
 };
 
+/** Full port list — used rarely (there is no current admin/listing UI for
+ * it); the shipment-creation path uses `searchPorts` instead so it never
+ * has to load the whole table. */
 export async function listPorts(db: Db = supabase) {
-  const { data, error } = await db.from("ports").select("*").order("name");
+  const { data, error } = await db.from("ports").select("*").eq("active", true).order("name");
   if (error) throw error;
   return (data ?? []) as Port[];
 }
@@ -378,6 +396,31 @@ export async function getPortById(id: string, db: Db = supabase): Promise<Port |
   const { data, error } = await db.from("ports").select("*").eq("id", id).maybeSingle();
   if (error) throw error;
   return (data as Port | null) ?? null;
+}
+
+/**
+ * Server-side port search for the autocomplete — with a few thousand ports
+ * (and growing), filtering a client-side copy of the whole table on every
+ * keystroke stops being the right approach. Matches name, UN/LOCODE or
+ * country, active ports only, ranked by name.
+ */
+export async function searchPorts(term: string, limit = 8, db: Db = supabase): Promise<Port[]> {
+  const trimmed = term.trim();
+  if (!trimmed) return [];
+  // `.or()` filter values are comma-separated, so a literal comma in the
+  // search term would otherwise break the filter's own syntax.
+  const safe = trimmed.replace(/[,()%]/g, " ").trim();
+  if (!safe) return [];
+  const pattern = `%${safe}%`;
+  const { data, error } = await db
+    .from("ports")
+    .select("*")
+    .eq("active", true)
+    .or(`name.ilike.${pattern},unlocode.ilike.${pattern},country.ilike.${pattern}`)
+    .order("name")
+    .limit(limit);
+  if (error) throw error;
+  return (data ?? []) as Port[];
 }
 
 export async function listDocuments(shipmentId: string) {

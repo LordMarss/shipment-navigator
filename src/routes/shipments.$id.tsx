@@ -24,12 +24,12 @@ import {
   advanceStatus,
   deleteShipment,
   formatEta,
+  getPortById,
   getShipment,
   getVesselPositionForShipment,
   listAlerts,
   listDocuments,
   listEvents,
-  listPorts,
   nextStatus,
   saveShipmentDetails,
   shortId,
@@ -172,7 +172,6 @@ function ShipmentDetail() {
     queryFn: () => listEvents(id),
   });
   const { data: alerts = [] } = useQuery({ queryKey: ["alerts"], queryFn: listAlerts });
-  const { data: ports = [] } = useQuery({ queryKey: ["ports"], queryFn: () => listPorts() });
   const { data: position } = useQuery({
     queryKey: ["vesselPosition", shipment?.vessel_mmsi ?? null],
     queryFn: () => getVesselPositionForShipment({ vessel_mmsi: shipment?.vessel_mmsi ?? null }),
@@ -181,13 +180,23 @@ function ShipmentDetail() {
     // read instead of only ever showing what was there on page load.
     refetchInterval: 30_000,
   });
-  const portsById = useMemo(() => new Map(ports.map((p) => [p.id, p])), [ports]);
+
+  // Two targeted lookups rather than fetching the entire (several-thousand
+  // row) port reference table just to resolve two known ids.
+  const { data: originPort } = useQuery({
+    queryKey: ["port", shipment?.origin_port_id ?? null],
+    queryFn: () => getPortById(shipment!.origin_port_id!),
+    enabled: Boolean(shipment?.origin_port_id),
+  });
+  const { data: destPort } = useQuery({
+    queryKey: ["port", shipment?.destination_port_id ?? null],
+    queryFn: () => getPortById(shipment!.destination_port_id!),
+    enabled: Boolean(shipment?.destination_port_id),
+  });
 
   // Real great-circle progress along the voyage — only rendered when we
   // actually have structured origin/destination ports and a live position
   // to measure from; never estimated or faked otherwise.
-  const originPort = shipment?.origin_port_id ? portsById.get(shipment.origin_port_id) : undefined;
-  const destPort = shipment?.destination_port_id ? portsById.get(shipment.destination_port_id) : undefined;
   const routeProgress = useMemo(() => {
     if (!originPort || !destPort) return null;
     const totalKm = haversineDistanceKm(
@@ -693,14 +702,12 @@ function ShipmentDetail() {
                 label="Origin"
                 value={draft.origin}
                 portId={draft.origin_port_id}
-                ports={ports}
                 onChange={({ text, portId }) => setDraft({ ...draft, origin: text, origin_port_id: portId })}
               />
               <PortAutocomplete
                 label="Destination"
                 value={draft.destination}
                 portId={draft.destination_port_id}
-                ports={ports}
                 onChange={({ text, portId }) => setDraft({ ...draft, destination: text, destination_port_id: portId })}
               />
               <Field label="Vessel">

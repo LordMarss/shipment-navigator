@@ -1,22 +1,40 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Check } from "lucide-react";
 
 import { fieldClass, useDismiss } from "@/components/AppShell";
-import type { Port } from "@/lib/api";
+import { searchPorts } from "@/lib/api";
+
+/** Debounces a fast-changing value — used so typing doesn't fire a search
+ * query on every keystroke against a global port reference table. */
+function useDebounced<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const id = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(id);
+  }, [value, delayMs]);
+  return debounced;
+}
 
 /**
- * A free-text input that also searches the seeded `ports` table. Typing
- * always works as a normal text field (so ports outside the seed dataset
- * remain fully usable) — picking a suggestion additionally records the
- * structured port id, which is what enables destination-aware AIS
- * geofencing. Editing the text after a port was picked clears that link,
- * since the text no longer provably matches the selected port.
+ * A free-text input that also searches the global `ports` reference table
+ * (now several thousand rows — see `scripts/generate-ports-migration.ts`).
+ * Typing always works as a normal text field (so a destination outside the
+ * reference dataset remains fully usable) — picking a suggestion
+ * additionally records the structured port id, which is what enables
+ * destination-aware AIS geofencing. Editing the text after a port was
+ * picked clears that link, since the text no longer provably matches the
+ * selected port.
+ *
+ * Search runs server-side (debounced, top few matches only) rather than
+ * filtering a client-side copy of the whole table — the table is too large
+ * for "ship every row to the browser on every shipment form" to remain the
+ * right approach.
  */
 export function PortAutocomplete({
   label,
   value,
   portId,
-  ports,
   onChange,
   placeholder,
   required,
@@ -24,22 +42,19 @@ export function PortAutocomplete({
   label: string;
   value: string;
   portId: string | null;
-  ports: Port[];
   onChange: (next: { text: string; portId: string | null }) => void;
   placeholder?: string;
   required?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useDismiss<HTMLLabelElement>(() => setOpen(false));
+  const term = useDebounced(value.trim(), 200);
 
-  const term = value.trim().toLowerCase();
-  const matches = term
-    ? ports
-        .filter((p) =>
-          [p.name, p.country ?? "", p.unlocode ?? ""].join(" ").toLowerCase().includes(term),
-        )
-        .slice(0, 8)
-    : [];
+  const { data: matches = [] } = useQuery({
+    queryKey: ["ports", "search", term],
+    queryFn: () => searchPorts(term, 8),
+    enabled: open && term.length >= 2,
+  });
 
   return (
     <label className="relative block" ref={ref}>
@@ -58,7 +73,7 @@ export function PortAutocomplete({
       {portId ? (
         <span className="mt-1 flex items-center gap-1 text-xs text-positive">
           <Check className="size-3" />
-          Linked to a seeded port
+          Linked to a reference port
         </span>
       ) : null}
       {open && matches.length > 0 ? (

@@ -90,7 +90,12 @@ function makePort(overrides: Partial<Port> = {}): Port {
     latitude: 10,
     longitude: 10,
     geofence_radius_km: 20,
+    port_type: "general",
+    source: "manual_seed",
+    source_identifier: null,
+    active: true,
     created_at: new Date(NOW).toISOString(),
+    updated_at: new Date(NOW).toISOString(),
     ...overrides,
   };
 }

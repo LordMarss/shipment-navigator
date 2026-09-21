@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useState, type ReactNode } from "react";
 import { Check } from "lucide-react";
@@ -6,7 +6,7 @@ import { toast } from "sonner";
 
 import { btnGhost, btnPrimary, fieldClass } from "@/components/AppShell";
 import { PortAutocomplete } from "@/components/PortAutocomplete";
-import { createShipment, listPorts } from "@/lib/api";
+import { createShipment } from "@/lib/api";
 
 const EMPTY = {
   client_name: "",
@@ -30,7 +30,6 @@ export function NewShipmentForm({ onClose }: { onClose: () => void }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [form, setForm] = useState(EMPTY);
-  const { data: ports = [] } = useQuery({ queryKey: ["ports"], queryFn: () => listPorts() });
 
   const mmsi = form.vessel_mmsi.trim();
   const mmsiValid = /^\d{9}$/.test(mmsi);
@@ -90,7 +89,6 @@ export function NewShipmentForm({ onClose }: { onClose: () => void }) {
           required
           value={form.origin}
           portId={form.origin_port_id}
-          ports={ports}
           placeholder="Shanghai, CN"
           onChange={({ text, portId }) => setForm({ ...form, origin: text, origin_port_id: portId })}
         />
@@ -99,7 +97,6 @@ export function NewShipmentForm({ onClose }: { onClose: () => void }) {
           required
           value={form.destination}
           portId={form.destination_port_id}
-          ports={ports}
           placeholder="Vancouver, CA"
           onChange={({ text, portId }) => setForm({ ...form, destination: text, destination_port_id: portId })}
         />
