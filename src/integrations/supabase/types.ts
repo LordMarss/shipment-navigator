@@ -42,6 +42,7 @@ export type Database = {
       alerts: {
         Row: {
           created_at: string
+          dedupe_key: string | null
           from_status: Database["public"]["Enums"]["shipment_status"] | null
           id: string
           message: string
@@ -50,6 +51,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          dedupe_key?: string | null
           from_status?: Database["public"]["Enums"]["shipment_status"] | null
           id?: string
           message: string
@@ -58,6 +60,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          dedupe_key?: string | null
           from_status?: Database["public"]["Enums"]["shipment_status"] | null
           id?: string
           message?: string
@@ -199,6 +202,7 @@ export type Database = {
           automated: boolean
           category: string
           created_at: string
+          dedupe_key: string | null
           event_type: string
           field: string | null
           from_value: string | null
@@ -214,6 +218,7 @@ export type Database = {
           automated?: boolean
           category?: string
           created_at?: string
+          dedupe_key?: string | null
           event_type: string
           field?: string | null
           from_value?: string | null
@@ -229,6 +234,7 @@ export type Database = {
           automated?: boolean
           category?: string
           created_at?: string
+          dedupe_key?: string | null
           event_type?: string
           field?: string | null
           from_value?: string | null
@@ -293,6 +299,7 @@ export type Database = {
           ais_pending_status:
             | Database["public"]["Enums"]["shipment_status"]
             | null
+          automation_hold_until: string | null
           carrier: string | null
           client_name: string
           container_number: string | null
@@ -328,6 +335,7 @@ export type Database = {
           ais_pending_status?:
             | Database["public"]["Enums"]["shipment_status"]
             | null
+          automation_hold_until?: string | null
           carrier?: string | null
           client_name: string
           container_number?: string | null
@@ -363,6 +371,7 @@ export type Database = {
           ais_pending_status?:
             | Database["public"]["Enums"]["shipment_status"]
             | null
+          automation_hold_until?: string | null
           carrier?: string | null
           client_name?: string
           container_number?: string | null
@@ -457,7 +466,52 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      apply_automation_decision: {
+        Args: {
+          p_shipment_id: string
+          p_expected_status: Database["public"]["Enums"]["shipment_status"]
+          p_new_status: Database["public"]["Enums"]["shipment_status"]
+          p_expected_monitoring_state: string
+          p_new_monitoring_state: string
+          p_expected_pending_status?:
+            | Database["public"]["Enums"]["shipment_status"]
+            | null
+          p_expected_pending_since?: string | null
+          p_new_pending_status?:
+            | Database["public"]["Enums"]["shipment_status"]
+            | null
+          p_new_pending_since?: string | null
+          p_update_pending?: boolean
+          p_source?: string
+          p_actor?: string
+          p_reason?: string | null
+          p_monitoring_reason?: string | null
+          p_status_dedupe_key?: string | null
+          p_occurred_at?: string | null
+          p_stamp_actual_departure?: string | null
+          p_stamp_actual_arrival?: string | null
+          p_alert_message?: string | null
+        }
+        Returns: Json
+      }
+      apply_manual_status_change: {
+        Args: {
+          p_shipment_id: string
+          p_new_status: Database["public"]["Enums"]["shipment_status"]
+          p_expected_status?:
+            | Database["public"]["Enums"]["shipment_status"]
+            | null
+          p_event_type?: string
+          p_reason?: string | null
+          p_actor?: string
+          p_alert_message?: string | null
+        }
+        Returns: Json
+      }
+      resume_shipment_automation: {
+        Args: { p_shipment_id: string; p_actor?: string }
+        Returns: Json
+      }
     }
     Enums: {
       shipment_status:

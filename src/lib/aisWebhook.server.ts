@@ -43,8 +43,8 @@ export type AisWebhookResult = {
  * given MMSI against the latest persisted vessel_positions row.
  *
  * Idempotent / safe to call repeatedly for the same position:
- * deriveAisAutomation() is a pure function of (shipment, position, config,
- * now), and applyAisDecision() only performs a write when the derived
+ * deriveAisAutomation() is a pure function of (shipment, position, ports,
+ * config, now), and applyAisDecision() only performs a write when the derived
  * status, monitoring state, or pending-candidate fields actually differ
  * from what's stored — a duplicate webhook delivery for an unchanged
  * position produces zero writes and zero events on the second call.
@@ -69,10 +69,10 @@ export async function evaluateAisPositionForMmsi(
   const config = await loadConfig(db);
   const position = await getVesselPositionForShipment({ vessel_mmsi: mmsi }, db);
 
-  // Small per-run cache: multiple shipments can share the same destination
-  // port, so this avoids re-fetching it once per shipment in that case.
+  // Small per-run cache: multiple shipments can share the same origin or
+  // destination port, so this avoids re-fetching it once per shipment.
   const portCache = new Map<string, Port | null>();
-  const loadDestinationPort = async (portId: string | null): Promise<Port | null> => {
+  const loadPort = async (portId: string | null): Promise<Port | null> => {
     if (!portId) return null;
     if (!portCache.has(portId)) portCache.set(portId, await getPortById(portId, db));
     return portCache.get(portId) ?? null;
@@ -80,15 +80,19 @@ export async function evaluateAisPositionForMmsi(
 
   let updated = 0;
   for (const shipment of shipments) {
-    const destinationPort = await loadDestinationPort(shipment.destination_port_id);
-    const decision = deriveAisAutomation(shipment, position, config, now, destinationPort);
+    const destinationPort = await loadPort(shipment.destination_port_id);
+    const originPort = await loadPort(shipment.origin_port_id);
+    const decision = deriveAisAutomation(shipment, position, config, now, destinationPort, originPort);
     const pendingChanged =
       decision.pendingStatus !== shipment.ais_pending_status || decision.pendingSince !== shipment.ais_pending_since;
 
     if (decision.statusChanged || decision.monitoringChanged || pendingChanged) {
-      await applyAisDecision(shipment, decision, db);
+      // Atomic and compare-and-set: if another webhook, the sweep, or an
+      // operator got there first this is a no-op (conflict/held/duplicate),
+      // not an error — the next position report re-evaluates the real state.
+      const outcome = await applyAisDecision(shipment, decision, db);
+      if (outcome.outcome === "applied" && outcome.statusChanged) updated += 1;
     }
-    if (decision.statusChanged) updated += 1;
   }
 
   return { evaluated: shipments.length, updated };

@@ -11,8 +11,11 @@
  *   npm run ais:listen
  *
  * Responsibility is deliberately narrow: receive AIS messages, decode them,
- * validate them, and upsert the latest known position per vessel into
+ * validate them, and store the latest known position per vessel in
  * `vessel_positions` — one row per MMSI, never an unbounded message log.
+ * Invalid positions (out-of-range or (0,0) coordinates, future timestamps)
+ * are dropped, and a report older than the one already stored never
+ * replaces it.
  * It subscribes only to the MMSIs of shipments still worth tracking
  * (anything not in a legacy/retired status, deduplicated), and periodically
  * re-reads the shipments table to keep that subscription current as
@@ -25,6 +28,12 @@
  * process (see that module's docs for the intended integration point).
  */
 import { createClient } from "@supabase/supabase-js";
+
+// Pure validation + write-ordering rules, shared with the tests. Imported by
+// relative path with its extension because this script runs under plain
+// `node` (native TypeScript stripping) — no bundler, no `@/` alias.
+import { normalizePositionReport, storeLatestPosition } from "../src/lib/aisPositionIngest.ts";
+import type { PositionRow, PositionStore } from "../src/lib/aisPositionIngest.ts";
 
 const AISSTREAM_URL = "wss://stream.aisstream.io/v0/stream";
 
@@ -73,47 +82,31 @@ async function monitoredMmsis(): Promise<string[]> {
   return Array.from(new Set(mmsis));
 }
 
-type PositionReport = {
-  Latitude: number;
-  Longitude: number;
-  Sog?: number;
-  Cog?: number;
-  TrueHeading?: number;
-  NavigationalStatus?: number;
+/**
+ * Supabase-backed implementation of the write-ordering rule in
+ * aisPositionIngest.ts. Two cheap calls at most: the common case (an existing
+ * vessel) is a single conditional UPDATE — the row is written only if what is
+ * stored is not newer than this report.
+ */
+const positionStore: PositionStore = {
+  async updateIfNotNewer(row: PositionRow) {
+    const { mmsi, ...fields } = row;
+    const { data, error } = await db
+      .from("vessel_positions")
+      .update(fields)
+      .eq("mmsi", mmsi)
+      .or(`position_timestamp.is.null,position_timestamp.lte.${row.position_timestamp}`)
+      .select("mmsi");
+    if (error) throw error;
+    return (data?.length ?? 0) > 0;
+  },
+  async insertIfAbsent(row: PositionRow) {
+    const { error } = await db.from("vessel_positions").insert(row);
+    if (!error) return true;
+    if (error.code === "23505") return false; // unique violation: a row already exists (and is newer)
+    throw error;
+  },
 };
-
-function isValidPositionReport(report: unknown): report is PositionReport {
-  if (!report || typeof report !== "object") return false;
-  const r = report as Record<string, unknown>;
-  return (
-    typeof r.Latitude === "number" &&
-    Number.isFinite(r.Latitude) &&
-    Math.abs(r.Latitude) <= 90 &&
-    typeof r.Longitude === "number" &&
-    Number.isFinite(r.Longitude) &&
-    Math.abs(r.Longitude) <= 180
-  );
-}
-
-async function upsertPosition(mmsi: string, vesselName: string | null, report: PositionReport, positionTimestamp: string) {
-  const { error } = await db.from("vessel_positions").upsert(
-    {
-      mmsi,
-      vessel_name: vesselName,
-      latitude: report.Latitude,
-      longitude: report.Longitude,
-      sog: report.Sog ?? null,
-      cog: report.Cog ?? null,
-      true_heading: report.TrueHeading ?? null,
-      nav_status: report.NavigationalStatus != null ? String(report.NavigationalStatus) : null,
-      position_timestamp: positionTimestamp,
-      received_at: new Date().toISOString(),
-      source: "aisstream",
-    },
-    { onConflict: "mmsi" },
-  );
-  if (error) throw error;
-}
 
 // AISStream sends its JSON payload as binary WebSocket frames, which
 // Node's WebSocket implementation (per spec — binary frames use
@@ -142,21 +135,31 @@ async function handlePositionReport(parsed: Record<string, unknown>): Promise<vo
   const mmsi = String(metaData?.MMSI ?? (report as { UserID?: number } | undefined)?.UserID ?? "");
   const vesselName = (metaData?.ShipName as string | undefined)?.trim() || null;
 
-  if (!mmsi || !isValidPositionReport(report)) {
-    console.warn("[ais] malformed message ignored: missing MMSI or invalid position fields");
+  const normalized = normalizePositionReport({
+    mmsi,
+    vesselName,
+    report,
+    positionTimestamp: parseAisTimestamp(metaData?.time_utc as string | undefined),
+    receivedAt: new Date().toISOString(),
+  });
+  if (!normalized.ok) {
+    console.warn(`[ais] position ignored for MMSI ${mmsi || "(none)"}: ${normalized.reason}`);
     return;
   }
-
-  const positionTimestamp = parseAisTimestamp(metaData?.time_utc as string | undefined);
+  const { row } = normalized;
 
   try {
-    await upsertPosition(mmsi, vesselName, report, positionTimestamp);
+    const outcome = await storeLatestPosition(positionStore, row);
+    if (outcome === "ignored_older") {
+      console.log(`[ais] older position ignored — MMSI ${row.mmsi}: a newer one is already stored`);
+      return;
+    }
     console.log(
-      `[ais] vessel position persisted — MMSI ${mmsi}${vesselName ? ` (${vesselName})` : ""}: lat=${report.Latitude} lon=${report.Longitude} sog=${report.Sog ?? "?"}`,
+      `[ais] vessel position persisted — MMSI ${row.mmsi}${row.vessel_name ? ` (${row.vessel_name})` : ""}: lat=${row.latitude} lon=${row.longitude} sog=${row.sog ?? "?"}`,
     );
   } catch (err) {
     // A single failed write must never take the worker down — log and move on.
-    console.error(`[ais] database persistence error for MMSI ${mmsi}:`, err);
+    console.error(`[ais] database persistence error for MMSI ${row.mmsi}:`, err);
   }
 }
 

@@ -92,6 +92,8 @@ export type Shipment = {
   /** AIS debounce state (Phase 3) — the status a fresh AIS reading is currently proposing, and since when. */
   ais_pending_status: ShipmentStatus | null;
   ais_pending_since: string | null;
+  /** While in the future, automation stands down: an operator has just corrected this shipment's status. May be absent until the Phase 2 migration is applied. */
+  automation_hold_until?: string | null;
   reference: string | null;
   carrier: string | null;
   container_number: string | null;
@@ -520,26 +522,22 @@ export async function updateShipment(id: string, patch: Partial<Shipment>, db: D
 }
 
 /** Manual status advance — preserved as the fallback for the automation. */
-export async function advanceStatus(shipment: Shipment) {
+export async function advanceStatus(shipment: Shipment, db: Db = supabase) {
   const to = nextStatus(shipment.status);
   if (!to) return;
-  await updateShipment(shipment.id, { status: to });
-  await recordEvent({
-    shipment_id: shipment.id,
-    event_type: "status_manual",
-    category: "status",
-    field: "Status",
-    from_value: shipment.status,
-    to_value: to,
-    source: "manual",
-    automated: false,
-  });
-  await logAlert({
-    shipment_id: shipment.id,
-    message: `${shortId(shipment.id)} · ${shipment.client_name} moved to ${to}`,
-    from_status: shipment.status,
-    to_status: to,
-  });
+  // Applied only if the shipment is still in the status this page showed, so a
+  // stale page can never regress a shipment automation has since moved.
+  const result = await applyManualStatusChange({
+    shipmentId: shipment.id,
+    newStatus: to,
+    expectedStatus: shipment.status,
+    eventType: "status_manual",
+    reason: null,
+    alertMessage: `${shortId(shipment.id)} · ${shipment.client_name} moved to ${to}`,
+  }, db);
+  if (result.outcome === "conflict") {
+    throw new Error("This shipment's status changed since the page loaded. Refresh and try again.");
+  }
 }
 
 export async function deleteShipment(id: string) {
@@ -662,6 +660,7 @@ export const SETTING_KEYS = [
   "pre_monitoring_window_days",
   "eta_attention_hours",
   "eta_risk_hours",
+  "ais_lifecycle_fresh_minutes",
 ] as const;
 
 export type SettingKey = (typeof SETTING_KEYS)[number];
@@ -712,46 +711,58 @@ export async function saveShipmentDetails(
   shipment: Shipment,
   patch: Partial<Shipment>,
   reason?: string | null,
+  db: Db = supabase,
 ) {
-  const changed = Object.entries(patch).filter(
+  // A status change is an operator decision about the lifecycle. It goes through
+  // the same atomic path as advance/override — clearing pending AIS evidence,
+  // holding automation after a backward correction — not through the generic
+  // field update below.
+  const { status: newStatus, ...fieldPatch } = patch;
+
+  const changed = Object.entries(fieldPatch).filter(
     ([k, v]) => (v ?? null) !== ((shipment as Record<string, unknown>)[k] ?? null),
   );
-  if (changed.length === 0) return;
 
-  const etaChanged = changed.some(([k]) => k === "eta");
-  await updateShipment(shipment.id, {
-    ...patch,
-    ...(etaChanged ? { previous_eta: shipment.eta } : {}),
-  });
+  if (changed.length > 0) {
+    const etaChanged = changed.some(([k]) => k === "eta");
+    await updateShipment(shipment.id, {
+      ...fieldPatch,
+      ...(etaChanged ? { previous_eta: shipment.eta } : {}),
+    }, db);
 
-  for (const [field, value] of changed) {
-    const label = TEMPORAL_LABELS[field as keyof TemporalPatch] ?? field.replace(/_/g, " ");
-    await recordEvent({
-      shipment_id: shipment.id,
-      event_type: field,
-      category: field in TEMPORAL_LABELS ? "eta" : "event",
-      field: label,
-      from_value: formatEventValue((shipment as Record<string, unknown>)[field]),
-      to_value: formatEventValue(value),
-      source: "manual",
-      automated: false,
-      reason: reason ?? null,
-    });
+    for (const [field, value] of changed) {
+      const label = TEMPORAL_LABELS[field as keyof TemporalPatch] ?? field.replace(/_/g, " ");
+      await recordEvent({
+        shipment_id: shipment.id,
+        event_type: field,
+        category: field in TEMPORAL_LABELS ? "eta" : "event",
+        field: label,
+        from_value: formatEventValue((shipment as Record<string, unknown>)[field]),
+        to_value: formatEventValue(value),
+        source: "manual",
+        automated: false,
+        reason: reason ?? null,
+      }, db);
+    }
+
+    if (etaChanged) {
+      const to = (fieldPatch.eta as string | null) ?? null;
+      if (shipment.eta && to) {
+        const hours = Math.round(
+          (new Date(to).getTime() - new Date(shipment.eta).getTime()) / 3_600_000,
+        );
+        await logAlert({
+          shipment_id: shipment.id,
+          message: `ETA changed by ${Math.abs(hours)} hours ${hours >= 0 ? "later" : "earlier"}`,
+        }, db);
+      } else if (to) {
+        await logAlert({ shipment_id: shipment.id, message: `ETA set to ${formatEta(to)}` }, db);
+      }
+    }
   }
 
-  if (etaChanged) {
-    const to = (patch.eta as string | null) ?? null;
-    if (shipment.eta && to) {
-      const hours = Math.round(
-        (new Date(to).getTime() - new Date(shipment.eta).getTime()) / 3_600_000,
-      );
-      await logAlert({
-        shipment_id: shipment.id,
-        message: `ETA changed by ${Math.abs(hours)} hours ${hours >= 0 ? "later" : "earlier"}`,
-      });
-    } else if (to) {
-      await logAlert({ shipment_id: shipment.id, message: `ETA set to ${formatEta(to)}` });
-    }
+  if (newStatus !== undefined && newStatus !== shipment.status) {
+    await overrideStatus(shipment, newStatus, reason, db);
   }
 }
 
@@ -854,111 +865,217 @@ export async function importShipments(rows: ImportRow[]) {
 /* ------------------------------------------------ automated status pipeline */
 
 /**
- * Persists an automated status / monitoring transition. Every change is written
- * as its own append-only event so automated moves stay distinguishable from
- * manual ones, and previous history is never overwritten.
+ * Everything an automation decision needs persisted. The date-based sweep
+ * (`deriveAutomation`) and the AIS webhook (`deriveAisAutomation`) both
+ * produce one of these, and BOTH persist it through `applyAutomation()` —
+ * there is exactly one write path for an automatic lifecycle change.
+ */
+export type AutomationDecision = {
+  status: ShipmentStatus;
+  monitoring_state: MonitoringState;
+  reason: string;
+  /** Why the monitoring state changed, when it did (defaults to `reason`). */
+  monitoringReason?: string | null;
+  source: EventSource;
+  statusChanged: boolean;
+  monitoringChanged: boolean;
+  /** AIS debounce state to persist. Omit for decisions that don't touch it (the date-based sweep). */
+  pending?: { status: ActiveShipmentStatus | null; since: string | null };
+  /**
+   * When the evidence behind a status change was first observed — the identity
+   * of the logical transition (AIS: the pending candidate's first observation;
+   * date-based: the operator-recorded fact's timestamp). Feeds the dedupe key.
+   */
+  evidenceAt?: string | null;
+  /** Milestone timestamps to stamp with the AIS observation time (only ever fills an empty column). */
+  stampActualDeparture?: string | null;
+  stampActualArrival?: string | null;
+};
+
+export type AutomationOutcomeKind =
+  | "applied" // written
+  | "noop" // nothing to change
+  | "conflict" // the shipment no longer matches what was evaluated (another writer won); nothing written
+  | "held" // an operator hold is in force; nothing written
+  | "duplicate" // this logical transition was already recorded; nothing written
+  | "rejected" // not a forward move between active statuses; nothing written
+  | "not_found";
+
+export type AutomationOutcome = {
+  outcome: AutomationOutcomeKind;
+  statusChanged: boolean;
+  monitoringChanged: boolean;
+  pendingChanged: boolean;
+};
+
+/**
+ * Deterministic identity of one logical automated transition. Built only from
+ * stable inputs (shipment, from, to, source, and when the evidence was first
+ * observed) — never a random id, never the time of the write — so the same
+ * transition attempted twice, by anyone, yields the same key, and the unique
+ * index on `shipment_events.dedupe_key` turns the second attempt into a no-op.
+ * A later, genuinely different transition has different evidence and so a
+ * different key.
+ */
+export function transitionDedupeKey(
+  shipmentId: string,
+  from: ShipmentStatus,
+  to: ShipmentStatus,
+  source: EventSource,
+  evidenceAt: string | null | undefined,
+): string | null {
+  if (!evidenceAt) return null;
+  const ms = new Date(evidenceAt).getTime();
+  if (!Number.isFinite(ms)) return null;
+  return `status:${shipmentId}:${from}>${to}:${source}:${new Date(ms).toISOString()}`;
+}
+
+const asIsoOrNull = (value: string | null | undefined) => {
+  if (!value) return null;
+  const ms = new Date(value).getTime();
+  return Number.isFinite(ms) ? new Date(ms).toISOString() : null;
+};
+
+type RpcResult = { outcome?: AutomationOutcomeKind; status_changed?: boolean; monitoring_changed?: boolean; pending_changed?: boolean };
+
+/**
+ * Persists an automation decision ATOMICALLY through the database's
+ * `apply_automation_decision()`: one transaction, under a row lock, that
+ *  - acts only if the shipment is still exactly as it was evaluated
+ *    (compare-and-set on status and on the AIS pending candidate),
+ *  - stands down entirely while an operator hold is in force,
+ *  - never moves a shipment backward,
+ *  - writes the shipment change, its history event and its alert together, or
+ *    not at all, and
+ *  - records the same logical transition at most once (dedupe key).
+ * A `conflict` / `held` / `duplicate` outcome is not an error: it means
+ * someone else already dealt with it, and nothing was written.
  */
 export async function applyAutomation(
   shipment: Shipment,
-  decision: {
-    status: ShipmentStatus;
-    monitoring_state: MonitoringState;
-    reason: string;
-    source: EventSource;
-    statusChanged: boolean;
-    monitoringChanged: boolean;
-  },
+  decision: AutomationDecision,
   db: Db = supabase,
-) {
-  const now = new Date().toISOString();
-  const patch: Partial<Shipment> = { last_synced_at: now };
-  if (decision.statusChanged) patch.status = decision.status;
-  if (decision.monitoringChanged) patch.monitoring_state = decision.monitoring_state;
+): Promise<AutomationOutcome> {
+  const pendingProvided = decision.pending !== undefined;
+  const newPendingStatus = pendingProvided ? (decision.pending!.status ?? null) : null;
+  const newPendingSince = pendingProvided ? decision.pending!.since : null;
+  const pendingChanged =
+    pendingProvided &&
+    (newPendingStatus !== shipment.ais_pending_status || newPendingSince !== shipment.ais_pending_since);
 
-  await updateShipment(shipment.id, patch, db);
+  const nothing: AutomationOutcome = { outcome: "noop", statusChanged: false, monitoringChanged: false, pendingChanged: false };
+  if (!decision.statusChanged && !decision.monitoringChanged && !pendingChanged) return nothing;
 
-  if (decision.statusChanged) {
-    await recordEvent(
-      {
-        shipment_id: shipment.id,
-        event_type: "status_auto",
-        category: "status",
-        field: "Status",
-        from_value: shipment.status,
-        to_value: decision.status,
-        source: decision.source,
-        automated: true,
-        actor: "Automation",
-        reason: decision.reason,
-        occurred_at: now,
-      },
-      db,
-    );
-    await logAlert(
-      {
-        shipment_id: shipment.id,
-        message: `${shortId(shipment.id)} · ${shipment.client_name} automatically moved to ${decision.status} — ${decision.reason}`,
-        from_status: shipment.status,
-        to_status: decision.status,
-      },
-      db,
-    );
-  }
+  const evidenceAt = asIsoOrNull(decision.evidenceAt);
+  const dedupeKey = decision.statusChanged
+    ? transitionDedupeKey(shipment.id, shipment.status, decision.status, decision.source, evidenceAt)
+    : null;
+  const alertMessage = decision.statusChanged
+    ? `${shortId(shipment.id)} · ${shipment.client_name} automatically moved to ${decision.status} — ${decision.reason}`
+    : null;
 
-  if (decision.monitoringChanged) {
-    await recordEvent(
-      {
-        shipment_id: shipment.id,
-        event_type: "monitoring_auto",
-        category: "monitoring",
-        field: "Monitoring state",
-        from_value: String(shipment.monitoring_state),
-        to_value: decision.monitoring_state,
-        source: "system",
-        automated: true,
-        actor: "Automation",
-        reason: decision.reason,
-        occurred_at: now,
-      },
-      db,
-    );
-  }
+  const { data, error } = await db.rpc("apply_automation_decision", {
+    p_shipment_id: shipment.id,
+    p_expected_status: shipment.status,
+    p_new_status: decision.statusChanged ? decision.status : shipment.status,
+    p_expected_monitoring_state: shipment.monitoring_state,
+    p_new_monitoring_state: decision.monitoringChanged ? decision.monitoring_state : shipment.monitoring_state,
+    p_expected_pending_status: shipment.ais_pending_status,
+    p_expected_pending_since: shipment.ais_pending_since,
+    p_new_pending_status: newPendingStatus,
+    p_new_pending_since: newPendingSince,
+    p_update_pending: pendingChanged,
+    p_source: decision.source,
+    p_actor: "Automation",
+    p_reason: decision.reason,
+    p_monitoring_reason: decision.monitoringReason ?? null,
+    p_status_dedupe_key: dedupeKey,
+    p_occurred_at: null,
+    p_stamp_actual_departure: asIsoOrNull(decision.stampActualDeparture),
+    p_stamp_actual_arrival: asIsoOrNull(decision.stampActualArrival),
+    p_alert_message: alertMessage,
+  });
+  if (error) throw error;
+
+  const r = (data ?? {}) as RpcResult;
+  return {
+    outcome: r.outcome ?? "noop",
+    statusChanged: Boolean(r.status_changed),
+    monitoringChanged: Boolean(r.monitoring_changed),
+    pendingChanged: Boolean(r.pending_changed),
+  };
 }
 
 /* ------------------------------------------------------ manual status override */
 
+export type ManualStatusOutcome = {
+  outcome: "applied" | "noop" | "conflict" | "not_found";
+  /** True when the change moved the shipment backward (a correction) — automation is then held. */
+  backward: boolean;
+  holdUntil: string | null;
+};
+
+/**
+ * An operator changes a shipment's lifecycle status, through the database's
+ * `apply_manual_status_change()`: one transaction that records a MANUAL event
+ * (never disguised as automation), voids any pending AIS candidate, and — for
+ * a backward correction — holds automation so it cannot immediately undo the
+ * correction, and clears any milestone timestamp the corrected status now
+ * contradicts. `expectedStatus` makes the change conditional on the shipment
+ * still being in that status.
+ */
+export async function applyManualStatusChange(input: {
+  shipmentId: string;
+  newStatus: ShipmentStatus;
+  expectedStatus?: ShipmentStatus | null;
+  eventType: string;
+  reason?: string | null;
+  alertMessage?: string | null;
+  actor?: string;
+}, db: Db = supabase): Promise<ManualStatusOutcome> {
+  const { data, error } = await db.rpc("apply_manual_status_change", {
+    p_shipment_id: input.shipmentId,
+    p_new_status: input.newStatus,
+    p_expected_status: input.expectedStatus ?? null,
+    p_event_type: input.eventType,
+    p_reason: input.reason ?? null,
+    p_actor: input.actor ?? "Operator",
+    p_alert_message: input.alertMessage ?? null,
+  });
+  if (error) throw error;
+  const r = (data ?? {}) as { outcome?: ManualStatusOutcome["outcome"]; backward?: boolean; hold_until?: string | null };
+  return { outcome: r.outcome ?? "noop", backward: Boolean(r.backward), holdUntil: r.hold_until ?? null };
+}
+
 /**
  * Manual status override. This is a correction/exception path: the automated
  * pipeline stays the primary source of truth, so the event is recorded as
- * manual (never automated) and is clearly labelled as an override.
+ * manual (never automated) and is clearly labelled as an override. A backward
+ * correction puts automation on hold for `automation_hold_hours` (default 24)
+ * so the corrected status is not immediately re-advanced from the same
+ * evidence; `resumeAutomation()` ends the hold early.
  */
 export async function overrideStatus(
   shipment: Shipment,
   status: ShipmentStatus,
   reason?: string | null,
+  db: Db = supabase,
 ) {
   if (status === shipment.status) return;
-  const now = new Date().toISOString();
-  await updateShipment(shipment.id, { status });
-  await recordEvent({
-    shipment_id: shipment.id,
-    event_type: "status_override",
-    category: "status",
-    field: "Status",
-    from_value: shipment.status,
-    to_value: status,
-    source: "manual",
-    automated: false,
-    actor: "Operator",
+  await applyManualStatusChange({
+    shipmentId: shipment.id,
+    newStatus: status,
+    eventType: "status_override",
     reason: reason?.trim() ? reason.trim() : "Manual override (correction)",
-    occurred_at: now,
-  });
-  await logAlert({
-    shipment_id: shipment.id,
-    message: `${shortId(shipment.id)} · ${shipment.client_name} manually overridden to ${status}`,
-    from_status: shipment.status,
-    to_status: status,
-  });
+    alertMessage: `${shortId(shipment.id)} · ${shipment.client_name} manually overridden to ${status}`,
+  }, db);
+}
+
+/** Ends an automation hold early; AIS automation restarts from fresh evidence. */
+export async function resumeAutomation(shipmentId: string, db: Db = supabase) {
+  const { data, error } = await db.rpc("resume_shipment_automation", { p_shipment_id: shipmentId, p_actor: "Operator" });
+  if (error) throw error;
+  return ((data ?? {}) as { outcome?: string }).outcome ?? "noop";
 }
 
 /* ------------------------------------------------------------ shipment notes */

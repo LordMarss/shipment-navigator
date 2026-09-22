@@ -18,5 +18,7 @@ export function useMonitoringConfig(): MonitoringConfig {
     eta_attention_hours:
       data?.["eta_attention_hours"] ?? DEFAULT_MONITORING_CONFIG.eta_attention_hours,
     eta_risk_hours: data?.["eta_risk_hours"] ?? DEFAULT_MONITORING_CONFIG.eta_risk_hours,
+    ais_lifecycle_fresh_minutes:
+      data?.["ais_lifecycle_fresh_minutes"] ?? DEFAULT_MONITORING_CONFIG.ais_lifecycle_fresh_minutes,
   };
 }

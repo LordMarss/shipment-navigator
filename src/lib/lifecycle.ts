@@ -42,15 +42,29 @@ export type MonitoringConfig = {
   pre_monitoring_window_days: number;
   eta_attention_hours: number;
   eta_risk_hours: number;
+  /**
+   * How recent (in minutes) an AIS position must be to count as evidence
+   * for a lifecycle decision. Deliberately much tighter than the 24 h
+   * "last known position" display window (`AIS_STALE_HOURS`): a report from
+   * yesterday is history, not proof of what the vessel is doing now.
+   */
+  ais_lifecycle_fresh_minutes: number;
 };
 
 /** Fallback used only until `app_settings` has loaded. Never hard-code inline. */
 export const DEFAULT_MONITORING_CONFIG: MonitoringConfig = {
-  monitoring_start_offset_days: 7,
+  // Conservative for an ocean shipment: lifecycle automation opens 48 h
+  // before planned departure, not a week. Overridable per workspace
+  // (app_settings) and per shipment (`monitoring_start_offset_days`).
+  monitoring_start_offset_days: 2,
   pre_monitoring_window_days: 3,
   eta_attention_hours: 6,
   eta_risk_hours: 24,
+  ais_lifecycle_fresh_minutes: 30,
 };
+
+/** Upper bound for any monitoring-start offset, whatever a setting or shipment says. */
+export const MAX_MONITORING_START_OFFSET_DAYS = 14;
 
 /* ------------------------------------------------------------------ time --- */
 
@@ -142,7 +156,11 @@ export function drift(planned: string | null | undefined, current: string | null
 /* ------------------------------------------------------------ monitoring --- */
 
 export function monitoringOffset(shipment: Shipment, config: MonitoringConfig) {
-  return shipment.monitoring_start_offset_days ?? config.monitoring_start_offset_days;
+  const raw = shipment.monitoring_start_offset_days ?? config.monitoring_start_offset_days;
+  // An out-of-range or non-numeric value (a typo'd per-shipment override, a
+  // bad setting) must never open the window unexpectedly early.
+  if (!Number.isFinite(raw) || raw < 0) return DEFAULT_MONITORING_CONFIG.monitoring_start_offset_days;
+  return Math.min(raw, MAX_MONITORING_START_OFFSET_DAYS);
 }
 
 /** The date active monitoring should begin, derived from planned departure. */
@@ -164,8 +182,24 @@ export type MonitoringInfo = {
 /**
  * Derives the monitoring state from planned departure + configurable offset.
  * The backend owns `monitoring_state`; this is what the UI expects it to be.
+ *
+ * This is the gate for ALL AIS-driven lifecycle automation, so it is
+ * deliberately strict about what can open the window:
+ *  - a recorded `actual_departure` opens it, but only if it is not in the
+ *    future — a mistyped or placeholder future date is not a departure and
+ *    must not switch automation on;
+ *  - otherwise only a planned departure can: the window opens
+ *    `monitoring_start_offset_days` (default 48 h, capped) before it;
+ *  - with neither, there is no window at all. A previously stored
+ *    "Active Monitoring" is ignored — automation never runs on a shipment
+ *    that has no departure to anchor it.
+ * Being subscribed to a vessel's AIS (the worker's job) never enters into it.
  */
-export function monitoringInfo(shipment: Shipment, config: MonitoringConfig): MonitoringInfo {
+export function monitoringInfo(
+  shipment: Shipment,
+  config: MonitoringConfig,
+  now: number = Date.now(),
+): MonitoringInfo {
   const storedState = (shipment.monitoring_state as MonitoringState) ?? "Scheduled";
 
   if (shipment.status === "Delivered" || shipment.actual_delivery) {
@@ -178,28 +212,29 @@ export function monitoringInfo(shipment: Shipment, config: MonitoringConfig): Mo
     };
   }
 
-  if (shipment.actual_departure) {
+  const departedAt = toDate(shipment.actual_departure);
+  if (departedAt && departedAt.getTime() <= now) {
     return {
       state: "Active Monitoring",
       storedState,
-      startsAt: toDate(shipment.actual_departure),
+      startsAt: departedAt,
       daysUntilMonitoring: 0,
       reason: "Vessel has departed — shipment is under active monitoring",
     };
   }
 
   const startsAt = monitoringStartDate(shipment, config);
-  if (!startsAt) {
+  if (!startsAt || Number.isNaN(startsAt.getTime())) {
     return {
-      state: storedState,
+      state: "Scheduled",
       storedState,
       startsAt: null,
       daysUntilMonitoring: null,
-      reason: "No planned departure recorded — the monitoring window cannot be scheduled",
+      reason: "No planned departure recorded — automation stays dormant until one is set",
     };
   }
 
-  const days = Math.ceil((startsAt.getTime() - Date.now()) / DAY);
+  const days = Math.ceil((startsAt.getTime() - now) / DAY);
   if (days <= 0) {
     return {
       state: "Active Monitoring",
@@ -225,6 +260,28 @@ export function monitoringInfo(shipment: Shipment, config: MonitoringConfig): Mo
     daysUntilMonitoring: days,
     reason: `Departure is far out — monitoring begins ${formatDay(startsAt.toISOString())}`,
   };
+}
+
+/* ------------------------------------------------------- operator hold --- */
+
+/**
+ * If an operator's correction currently has automation on hold for this
+ * shipment, when that hold ends; otherwise null. While it is in force neither
+ * the AIS decision layer nor the date-based sweep may change the shipment's
+ * lifecycle status or accumulate a pending candidate — the same rule the
+ * database enforces in `apply_automation_decision()`. Tolerates the column
+ * being absent (before the Phase 2 migration is applied).
+ */
+export function activeAutomationHold(shipment: Shipment, now: number = Date.now()): Date | null {
+  const raw = shipment.automation_hold_until;
+  if (!raw) return null;
+  const until = new Date(raw);
+  return Number.isFinite(until.getTime()) && until.getTime() > now ? until : null;
+}
+
+/** "2026-09-22 14:00 UTC" — a stable, timezone-independent rendering for explanations. */
+export function formatUtcMinute(date: Date): string {
+  return `${date.toISOString().slice(0, 16).replace("T", " ")} UTC`;
 }
 
 /* ---------------------------------------------------------------- health --- */

@@ -15,10 +15,11 @@
  */
 import assert from "node:assert/strict";
 
-import type { Db, Shipment, VesselPosition } from "@/lib/api";
+import type { Port, Shipment, VesselPosition } from "@/lib/api";
 import { AIS_CONFIRMATION_MINUTES } from "@/lib/aisAutomation";
 import { evaluateAisPositionForMmsi } from "@/lib/aisWebhook.server";
 import { handleAisPositionWebhook } from "@/routes/api/public/hooks/ais-position";
+import { makeFakeDb, type Row } from "@/lib/testkit/fakeDb";
 
 const DAY = 86_400_000;
 const MINUTE = 60_000;
@@ -98,81 +99,60 @@ function makePosition(overrides: Partial<VesselPosition> = {}): VesselPosition {
   };
 }
 
+function makePort(overrides: Partial<Port> = {}): Port {
+  return {
+    id: "port-1",
+    name: "Test Port",
+    unlocode: "ZZTST",
+    country: "Testland",
+    latitude: 30,
+    longitude: 120,
+    geofence_radius_km: 20,
+    port_type: "general",
+    source: "manual_seed",
+    source_identifier: null,
+    active: true,
+    created_at: new Date(NOW).toISOString(),
+    updated_at: new Date(NOW).toISOString(),
+    ...overrides,
+  };
+}
+
+/** The point `km` from `port` along `bearingDeg` — so fixtures state real distances/directions. */
+function pointAt(port: Pick<Port, "latitude" | "longitude">, km: number, bearingDeg: number) {
+  const d = km / 6371;
+  const br = (bearingDeg * Math.PI) / 180;
+  const lat1 = (port.latitude * Math.PI) / 180;
+  const lon1 = (port.longitude * Math.PI) / 180;
+  const lat2 = Math.asin(Math.sin(lat1) * Math.cos(d) + Math.cos(lat1) * Math.sin(d) * Math.cos(br));
+  const lon2 =
+    lon1 + Math.atan2(Math.sin(br) * Math.sin(d) * Math.cos(lat1), Math.cos(d) - Math.sin(lat1) * Math.sin(lat2));
+  return { latitude: (lat2 * 180) / Math.PI, longitude: (lon2 * 180) / Math.PI };
+}
+
+// Origin (20 km radius -> departure area 20..80 km) and a separate destination.
+const ORIGIN_PORT = makePort({ id: "origin-port", name: "Origin Port", unlocode: "ZZORG" });
+const DESTINATION_PORT = makePort({ id: "dest-port", name: "Destination Port", unlocode: "ZZDST", latitude: 10, longitude: 10 });
+
+/** Under way 30 km from the origin, heading directly away — genuine departure evidence. */
+const departingPosition = (mmsi: string, overrides: Partial<VesselPosition> = {}) =>
+  makePosition({ mmsi, ...pointAt(ORIGIN_PORT, 30, 90), sog: 8, nav_status: "0", cog: 90, ...overrides });
+
 type EventRow = { source: string };
 
-// --- a tiny fake Db, covering exactly the query shapes this integration
-// uses (select+eq[+maybeSingle], update+eq, insert) --------------------
-
-type Row = Record<string, unknown>;
-type Tables = {
-  shipments: Row[];
-  vessel_positions: Row[];
-  app_settings: Row[];
-  shipment_events: Row[];
-  alerts: Row[];
-};
-type FakeDb = Db & { tables: Tables };
-
-function makeFakeDb(seed: { shipments?: Row[]; vessel_positions?: Row[]; app_settings?: Row[] } = {}): FakeDb {
-  const tables: Record<string, Row[]> = {
-    shipments: seed.shipments ?? [],
-    vessel_positions: seed.vessel_positions ?? [],
-    app_settings: seed.app_settings ?? [],
-    shipment_events: [],
-    alerts: [],
-  };
-
-  function from(table: string) {
-    const rows = () => (tables[table] ??= []);
-
-    function selectBuilder(filters: Array<[string, unknown]>) {
-      const applyFilters = (data: Row[]) => data.filter((r) => filters.every(([k, v]) => r[k] === v));
-      return {
-        eq(col: string, val: unknown) {
-          return selectBuilder([...filters, [col, val]]);
-        },
-        maybeSingle() {
-          return Promise.resolve({ data: applyFilters(rows())[0] ?? null, error: null });
-        },
-        then(resolve: (v: { data: Row[]; error: null }) => void, reject: (e: unknown) => void) {
-          return Promise.resolve({ data: applyFilters(rows()), error: null }).then(resolve, reject);
-        },
-      };
-    }
-
-    return {
-      select(_cols: string) {
-        return selectBuilder([]);
-      },
-      update(patch: Row) {
-        return {
-          eq(col: string, val: unknown) {
-            for (const r of rows()) {
-              if (r[col] === val) Object.assign(r, patch);
-            }
-            return Promise.resolve({ error: null });
-          },
-        };
-      },
-      insert(obj: Row) {
-        rows().push({ id: `${table}-${rows().length + 1}`, ...obj });
-        return Promise.resolve({ error: null });
-      },
-    };
-  }
-
-  return { from, tables } as unknown as FakeDb;
-}
+// The shared in-memory fake (with an emulation of the Phase 2 database
+// functions, proven equivalent to the real SQL in transitions.db.test.ts).
+type FakeDb = ReturnType<typeof makeFakeDb>;
 
 /** Typed views over the fake db's tables, so assertions read naturally instead of via bracket access on Record<string, unknown>. */
 function shipmentsOf(db: FakeDb): Shipment[] {
-  return db.tables.shipments as unknown as Shipment[];
+  return db.tables["shipments"] as unknown as Shipment[];
 }
 function positionsOf(db: FakeDb): VesselPosition[] {
-  return db.tables.vessel_positions as unknown as VesselPosition[];
+  return db.tables["vessel_positions"] as unknown as VesselPosition[];
 }
 function eventsOf(db: FakeDb): EventRow[] {
-  return db.tables.shipment_events as unknown as EventRow[];
+  return db.tables["shipment_events"] as unknown as EventRow[];
 }
 
 function setWebhookSecret(value: string) {
@@ -299,25 +279,54 @@ await test("matching: a legacy shipment sharing the MMSI is not evaluated", asyn
 });
 
 // --- Automation integration --------------------------------------------------
+//
+// These run the real evaluator against the fake db and verify the Phase 1
+// rules survive the plumbing: the shipment's linked origin/destination ports
+// are actually loaded and used, and the debounce counts distinct AIS
+// observations rather than delivery time.
 
-await test("integration: qualifying first observation creates a pending candidate, no status change", async () => {
-  const shipment = makeShipment({ id: "s1", vessel_mmsi: "444444444", status: "Booked" });
-  const underway = makePosition({ mmsi: "444444444", sog: 6, nav_status: "0" });
-  const db = makeFakeDb({ shipments: [shipment] as unknown as Row[], vessel_positions: [underway] as unknown as Row[] });
+const asRows = (...xs: unknown[]) => xs as unknown as Row[];
+
+await test("integration: qualifying first observation (origin linked, vessel departing) creates a pending candidate, no status change", async () => {
+  const shipment = makeShipment({ id: "s1", vessel_mmsi: "444444444", status: "Booked", origin_port_id: ORIGIN_PORT.id });
+  const db = makeFakeDb({
+    shipments: asRows(shipment),
+    ports: asRows(ORIGIN_PORT),
+    vessel_positions: asRows(departingPosition("444444444")),
+  });
 
   const result = await evaluateAisPositionForMmsi("444444444", db, NOW);
   assert.equal(result.updated, 0);
 
   const stored = shipmentsOf(db)[0]!;
   assert.equal(stored.ais_pending_status, "Departed");
+  assert.equal(stored.ais_pending_since, new Date(NOW).toISOString(), "pending starts at the position's own timestamp");
   assert.equal(stored.status, "Booked");
   assert.equal(eventsOf(db).length, 0, "no event yet — nothing confirmed");
 });
 
+await test("integration: the SAME movement with NO origin port linked never creates a Departed candidate", async () => {
+  const shipment = makeShipment({ id: "s1", vessel_mmsi: "444000444", status: "Booked", origin_port_id: null });
+  const db = makeFakeDb({
+    shipments: asRows(shipment),
+    ports: asRows(ORIGIN_PORT), // exists, but this shipment isn't linked to it
+    vessel_positions: asRows(departingPosition("444000444")),
+  });
+
+  await evaluateAisPositionForMmsi("444000444", db, NOW);
+  await evaluateAisPositionForMmsi("444000444", db, NOW + 30 * MINUTE);
+  assert.equal(shipmentsOf(db)[0]!.ais_pending_status, null);
+  assert.equal(shipmentsOf(db)[0]!.status, "Booked");
+  assert.equal(eventsOf(db).length, 0);
+});
+
 await test("integration: repeated identical webhook does not promote early and creates no event", async () => {
-  const shipment = makeShipment({ id: "s1", vessel_mmsi: "555555555", status: "Booked" });
-  const underway = makePosition({ mmsi: "555555555", sog: 6, nav_status: "0" });
-  const db = makeFakeDb({ shipments: [shipment] as unknown as Row[], vessel_positions: [underway] as unknown as Row[] });
+  const shipment = makeShipment({ id: "s1", vessel_mmsi: "555555555", status: "Booked", origin_port_id: ORIGIN_PORT.id });
+  const db = makeFakeDb({
+    shipments: asRows(shipment),
+    ports: asRows(ORIGIN_PORT),
+    vessel_positions: asRows(departingPosition("555555555")),
+  });
 
   await evaluateAisPositionForMmsi("555555555", db, NOW);
   const pendingSinceAfterFirst = shipmentsOf(db)[0]!.ais_pending_since;
@@ -334,17 +343,41 @@ await test("integration: repeated identical webhook does not promote early and c
   assert.equal(eventsOf(db).length, 0);
 });
 
-await test("integration: qualifying second observation after 15+ minutes promotes and records exactly one event", async () => {
-  const shipment = makeShipment({ id: "s1", vessel_mmsi: "666666666", status: "Booked" });
-  const underway = makePosition({ mmsi: "666666666", sog: 6, nav_status: "0" });
-  const db = makeFakeDb({ shipments: [shipment] as unknown as Row[], vessel_positions: [underway] as unknown as Row[] });
+await test("integration: the SAME position re-delivered 20 minutes later does not confirm (distinct observations required)", async () => {
+  const shipment = makeShipment({ id: "s1", vessel_mmsi: "555000555", status: "Booked", origin_port_id: ORIGIN_PORT.id });
+  const db = makeFakeDb({
+    shipments: asRows(shipment),
+    ports: asRows(ORIGIN_PORT),
+    vessel_positions: asRows(departingPosition("555000555")),
+  });
+
+  await evaluateAisPositionForMmsi("555000555", db, NOW);
+  // Nothing about the stored position changes — only the wall clock moves on.
+  const result = await evaluateAisPositionForMmsi("555000555", db, NOW + 20 * MINUTE);
+  assert.equal(result.updated, 0);
+  assert.equal(shipmentsOf(db)[0]!.status, "Booked", "a replay is not a second observation");
+  assert.equal(eventsOf(db).length, 0);
+});
+
+await test("integration: a distinct second observation after 15+ minutes promotes and records exactly one event", async () => {
+  const shipment = makeShipment({ id: "s1", vessel_mmsi: "666666666", status: "Booked", origin_port_id: ORIGIN_PORT.id });
+  const db = makeFakeDb({
+    shipments: asRows(shipment),
+    ports: asRows(ORIGIN_PORT),
+    vessel_positions: asRows(departingPosition("666666666")),
+  });
 
   await evaluateAisPositionForMmsi("666666666", db, NOW);
   assert.equal(shipmentsOf(db)[0]!.status, "Booked", "not yet — only one observation so far");
 
   const later = NOW + (AIS_CONFIRMATION_MINUTES + 1) * MINUTE;
-  // A fresh position for the second observation (as a real new AIS message would carry).
-  positionsOf(db)[0]!.position_timestamp = new Date(later).toISOString();
+  // A genuinely new AIS report: new timestamp, vessel a little further out.
+  const second = departingPosition("666666666", {
+    ...pointAt(ORIGIN_PORT, 38, 90),
+    position_timestamp: new Date(later).toISOString(),
+    received_at: new Date(later).toISOString(),
+  });
+  Object.assign(positionsOf(db)[0]!, second);
   const result = await evaluateAisPositionForMmsi("666666666", db, later);
 
   assert.equal(result.updated, 1);
@@ -359,9 +392,9 @@ await test("integration: qualifying second observation after 15+ minutes promote
 });
 
 await test("integration: non-qualifying observation does not change status", async () => {
-  const shipment = makeShipment({ id: "s1", vessel_mmsi: "777777777", status: "Booked" });
+  const shipment = makeShipment({ id: "s1", vessel_mmsi: "777777777", status: "Booked", origin_port_id: ORIGIN_PORT.id });
   const moored = makePosition({ mmsi: "777777777", sog: 0.1, nav_status: "5" });
-  const db = makeFakeDb({ shipments: [shipment] as unknown as Row[], vessel_positions: [moored] as unknown as Row[] });
+  const db = makeFakeDb({ shipments: asRows(shipment), ports: asRows(ORIGIN_PORT), vessel_positions: asRows(moored) });
 
   const result = await evaluateAisPositionForMmsi("777777777", db, NOW);
   assert.equal(result.updated, 0);
@@ -374,21 +407,86 @@ await test("integration: stale AIS does not promote even a previously-pending ca
     id: "s1",
     vessel_mmsi: "888888888",
     status: "Booked",
+    origin_port_id: ORIGIN_PORT.id,
     ais_pending_status: "Departed",
     ais_pending_since: new Date(NOW - 20 * MINUTE).toISOString(), // already past the confirmation window
   });
-  const stale = makePosition({
-    mmsi: "888888888",
-    sog: 6,
-    nav_status: "0",
-    position_timestamp: new Date(NOW - 48 * 3_600_000).toISOString(),
-  });
-  const db = makeFakeDb({ shipments: [shipment] as unknown as Row[], vessel_positions: [stale] as unknown as Row[] });
+  const stale = departingPosition("888888888", { position_timestamp: new Date(NOW - 48 * 3_600_000).toISOString() });
+  const db = makeFakeDb({ shipments: asRows(shipment), ports: asRows(ORIGIN_PORT), vessel_positions: asRows(stale) });
 
   const result = await evaluateAisPositionForMmsi("888888888", db, NOW);
   assert.equal(result.updated, 0);
   assert.equal(shipmentsOf(db)[0]!.status, "Booked");
   assert.equal(shipmentsOf(db)[0]!.ais_pending_status, null, "stale evidence clears the stale pending candidate");
+});
+
+await test("integration: a position 45 minutes old (inside the old 24 h window) cannot confirm a due candidate", async () => {
+  const shipment = makeShipment({
+    id: "s1",
+    vessel_mmsi: "888000888",
+    status: "Booked",
+    origin_port_id: ORIGIN_PORT.id,
+    ais_pending_status: "Departed",
+    ais_pending_since: new Date(NOW - 60 * MINUTE).toISOString(),
+  });
+  const old = departingPosition("888000888", {
+    position_timestamp: new Date(NOW - 45 * MINUTE).toISOString(),
+    received_at: new Date(NOW - 45 * MINUTE).toISOString(),
+  });
+  const db = makeFakeDb({ shipments: asRows(shipment), ports: asRows(ORIGIN_PORT), vessel_positions: asRows(old) });
+
+  const result = await evaluateAisPositionForMmsi("888000888", db, NOW);
+  assert.equal(result.updated, 0);
+  assert.equal(shipmentsOf(db)[0]!.status, "Booked");
+});
+
+await test("integration: Arrived needs a linked destination port — a moored vessel with none never becomes Arrived", async () => {
+  const shipment = makeShipment({ id: "s1", vessel_mmsi: "999000111", status: "Approaching Destination", destination_port_id: null });
+  const moored = makePosition({ mmsi: "999000111", ...pointAt(DESTINATION_PORT, 3, 45), sog: 0, nav_status: "5" });
+  const db = makeFakeDb({ shipments: asRows(shipment), ports: asRows(DESTINATION_PORT), vessel_positions: asRows(moored) });
+
+  await evaluateAisPositionForMmsi("999000111", db, NOW);
+  await evaluateAisPositionForMmsi("999000111", db, NOW + 30 * MINUTE);
+  assert.equal(shipmentsOf(db)[0]!.status, "Approaching Destination");
+  assert.equal(shipmentsOf(db)[0]!.ais_pending_status, null);
+  assert.equal(eventsOf(db).length, 0);
+});
+
+await test("integration: with a destination port linked, moored inside the geofence sets a pending Arrived candidate", async () => {
+  const shipment = makeShipment({
+    id: "s1",
+    vessel_mmsi: "999000222",
+    status: "Approaching Destination",
+    destination_port_id: DESTINATION_PORT.id,
+  });
+  const moored = makePosition({ mmsi: "999000222", ...pointAt(DESTINATION_PORT, 3, 45), sog: 0, nav_status: "5" });
+  const db = makeFakeDb({ shipments: asRows(shipment), ports: asRows(DESTINATION_PORT), vessel_positions: asRows(moored) });
+
+  await evaluateAisPositionForMmsi("999000222", db, NOW);
+  assert.equal(shipmentsOf(db)[0]!.ais_pending_status, "Arrived");
+  assert.equal(shipmentsOf(db)[0]!.status, "Approaching Destination");
+});
+
+await test("integration: ETD 30 days away -> the vessel's AIS does nothing to the shipment", async () => {
+  const shipment = makeShipment({
+    id: "s1",
+    vessel_mmsi: "999000333",
+    status: "Booked",
+    origin_port_id: ORIGIN_PORT.id,
+    planned_etd: new Date(NOW + 30 * DAY).toISOString(),
+    monitoring_state: "Scheduled",
+  });
+  const db = makeFakeDb({
+    shipments: asRows(shipment),
+    ports: asRows(ORIGIN_PORT),
+    vessel_positions: asRows(departingPosition("999000333")),
+  });
+
+  const result = await evaluateAisPositionForMmsi("999000333", db, NOW);
+  assert.equal(result.updated, 0);
+  assert.equal(shipmentsOf(db)[0]!.status, "Booked");
+  assert.equal(shipmentsOf(db)[0]!.ais_pending_status, null);
+  assert.equal(eventsOf(db).length, 0);
 });
 
 await test("integration: no status change across repeated evaluations means no duplicate shipment_events", async () => {
@@ -399,7 +497,7 @@ await test("integration: no status change across repeated evaluations means no d
     actual_departure: new Date(NOW - 5 * DAY).toISOString(),
   });
   const moored = makePosition({ mmsi: "999111222", sog: 0, nav_status: "5" }); // does not qualify as still under way
-  const db = makeFakeDb({ shipments: [shipment] as unknown as Row[], vessel_positions: [moored] as unknown as Row[] });
+  const db = makeFakeDb({ shipments: asRows(shipment), vessel_positions: asRows(moored) });
 
   await evaluateAisPositionForMmsi("999111222", db, NOW);
   await evaluateAisPositionForMmsi("999111222", db, NOW + MINUTE);

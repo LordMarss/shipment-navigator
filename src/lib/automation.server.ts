@@ -6,17 +6,19 @@
  * `applyAutomation()` persists it (append-only events, no duplicates because a
  * write only happens when the derived values differ from the stored ones).
  *
- * Mostly no AIS data, no prediction — but before deriving, this checks
- * whether the shipment's vessel has a fresh `vessel_positions` row. If it
- * does, `deriveAutomation()` is told to stand down on elapsed-time advances
- * for that shipment (the AIS webhook path, `aisWebhook.server.ts`, is what
- * actually advances it from there). Planned ETD/ETA and the actual
- * timestamps are never overwritten here, and this never itself reads or
- * reasons about SOG/nav_status — it only asks "is there fresh AIS data at
- * all" via the same `isAisFresh()` the AIS decision layer uses.
+ * This sweep does NOT infer lifecycle status from the calendar. It keeps the
+ * monitoring state current and applies operator-recorded facts (an actual
+ * arrival / departure); where the calendar says something should have
+ * happened but no AIS evidence exists, it only says so in the decision's
+ * reason. Status progression from vessel movement is the AIS webhook path's
+ * job (`aisWebhook.server.ts`), and only with fresh AIS. Before deriving,
+ * this checks whether the shipment's vessel has a lifecycle-fresh
+ * `vessel_positions` row (`isAisFreshForLifecycle()`, the same definition
+ * the AIS decision layer uses) purely to choose which explanation to show.
+ * Planned ETD/ETA and the actual timestamps are never overwritten here.
  */
 import { applyAutomation, getVesselPositionForShipment, type Db, type Shipment } from "@/lib/api";
-import { isAisFresh } from "@/lib/aisAutomation";
+import { isAisFreshForLifecycle } from "@/lib/aisAutomation";
 import { deriveAutomation } from "@/lib/autoStatus";
 import { DEFAULT_MONITORING_CONFIG, type MonitoringConfig } from "@/lib/lifecycle";
 
@@ -63,12 +65,15 @@ export async function runAutomationSweep(db: Db): Promise<SweepResult> {
   for (const shipment of shipments) {
     try {
       const hasFreshAis = shipment.vessel_mmsi
-        ? isAisFresh(await getVesselPositionForShipment(shipment, db), now)
+        ? isAisFreshForLifecycle(await getVesselPositionForShipment(shipment, db), now, config)
         : false;
       const decision = deriveAutomation(shipment, config, hasFreshAis, now);
       if (!decision.statusChanged && !decision.monitoringChanged) continue;
-      await applyAutomation(shipment, decision, db);
-      updated += 1;
+      // Same atomic write path as the AIS webhook. A conflict/held/duplicate
+      // outcome means another writer (the webhook, an operator) already dealt
+      // with this shipment — nothing was written, and that is correct.
+      const outcome = await applyAutomation(shipment, decision, db);
+      if (outcome.outcome === "applied") updated += 1;
     } catch (e) {
       failed += 1;
       console.error(

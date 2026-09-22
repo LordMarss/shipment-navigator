@@ -31,6 +31,7 @@ import {
   listDocuments,
   listEvents,
   nextStatus,
+  resumeAutomation,
   saveShipmentDetails,
   shortId,
   type ActiveShipmentStatus,
@@ -41,6 +42,7 @@ import { deriveVesselCondition, isAisFresh, vesselConditionLabel } from "@/lib/a
 import { deriveAutomation } from "@/lib/autoStatus";
 import { haversineDistanceKm } from "@/lib/geo";
 import {
+  activeAutomationHold,
   alertSeverity,
   docsFor,
   drift,
@@ -291,6 +293,19 @@ function ShipmentDetail() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const resume = useMutation({
+    mutationFn: async () => {
+      if (!shipment) return "noop";
+      return resumeAutomation(shipment.id);
+    },
+    onSuccess: (outcome) => {
+      refresh();
+      if (outcome === "applied") toast.success("Automation resumed");
+      else toast.info("Automation was not on hold");
+    },
+    onError: (e: Error) => toast.error(`Could not resume automation: ${e.message}`),
+  });
+
   const remove = useMutation({
     mutationFn: () => deleteShipment(id),
     onSuccess: () => {
@@ -337,6 +352,7 @@ function ShipmentDetail() {
   // has moved from the original plan, if it has moved at all.
   const etaDrift = drift(shipment.planned_eta, shipment.eta);
   const decision = deriveAutomation(shipment, config, hasFreshAis);
+  const automationHold = activeAutomationHold(shipment);
   const vesselCondition = deriveVesselCondition(shipment, position ?? null);
   const conditionLabel = vesselConditionLabel(vesselCondition);
   const shipmentAlerts = alerts.filter((a) => a.shipment_id === shipment.id);
@@ -473,6 +489,16 @@ function ShipmentDetail() {
                 {" · "}
                 {decision.reason}
               </p>
+              {automationHold ? (
+                <button
+                  type="button"
+                  className={`${btnGhost} shrink-0 self-start`}
+                  disabled={resume.isPending}
+                  onClick={() => resume.mutate()}
+                >
+                  {resume.isPending ? "Resuming…" : "Resume Automation"}
+                </button>
+              ) : null}
             </div>
           </section>
 
