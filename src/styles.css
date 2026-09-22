@@ -443,3 +443,15 @@
     opacity: 0;
   }
 }
+
+/* Live indicators and transitions collapse to static for anyone who has
+ * asked the OS for reduced motion; the information (colour, label) stays. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

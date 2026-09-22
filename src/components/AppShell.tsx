@@ -61,6 +61,7 @@ export function AppShell({
   headerExtra,
   children,
   wide = false,
+  bare = false,
 }: {
   /** Usually plain text; a page needing a richer header (e.g. an inline back
    *  button) may pass a small ReactNode instead. */
@@ -75,6 +76,9 @@ export function AppShell({
   headerExtra?: ReactNode;
   children: ReactNode;
   wide?: boolean;
+  /** The page draws its own header and layout on an open canvas (the
+   * dashboard): no atmosphere band, no width cap, no main padding. */
+  bare?: boolean;
 }) {
   const [mobileNav, setMobileNav] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -91,26 +95,34 @@ export function AppShell({
       <div className="lg:pl-[248px]">
         <TopBar onMenu={() => setMobileNav(true)} />
 
-        {/* The atmosphere: the deliberate pale-blue step between the dark
-         * deck (sidebar) and the white chart below — page identity and,
-         * where it matters, the live operational summary. */}
-        <div className="atmosphere atmosphere-grid border-b border-border">
-          <div className={`mx-auto w-full px-6 pb-7 pt-7 sm:px-8 lg:px-10 ${maxW}`}>
-            <div className="flex flex-wrap items-end justify-between gap-4">
-              <div className="min-w-0">
-                {eyebrow ? <p className="label-xs mb-2">{eyebrow}</p> : null}
-                <h1 className="text-3xl font-semibold text-foreground">{title}</h1>
-                {description ? <p className="mt-1.5 text-sm text-muted-foreground">{description}</p> : null}
+        {bare ? (
+          <main className="w-full">
+            <div className="animate-in">{children}</div>
+          </main>
+        ) : (
+          <>
+            {/* The atmosphere: the deliberate pale-blue step between the dark
+             * deck (sidebar) and the white chart below — page identity and,
+             * where it matters, the live operational summary. */}
+            <div className="atmosphere atmosphere-grid border-b border-border">
+              <div className={`mx-auto w-full px-6 pb-7 pt-7 sm:px-8 lg:px-10 ${maxW}`}>
+                <div className="flex flex-wrap items-end justify-between gap-4">
+                  <div className="min-w-0">
+                    {eyebrow ? <p className="label-xs mb-2">{eyebrow}</p> : null}
+                    <h1 className="text-3xl font-semibold text-foreground">{title}</h1>
+                    {description ? <p className="mt-1.5 text-sm text-muted-foreground">{description}</p> : null}
+                  </div>
+                  {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
+                </div>
+                {headerExtra ? <div className="mt-7">{headerExtra}</div> : null}
               </div>
-              {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
             </div>
-            {headerExtra ? <div className="mt-7">{headerExtra}</div> : null}
-          </div>
-        </div>
 
-        <main className={`mx-auto w-full px-6 py-8 sm:px-8 lg:px-10 ${maxW}`}>
-          <div className="animate-in">{children}</div>
-        </main>
+            <main className={`mx-auto w-full px-6 py-8 sm:px-8 lg:px-10 ${maxW}`}>
+              <div className="animate-in">{children}</div>
+            </main>
+          </>
+        )}
       </div>
     </div>
   );
@@ -211,22 +223,22 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
 
   return (
     <>
-      {/* Hard left edge by design — the one place in the interface that
-       * meets the screen edge, per the shell's exception to the radius
-       * system. */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[248px] lg:block">{body}</aside>
-      {open ? (
-        <div className="fixed inset-0 z-40 lg:hidden">
-          <button
-            className="absolute inset-0 bg-foreground/30"
-            aria-label="Close navigation"
-            onClick={onClose}
-          />
-          <aside className="absolute inset-y-0 left-0 w-[248px] shadow-[0_0_32px_rgba(0,0,0,0.25)]">
-            {body}
-          </aside>
-        </div>
-      ) : null}
+          {/* Hard left edge by design — the one place in the interface that
+           * meets the screen edge, per the shell's exception to the radius
+           * system. */}
+          <aside className="fixed inset-y-0 left-0 z-30 hidden w-[248px] lg:block">{body}</aside>
+          {open ? (
+            <div className="fixed inset-0 z-40 lg:hidden">
+              <button
+                className="absolute inset-0 bg-foreground/30"
+                aria-label="Close navigation"
+                onClick={onClose}
+              />
+              <aside className="absolute inset-y-0 left-0 w-[248px] shadow-[0_0_32px_rgba(0,0,0,0.25)]">
+                {body}
+              </aside>
+            </div>
+          ) : null}
     </>
   );
 }
@@ -285,18 +297,18 @@ function GlobalSearch() {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="focus-ring flex h-8 w-full max-w-[380px] items-center gap-2 rounded-md border border-border bg-surface px-2.5 text-sm text-muted-foreground transition-colors hover:border-primary/35"
-      >
-        <Search className="size-3.5 shrink-0" />
-        <span className="flex-1 truncate text-left">Search shipments, vessels, clients…</span>
-        <kbd className="instrument hidden shrink-0 items-center rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground sm:flex">
-          ⌘K
-        </kbd>
-      </button>
-      {open ? <CommandPalette onClose={() => setOpen(false)} /> : null}
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="focus-ring flex h-8 w-full min-w-0 max-w-[380px] items-center gap-2 rounded-md border border-border bg-surface px-2.5 text-sm text-muted-foreground transition-colors hover:border-primary/35"
+          >
+            <Search className="size-3.5 shrink-0" />
+            <span className="flex-1 truncate text-left">Search shipments, vessels, clients…</span>
+            <kbd className="instrument hidden shrink-0 items-center rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground sm:flex">
+              ⌘K
+            </kbd>
+          </button>
+          {open ? <CommandPalette onClose={() => setOpen(false)} /> : null}
     </>
   );
 }
@@ -558,5 +570,12 @@ export const btnGhost =
 export const btnDanger =
   "focus-ring inline-flex h-9 items-center gap-1.5 rounded-md border border-destructive/30 bg-surface px-3.5 text-sm font-medium text-destructive transition-colors duration-150 hover:bg-risk-soft active:scale-[0.98]";
 
-export const fieldClass =
-  "focus-ring h-9 w-full rounded-md border border-input bg-surface px-2.5 text-sm text-foreground transition-colors placeholder:text-muted-foreground";
+const fieldBase =
+  "focus-ring h-9 rounded-md border border-input bg-surface px-2.5 text-sm text-foreground transition-colors placeholder:text-muted-foreground";
+
+export const fieldClass = `${fieldBase} w-full`;
+
+/** A field sized to its content (e.g. a filter select in a toolbar). A
+ * separate class rather than `${fieldClass} w-auto`, because two width
+ * utilities on one element resolve by stylesheet order, not class order. */
+export const fieldInlineClass = `${fieldBase} w-auto`;

@@ -1,12 +1,12 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { ArrowDown, ArrowUp, Package, Search, Ship } from "lucide-react";
 
-import { EmptyState, Skeleton, fieldClass } from "@/components/AppShell";
+import { useShipmentFilters, type SortKey } from "@/components/useShipmentFilters";
+import { EmptyState, Skeleton, fieldClass, fieldInlineClass } from "@/components/AppShell";
 import { DocsIndicator, HealthBadge, SeverityBadge, StatusPill, statusAccent, type StatusAccent } from "@/components/StatusPill";
 import {
   ACTIVE_STATUSES,
-  STATUSES,
   formatCost,
   formatEta,
   shortId,
@@ -20,8 +20,6 @@ import { deriveVesselCondition } from "@/lib/aisAutomation";
 import { alertSeverity, relativeTime, SEVERITY_LABEL, shipmentHealth, type Severity } from "@/lib/lifecycle";
 import { docsFor } from "@/lib/insights";
 import { useMonitoringConfig } from "@/hooks/useMonitoringConfig";
-
-type SortKey = "created_at" | "client_name" | "eta" | "landed_cost" | "status";
 
 const SEVERITY_RANK: Record<Severity, number> = { critical: 0, attention: 1, informational: 2 };
 
@@ -75,18 +73,8 @@ export function ShipmentTable({
 }) {
   const navigate = useNavigate();
   const config = useMonitoringConfig();
-  const [query, setQuery] = useState("");
-  const [status, setStatus] = useState<ShipmentStatus | "all">("all");
-  const [client, setClient] = useState("all");
-  const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({
-    key: "created_at",
-    dir: "desc",
-  });
-
-  const clients = useMemo(
-    () => Array.from(new Set(shipments.map((s) => s.client_name))).sort(),
-    [shipments],
-  );
+  const { query, setQuery, status, setStatus, client, setClient, clients, sort, toggleSort, rows } =
+    useShipmentFilters(shipments);
 
   const alertsByShipment = useMemo(() => {
     const map = new Map<string, { severity: Severity; count: number }>();
@@ -107,50 +95,6 @@ export function ShipmentTable({
   const columnCount =
     6 + (showClient ? 1 : 0) + (alerts ? 1 : 0) + (showLandedCost ? 1 : 0) + (showLastUpdated ? 1 : 0);
 
-  const rows = useMemo(() => {
-    const term = query.trim().toLowerCase();
-    const filtered = shipments.filter((s) => {
-      if (status !== "all" && s.status !== status) return false;
-      if (client !== "all" && s.client_name !== client) return false;
-      if (!term) return true;
-      return [
-        shortId(s.id),
-        s.client_name,
-        s.origin,
-        s.destination,
-        s.vessel_name ?? "",
-        s.vessel_mmsi ?? "",
-      ]
-        .join(" ")
-        .toLowerCase()
-        .includes(term);
-    });
-
-    const dir = sort.dir === "asc" ? 1 : -1;
-    return [...filtered].sort((a, b) => {
-      switch (sort.key) {
-        case "client_name":
-          return a.client_name.localeCompare(b.client_name) * dir;
-        case "status":
-          return (STATUSES.indexOf(a.status) - STATUSES.indexOf(b.status)) * dir;
-        case "landed_cost":
-          return ((a.landed_cost ?? 0) - (b.landed_cost ?? 0)) * dir;
-        case "eta": {
-          const av = a.eta ? new Date(a.eta).getTime() : Number.MAX_SAFE_INTEGER;
-          const bv = b.eta ? new Date(b.eta).getTime() : Number.MAX_SAFE_INTEGER;
-          return (av - bv) * dir;
-        }
-        default:
-          return (new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) * dir;
-      }
-    });
-  }, [shipments, query, status, client, sort]);
-
-  const toggleSort = (key: SortKey) =>
-    setSort((prev) =>
-      prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" },
-    );
-
   return (
     <section className="panel overflow-hidden">
       <div className="flex flex-wrap items-center gap-2.5 border-b border-border px-4 py-3">
@@ -164,7 +108,7 @@ export function ShipmentTable({
           />
         </div>
         <select
-          className={`${fieldClass} w-auto`}
+          className={fieldInlineClass}
           value={status}
           onChange={(e) => setStatus(e.target.value as ShipmentStatus | "all")}
         >
@@ -176,7 +120,7 @@ export function ShipmentTable({
           ))}
         </select>
         <select
-          className={`${fieldClass} w-auto`}
+          className={fieldInlineClass}
           value={client}
           onChange={(e) => setClient(e.target.value)}
         >

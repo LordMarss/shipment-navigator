@@ -1,65 +1,38 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
-import { AppShell, btnPrimary } from "@/components/AppShell";
+import { AppShell } from "@/components/AppShell";
 import { NewShipmentForm } from "@/components/NewShipmentForm";
-import { ShipmentTable } from "@/components/ShipmentTable";
-import { SeverityBadge, SourceTag } from "@/components/StatusPill";
+import { ActivityLog } from "@/components/dashboard/ActivityLog";
+import { Band } from "@/components/dashboard/glyphs";
+import { Horizon } from "@/components/dashboard/Horizon";
+import { Manifest, type Lens } from "@/components/dashboard/Manifest";
+import { Masthead, type MastheadFacts } from "@/components/dashboard/Masthead";
+import { useNow } from "@/components/dashboard/useNow";
+import { WatchList, type WatchItem } from "@/components/dashboard/WatchList";
 import { useMonitoringConfig } from "@/hooks/useMonitoringConfig";
 import {
-  formatEta,
   isLegacyStatus,
   listAllDocuments,
   listAllEvents,
   listAlerts,
   listShipments,
   listVesselPositionsByMmsi,
-  type Shipment,
 } from "@/lib/api";
 import { deriveVesselCondition } from "@/lib/aisAutomation";
-import { alertSeverity, kpis, relativeTime, SEVERITY_LABEL, type Severity } from "@/lib/lifecycle";
-
-const SEVERITY_ROW_BORDER: Record<Severity, string> = {
-  critical: "border-l-risk",
-  attention: "border-l-warning",
-  informational: "border-l-transparent",
-};
-
-/** "in 3 days" / "tomorrow" / "today" — the future-facing counterpart to
- * `relativeTime`, which only ever looks backward. */
-function daysUntil(iso: string) {
-  const days = Math.round((new Date(iso).getTime() - Date.now()) / 86_400_000);
-  if (days <= 0) return "today";
-  if (days === 1) return "tomorrow";
-  return `in ${days} days`;
-}
-
-function NextEvent({ label, shipment, date }: { label: string; shipment: Shipment; date: string }) {
-  return (
-    <Link to="/shipments/$id" params={{ id: shipment.id }} className="flex flex-col gap-1.5 hover:opacity-75">
-      <span className="label-xs">{label}</span>
-      <span className="text-sm">
-        <span className="font-medium text-foreground">{shipment.client_name}</span>
-        <span className="instrument text-muted-foreground">
-          {" "}
-          · {formatEta(date)} · {daysUntil(date)}
-        </span>
-      </span>
-    </Link>
-  );
-}
+import { docsFor, kpis, shipmentHealth } from "@/lib/lifecycle";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Shipment Dashboard — StimTech Solutions" },
+      { title: "Dashboard - StimTech Solutions" },
       {
         name: "description",
         content:
           "Every shipment in one dense table: client, route, planned dates, pipeline status and landed cost.",
       },
-      { property: "og:title", content: "Shipment Dashboard — StimTech Solutions" },
+      { property: "og:title", content: "Dashboard - StimTech Solutions" },
       {
         property: "og:description",
         content: "Track client shipments, routes, schedule, status and landed cost in one place.",
@@ -71,31 +44,21 @@ export const Route = createFileRoute("/")({
   component: Dashboard,
 });
 
-function greetingForHour(hour: number) {
-  if (hour < 12) return "Good morning";
-  if (hour < 18) return "Good afternoon";
-  return "Good evening";
-}
+const DAY = 86_400_000;
+const FINISHED = new Set(["Arrived", "At Port", "Cleared Customs", "Delivered"]);
 
-/** Time-of-day greeting, resolved only after mount. The server and the
- * browser can render on opposite sides of the "morning/afternoon/evening"
- * boundary a few milliseconds apart, which — if computed during the
- * initial render — produces a text mismatch between the server-rendered
- * HTML and the client's hydration pass. Resolving it in an effect keeps
- * the first render identical on both sides; the real greeting appears a
- * moment later, same as any other client-only value. */
-function useGreeting() {
-  const [greeting, setGreeting] = useState<string | null>(null);
-  useEffect(() => {
-    setGreeting(greetingForHour(new Date().getHours()));
-  }, []);
-  return greeting;
-}
-
+/**
+ * The operations sheet. One open, ruled surface in three bands of
+ * priority: what needs a decision, what happens next, and the whole fleet
+ * in motion, followed by the watch log. Hovering a shipment anywhere
+ * (watch list, schedule, manifest) marks the same shipment everywhere else.
+ */
 function Dashboard() {
   const [open, setOpen] = useState(false);
+  const [focusId, setFocusId] = useState<string | null>(null);
+  const [lens, setLens] = useState<Lens>("all");
   const config = useMonitoringConfig();
-  const greeting = useGreeting();
+  const now = useNow();
 
   const { data: shipments = [], isLoading } = useQuery({
     queryKey: ["shipments"],
@@ -105,11 +68,11 @@ function Dashboard() {
     queryKey: ["documents", "all"],
     queryFn: listAllDocuments,
   });
-  const { data: alerts = [] } = useQuery({
+  const { data: alerts = [], isLoading: alertsLoading } = useQuery({
     queryKey: ["alerts"],
     queryFn: listAlerts,
   });
-  const { data: events = [] } = useQuery({
+  const { data: events = [], isLoading: eventsLoading } = useQuery({
     queryKey: ["events", "recent"],
     queryFn: () => listAllEvents(6),
   });
@@ -118,9 +81,8 @@ function Dashboard() {
     () => shipments.map((s) => s.vessel_mmsi).filter((m): m is string => Boolean(m)),
     [shipments],
   );
-  // Live telemetry for the whole fleet in one query — powers "Moving" below
-  // and the inline speed reading in the table, refreshed on an interval so
-  // a vessel that starts moving is reflected without a manual reload.
+  // Live telemetry for the whole fleet in one query, refreshed on an
+  // interval so a vessel that starts moving shows without a reload.
   const { data: positions } = useQuery({
     queryKey: ["vesselPositions", mmsis],
     queryFn: () => listVesselPositionsByMmsi(mmsis),
@@ -128,343 +90,155 @@ function Dashboard() {
     refetchInterval: 45_000,
   });
 
-  // The automated status pipeline runs server-side on a schedule, so nothing is
-  // driven from the browser here. This only reports when it last ran.
+  // The automated status pipeline runs server-side on a schedule; this only
+  // reports when it last ran.
   const lastSync = shipments
     .map((s) => s.last_synced_at)
     .filter((v): v is string => Boolean(v))
     .sort()
     .pop();
 
-  const stats = useMemo(() => {
-    const active = shipments.filter((s) => !isLegacyStatus(s.status) && s.status !== "Arrived").length;
-    const { atRisk, delayed } = kpis(shipments, documents, config);
-    return { active, exceptions: atRisk + delayed };
-  }, [shipments, documents, config]);
-
-  // "Moving" is read from real AIS telemetry, not the status field — a
-  // shipment can say "In Transit" for days between position reports, but
-  // this only counts a vessel confirmed underway right now.
-  const moving = useMemo(() => {
-    if (!positions) return [];
-    return shipments.filter((s) => {
-      if (!s.vessel_mmsi) return false;
-      const position = positions.get(s.vessel_mmsi) ?? null;
-      return deriveVesselCondition(s, position).kind === "underway";
-    });
-  }, [shipments, positions]);
-
-  const arrivingSoon = useMemo(() => {
-    const now = Date.now();
-    const horizon = now + 3 * 86_400_000;
-    return shipments.filter((s) => {
-      if (s.status === "Arrived" || s.status === "Delivered" || !s.eta) return false;
-      const t = new Date(s.eta).getTime();
-      return t > now && t <= horizon;
-    });
-  }, [shipments]);
-
-  // ETAs that were revised in the last 24 hours — read from the same alert
-  // feed the Exceptions panel already uses, so this never disagrees with
-  // what "an ETA changed" means elsewhere in the product.
-  const changedShipmentIds = useMemo(() => {
-    const cutoff = Date.now() - 24 * 3_600_000;
-    const ids = new Set<string>();
-    for (const a of alerts) {
-      if (!a.shipment_id) continue;
-      if (!a.message.toLowerCase().includes("eta changed")) continue;
-      if (new Date(a.created_at).getTime() < cutoff) continue;
-      ids.add(a.shipment_id);
-    }
-    return ids;
-  }, [alerts]);
-
-  const topAlerts = useMemo(() => {
-    const scored = alerts.map((a) => ({ alert: a, severity: alertSeverity(a) }));
-    const rank = { critical: 0, attention: 1, informational: 2 } as const;
-    return scored.sort((a, b) => rank[a.severity] - rank[b.severity]).slice(0, 4);
-  }, [alerts]);
-
   const shipmentById = useMemo(() => new Map(shipments.map((s) => [s.id, s])), [shipments]);
 
-  const nextDeparture = useMemo(() => {
-    const now = Date.now();
+  // Same verdict as `kpis` (and the sidebar), itemised: the masthead's
+  // headline number always equals the at-risk/delayed rows here.
+  const watch = useMemo<WatchItem[]>(() => {
+    const alertCounts = new Map<string, number>();
+    for (const a of alerts) {
+      if (a.shipment_id) alertCounts.set(a.shipment_id, (alertCounts.get(a.shipment_id) ?? 0) + 1);
+    }
     return shipments
-      .filter((s) => !s.actual_departure && s.planned_etd && new Date(s.planned_etd).getTime() > now)
-      .sort((a, b) => new Date(a.planned_etd!).getTime() - new Date(b.planned_etd!).getTime())[0];
-  }, [shipments]);
-
-  const nextArrival = useMemo(() => {
-    const now = Date.now();
-    return shipments
+      .filter((s) => s.status !== "Delivered")
+      .map((shipment) => ({
+        shipment,
+        health: shipmentHealth(shipment, docsFor(documents, shipment.id), config),
+        alertCount: alertCounts.get(shipment.id) ?? 0,
+      }))
       .filter(
-        (s) =>
-          s.status !== "Arrived" &&
-          s.status !== "Delivered" &&
-          s.eta &&
-          new Date(s.eta).getTime() > now,
-      )
-      .sort((a, b) => new Date(a.eta!).getTime() - new Date(b.eta!).getTime())[0];
-  }, [shipments]);
+        ({ health }) =>
+          health.level === "At Risk" || health.level === "Delayed" || health.level === "Attention",
+      );
+  }, [shipments, documents, alerts, config]);
+
+  const facts = useMemo<MastheadFacts>(() => {
+    const { atRisk, delayed } = kpis(shipments, documents, config);
+    const exceptions = atRisk + delayed;
+    // "Under way" is read from real AIS telemetry, not the status field.
+    const underway = positions
+      ? shipments.filter(
+          (s) =>
+            s.vessel_mmsi &&
+            deriveVesselCondition(s, positions.get(s.vessel_mmsi) ?? null).kind === "underway",
+        ).length
+      : 0;
+    const open = shipments.filter((s) => !FINISHED.has(s.status));
+    const t = now ?? 0;
+    const upcoming = open
+      .filter((s) => s.eta && !s.actual_arrival && new Date(s.eta).getTime() > t)
+      .sort((a, b) => new Date(a.eta!).getTime() - new Date(b.eta!).getTime());
+    const etaRevised = new Set(
+      alerts
+        .filter(
+          (a) =>
+            a.shipment_id &&
+            a.message.toLowerCase().includes("eta changed") &&
+            new Date(a.created_at).getTime() >= t - DAY,
+        )
+        .map((a) => a.shipment_id),
+    );
+    return {
+      exceptions,
+      toReview: watch.length - exceptions,
+      overdueDepartures: open.filter(
+        (s) => !s.actual_departure && s.planned_etd && new Date(s.planned_etd).getTime() < t,
+      ).length,
+      nextArrival: upcoming[0] ?? null,
+      underway,
+      active: shipments.filter((s) => !isLegacyStatus(s.status) && s.status !== "Arrived").length,
+      arriving72h: upcoming.filter((s) => new Date(s.eta!).getTime() <= t + 3 * DAY).length,
+      etaRevised24h: etaRevised.size,
+      missingDocs: open.filter((s) => {
+        const d = docsFor(documents, s.id);
+        return d.attached < d.total;
+      }).length,
+    };
+  }, [shipments, documents, alerts, positions, config, now, watch.length]);
+
+  const urgent = watch.filter((w) => w.health.level !== "Attention").length;
 
   return (
-    <AppShell
-      title={`${greeting ?? "Welcome"}, StimTech Solutions`}
-      {...(lastSync ? { description: `Monitoring last checked ${relativeTime(lastSync)}.` } : {})}
-      actions={
-        <button className={btnPrimary} onClick={() => setOpen((v) => !v)}>
-          {open ? "Cancel" : "New Shipment"}
-        </button>
-      }
-      headerExtra={
-        <div className="flex flex-col gap-7">
-          {/* Leads with what needs attention, before the stats do. */}
-          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm">
-            {stats.exceptions > 0 ? (
-              <>
-                <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-risk" />
-                <span className="font-medium text-foreground">
-                  {stats.exceptions} shipment{stats.exceptions === 1 ? "" : "s"} need attention
-                </span>
-                <Link to="/alerts" className="text-xs font-medium text-primary hover:underline">
-                  Review →
-                </Link>
-              </>
-            ) : (
-              <>
-                <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-positive" />
-                <span className="text-muted-foreground">All shipments on track — nothing needs attention.</span>
-              </>
-            )}
-          </div>
+    <AppShell title="Operations" bare>
+      <div className="mx-auto w-full max-w-[1520px] px-5 [--ww-margin:188px] sm:px-8 lg:px-10 2xl:px-14 2xl:[--ww-margin:220px]">
+        <Masthead
+          facts={facts}
+          now={now}
+          lastSync={lastSync}
+          isLoading={isLoading}
+          formOpen={open}
+          onToggleForm={() => setOpen((v) => !v)}
+        />
 
-          <FleetStatusBand
-            moving={moving.length}
-            arriving={arrivingSoon.length}
-            atRisk={stats.exceptions}
-            changed={changedShipmentIds.size}
+        {open ? (
+          <div id="new-shipment" className="pb-10 pt-2 xl:pl-[var(--ww-margin)]">
+            <NewShipmentForm onClose={() => setOpen(false)} />
+          </div>
+        ) : null}
+
+        <Band
+          id="attention"
+          title="Needs attention"
+          meta={
+            isLoading
+              ? null
+              : watch.length === 0
+                ? "All clear"
+                : [
+                    urgent > 0 ? `${urgent} at risk or delayed` : null,
+                    watch.length > urgent ? `${watch.length - urgent} to review` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(", ")
+          }
+        >
+          <WatchList
+            items={watch}
+            isLoading={isLoading}
+            focusId={focusId}
+            onFocus={setFocusId}
+            onShowAll={() => {
+              setLens("attention");
+              document.getElementById("fleet")?.scrollIntoView({ block: "start" });
+            }}
           />
+        </Band>
 
-          {moving.length > 0 && positions ? (
-            <LiveFleetRail
-              vessels={moving.map((s) => ({ shipment: s, position: positions.get(s.vessel_mmsi!)! }))}
-            />
-          ) : null}
+        <Band id="schedule" title="Schedule" meta="Planned departures and arrivals">
+          <Horizon shipments={shipments} now={now} focusId={focusId} onFocus={setFocusId} />
+        </Band>
 
-          {nextDeparture || nextArrival ? (
-            <div className="flex flex-wrap gap-x-12 gap-y-4 border-t border-border pt-6">
-              {nextDeparture ? (
-                <NextEvent label="Next departure" shipment={nextDeparture} date={nextDeparture.planned_etd!} />
-              ) : null}
-              {nextArrival ? (
-                <NextEvent label="Next arrival" shipment={nextArrival} date={nextArrival.eta!} />
-              ) : null}
-            </div>
-          ) : null}
-        </div>
-      }
-    >
-      {open ? <NewShipmentForm onClose={() => setOpen(false)} /> : null}
+        <Manifest
+          shipments={shipments}
+          documents={documents}
+          alerts={alerts}
+          positions={positions}
+          isLoading={isLoading}
+          now={now}
+          focusId={focusId}
+          onFocus={setFocusId}
+          lens={lens}
+          onLensChange={setLens}
+        />
 
-      <ShipmentTable
-        shipments={shipments}
-        documents={documents}
-        alerts={alerts}
-        positions={positions}
-        isLoading={isLoading}
-        showClient={false}
-        showLandedCost={false}
-        showLastUpdated
-      />
-
-      <div className="mt-9 grid gap-8 lg:grid-cols-2">
-        <section className="min-w-0">
-          <div className="mb-2.5 flex items-center justify-between">
-            <h2 className="label-xs">Exceptions</h2>
-            <Link to="/alerts" className="text-xs font-medium text-primary hover:underline">
-              View all
-            </Link>
-          </div>
-          {topAlerts.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No open alerts.</p>
-          ) : (
-            <ul className="divide-y divide-border">
-              {topAlerts.map(({ alert, severity }) => {
-                const shipment = alert.shipment_id ? shipmentById.get(alert.shipment_id) : undefined;
-                const row = (
-                  <div className={`flex items-center gap-3 border-l-2 py-2.5 pl-3 ${SEVERITY_ROW_BORDER[severity]}`}>
-                    <SeverityBadge severity={severity} label={SEVERITY_LABEL[severity]} />
-                    <p className="min-w-0 flex-1 truncate text-sm text-foreground">{alert.message}</p>
-                    <span className="shrink-0 text-xs text-muted-foreground">
-                      {relativeTime(alert.created_at)}
-                    </span>
-                  </div>
-                );
-                return (
-                  <li key={alert.id}>
-                    {shipment ? (
-                      <Link
-                        to="/shipments/$id"
-                        params={{ id: shipment.id }}
-                        className="block transition-colors duration-150 hover:bg-atmosphere/60"
-                      >
-                        {row}
-                      </Link>
-                    ) : (
-                      row
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </section>
-
-        <section className="min-w-0">
-          <h2 className="label-xs mb-2.5">Recent activity</h2>
-          {events.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No recent activity yet.</p>
-          ) : (
-            <ul className="divide-y divide-border">
-              {events.map((event) => {
-                const shipment = shipmentById.get(event.shipment_id);
-                const description =
-                  event.field && (event.from_value || event.to_value)
-                    ? `${event.field} → ${event.to_value ?? "—"}`
-                    : (event.reason ?? event.event_type);
-                const content = (
-                  <div className="flex items-center gap-3 py-2.5">
-                    <p className="min-w-0 flex-1 truncate text-sm text-foreground">
-                      {shipment ? shipment.client_name : "Shipment"}
-                      <span className="text-muted-foreground"> — {description}</span>
-                    </p>
-                    <SourceTag source={event.source} automated={event.automated} />
-                    <span className="shrink-0 text-xs text-muted-foreground">
-                      {relativeTime(event.occurred_at)}
-                    </span>
-                  </div>
-                );
-                return (
-                  <li key={event.id}>
-                    {shipment ? (
-                      <Link
-                        to="/shipments/$id"
-                        params={{ id: shipment.id }}
-                        className="block transition-colors duration-150 hover:bg-atmosphere/60"
-                      >
-                        {content}
-                      </Link>
-                    ) : (
-                      content
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </section>
+        <Band id="log" title="Log" meta="Latest events and alerts">
+          <ActivityLog
+            events={events}
+            alerts={alerts}
+            shipmentById={shipmentById}
+            isLoading={alertsLoading || eventsLoading}
+            now={now}
+          />
+        </Band>
       </div>
     </AppShell>
-  );
-}
-
-const FLEET_STAT_TONE: Record<"primary" | "risk" | "warning" | "foreground" | "muted", string> = {
-  primary: "text-primary-deep",
-  risk: "text-risk",
-  warning: "text-warning",
-  foreground: "text-foreground",
-  muted: "text-muted-foreground/55",
-};
-
-/**
- * The dashboard's command-centre strip: four operational readings a
- * shipping coordinator actually needs at a glance, replacing a flat count
- * of every lifecycle stage. Each block is quiet when its count is zero and
- * only picks up colour when there's something to act on — attention is
- * earned, not applied uniformly.
- */
-function FleetStatusBand({
-  moving,
-  arriving,
-  atRisk,
-  changed,
-}: {
-  moving: number;
-  arriving: number;
-  atRisk: number;
-  changed: number;
-}) {
-  return (
-    <div className="flex flex-wrap items-stretch gap-x-8 gap-y-5">
-      <FleetStatusItem label="Moving" hint="Underway now" value={moving} tone={moving > 0 ? "primary" : "muted"} live={moving > 0} />
-      <span className="divider-fade hidden sm:block" aria-hidden />
-      <FleetStatusItem label="Arriving soon" hint="Within 3 days" value={arriving} tone={arriving > 0 ? "foreground" : "muted"} />
-      <span className="divider-fade hidden sm:block" aria-hidden />
-      <FleetStatusItem label="At risk" hint="Health flagged" value={atRisk} tone={atRisk > 0 ? "risk" : "muted"} />
-      <span className="divider-fade hidden sm:block" aria-hidden />
-      <FleetStatusItem label="Changed today" hint="ETA revised" value={changed} tone={changed > 0 ? "warning" : "muted"} />
-    </div>
-  );
-}
-
-function FleetStatusItem({
-  label,
-  hint,
-  value,
-  tone,
-  live = false,
-}: {
-  label: string;
-  hint: string;
-  value: number;
-  tone: "primary" | "risk" | "warning" | "foreground" | "muted";
-  live?: boolean;
-}) {
-  return (
-    <div className="flex min-w-[108px] flex-col gap-1.5">
-      <span className="label-xs inline-flex items-center gap-1.5">
-        {live ? (
-          <span aria-hidden className="ping-live relative inline-block size-1.5 shrink-0 rounded-full bg-primary text-primary" />
-        ) : null}
-        {label}
-      </span>
-      <span className={`instrument text-4xl font-semibold ${FLEET_STAT_TONE[tone]}`}>{value}</span>
-      <span className="text-xs text-muted-foreground">{hint}</span>
-    </div>
-  );
-}
-
-/**
- * A live glimpse of the fleet, not just a count — every vessel AIS
- * confirms is underway right now, with its real speed. Renders nothing
- * when nothing is moving, so this row of the interface disappears the
- * moment it has nothing live to report rather than sitting there empty.
- */
-function LiveFleetRail({
-  vessels,
-}: {
-  vessels: { shipment: Shipment; position: { sog: number | null } }[];
-}) {
-  return (
-    <div className="border-t border-border pt-6">
-      <p className="label-xs mb-2.5">Underway right now</p>
-      <div className="flex flex-wrap gap-2">
-        {vessels.map(({ shipment, position }) => (
-          <Link
-            key={shipment.id}
-            to="/shipments/$id"
-            params={{ id: shipment.id }}
-            className="chip transition-colors hover:border-primary/40"
-          >
-            <span aria-hidden className="ping-live relative inline-block size-1.5 shrink-0 rounded-full bg-primary text-primary" />
-            <span className="font-medium text-foreground">{shipment.vessel_name ?? "Vessel"}</span>
-            <span className="instrument text-muted-foreground">
-              {position.sog != null ? `${position.sog.toFixed(1)} kn` : "—"}
-            </span>
-            <span className="text-muted-foreground/60">→ {shipment.destination}</span>
-          </Link>
-        ))}
-      </div>
-    </div>
   );
 }
