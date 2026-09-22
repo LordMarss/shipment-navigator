@@ -168,76 +168,85 @@ function Dashboard() {
 
   return (
     <AppShell title="Operations" bare>
-      <div className="mx-auto w-full max-w-[1520px] px-5 [--ww-margin:188px] sm:px-8 lg:px-10 2xl:px-14 2xl:[--ww-margin:220px]">
-        <Masthead
-          facts={facts}
-          now={now}
-          lastSync={lastSync}
-          isLoading={isLoading}
-          formOpen={open}
-          onToggleForm={() => setOpen((v) => !v)}
-        />
-
-        {open ? (
-          <div id="new-shipment" className="pb-10 pt-2 xl:pl-[var(--ww-margin)]">
-            <NewShipmentForm onClose={() => setOpen(false)} />
-          </div>
-        ) : null}
-
-        <Band
-          id="attention"
-          title="Needs attention"
-          meta={
-            isLoading
-              ? null
-              : watch.length === 0
-                ? "All clear"
-                : [
-                    urgent > 0 ? `${urgent} at risk or delayed` : null,
-                    watch.length > urgent ? `${watch.length - urgent} to review` : null,
-                  ]
-                    .filter(Boolean)
-                    .join(", ")
-          }
-        >
-          <WatchList
-            items={watch}
+      {/* The operations sheet: neutral paper, graphite ink, one signal blue. */}
+      <div className="min-h-[calc(100dvh-3.5rem)] bg-paper text-ink-1">
+        <div className="mx-auto w-full max-w-[1520px] px-5 pb-6 [--ww-margin:188px] sm:px-8 lg:px-10 2xl:px-14 2xl:[--ww-margin:220px]">
+          <Masthead
+            facts={facts}
+            now={now}
+            lastSync={lastSync}
             isLoading={isLoading}
+            formOpen={open}
+            onToggleForm={() => setOpen((v) => !v)}
+          />
+
+          {open ? (
+            <div id="new-shipment" className="pb-10 pt-2 xl:pl-[var(--ww-margin)]">
+              <NewShipmentForm onClose={() => setOpen(false)} />
+            </div>
+          ) : null}
+
+          <Band
+            id="attention"
+            title="Needs attention"
+            meta={
+              isLoading
+                ? null
+                : watch.length === 0
+                  ? "All clear"
+                  : [
+                      urgent > 0 ? `${urgent} at risk or delayed` : null,
+                      watch.length > urgent ? `${watch.length - urgent} to review` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(", ")
+            }
+          >
+            <WatchList
+              items={watch}
+              isLoading={isLoading}
+              focusId={focusId}
+              onFocus={setFocusId}
+              onShowAll={() => {
+                setLens("attention");
+                document.getElementById("fleet")?.scrollIntoView({ block: "start" });
+              }}
+            />
+          </Band>
+
+          <Band id="schedule" title="Schedule" meta="Planned departures and arrivals">
+            <Horizon
+              shipments={shipments}
+              now={now}
+              focusId={focusId}
+              onFocus={setFocusId}
+              isLoading={isLoading}
+            />
+          </Band>
+
+          <Manifest
+            shipments={shipments}
+            documents={documents}
+            alerts={alerts}
+            positions={positions}
+            isLoading={isLoading}
+            now={now}
             focusId={focusId}
             onFocus={setFocusId}
-            onShowAll={() => {
-              setLens("attention");
-              document.getElementById("fleet")?.scrollIntoView({ block: "start" });
-            }}
+            lens={lens}
+            onLensChange={setLens}
           />
-        </Band>
 
-        <Band id="schedule" title="Schedule" meta="Planned departures and arrivals">
-          <Horizon shipments={shipments} now={now} focusId={focusId} onFocus={setFocusId} />
-        </Band>
-
-        <Manifest
-          shipments={shipments}
-          documents={documents}
-          alerts={alerts}
-          positions={positions}
-          isLoading={isLoading}
-          now={now}
-          focusId={focusId}
-          onFocus={setFocusId}
-          lens={lens}
-          onLensChange={setLens}
-        />
-
-        <Band id="log" title="Log" meta="Latest events and alerts">
-          <ActivityLog
-            events={events}
-            alerts={alerts}
-            shipmentById={shipmentById}
-            isLoading={alertsLoading || eventsLoading}
-            now={now}
-          />
-        </Band>
+          <Band id="log" title="Log" meta="Latest events and alerts">
+            <ActivityLog
+              events={events}
+              alerts={alerts}
+              shipmentById={shipmentById}
+              isLoading={alertsLoading || eventsLoading}
+              now={now}
+            />
+          </Band>
+        </div>
       </div>
     </AppShell>
   );

@@ -8,32 +8,43 @@ const HOUR = 3_600_000;
 
 export type SignalState = "live" | "stale" | "none";
 
-export function signalState(position: VesselPosition | null, now: number | null): SignalState {
-  if (!position || now == null) return "none";
-  return isAisFresh(position, now) ? "live" : "stale";
+export type Signal = {
+  state: SignalState;
+  /** 0 to 4 bars: 4 under an hour old, 3 under six hours, 2 within the
+   * 24-hour freshness window, 1 once stale, 0 with no position at all. */
+  bars: number;
+  /** Compact age of the last fix ("3m", "5h", "4d"), or null. */
+  age: string | null;
+};
+
+export function signalOf(position: VesselPosition | null, now: number | null): Signal {
+  if (!position || now == null) return { state: "none", bars: 0, age: null };
+  const ts = position.position_timestamp ?? position.received_at;
+  const age = ago(ts, now);
+  if (!isAisFresh(position, now)) return { state: "stale", bars: 1, age };
+  const hours = (now - new Date(ts).getTime()) / HOUR;
+  return { state: "live", bars: hours < 1 ? 4 : hours < 6 ? 3 : 2, age };
 }
 
+/** What the vessel is doing, in words, when the signal supports saying so. */
 export function vesselReading(
   condition: VesselCondition["kind"] | null,
   position: VesselPosition | null,
   hasMmsi: boolean,
-  state: SignalState,
-  now: number | null,
-): { text: string; tone: string } {
-  if (!hasMmsi) return { text: "No MMSI", tone: "text-muted-foreground" };
-  if (state === "none") return { text: "No position", tone: "text-muted-foreground" };
-  if (state === "stale" && position && now != null) {
-    const ts = position.position_timestamp ?? position.received_at;
-    return { text: `Last fix ${ago(ts, now)} ago`, tone: "text-muted-foreground" };
-  }
+  signal: Signal,
+): { text: string; tone: string; moving: boolean } {
+  if (!hasMmsi) return { text: "No MMSI", tone: "text-ink-3", moving: false };
+  if (signal.state === "none") return { text: "No signal", tone: "text-ink-3", moving: false };
+  if (signal.state === "stale") return { text: "Stale", tone: "text-ink-3", moving: false };
   if (condition === "underway") {
     return {
       text: position?.sog != null ? `${position.sog.toFixed(1)} kn` : "Under way",
-      tone: "text-primary-deep",
+      tone: "text-signal",
+      moving: true,
     };
   }
-  if (condition === "stopped") return { text: "Stopped", tone: "text-warning" };
-  return { text: "Reporting", tone: "text-muted-foreground" };
+  if (condition === "stopped") return { text: "Stopped", tone: "text-caution-ink", moving: false };
+  return { text: "Reporting", tone: "text-ink-2", moving: false };
 }
 
 export function formatCoordinates(lat: number, lon: number) {

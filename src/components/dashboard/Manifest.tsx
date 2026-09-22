@@ -2,7 +2,6 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState, type ReactNode } from "react";
 import { ArrowDown, ArrowUp, Search } from "lucide-react";
 
-import { Skeleton, fieldClass } from "@/components/AppShell";
 import { useShipmentFilters, type SortKey } from "@/components/useShipmentFilters";
 import {
   ACTIVE_STATUSES,
@@ -23,20 +22,28 @@ import {
   type Severity,
 } from "@/lib/lifecycle";
 import { useMonitoringConfig } from "@/hooks/useMonitoringConfig";
-import { Band, DocsMeter, PhaseLabel, SignalGlyph, TCount } from "@/components/dashboard/glyphs";
+import {
+  Band,
+  DocsMeter,
+  Mark,
+  PhaseLabel,
+  SignalBars,
+  TCount,
+  Skeleton,
+} from "@/components/dashboard/glyphs";
 import {
   ago,
   formatCoordinates,
   shortDate,
-  signalState,
+  signalOf,
   vesselReading,
 } from "@/components/dashboard/format";
 
 const DAY = 86_400_000;
 const SEVERITY_RANK: Record<Severity, number> = { critical: 0, attention: 1, informational: 2 };
+const FINISHED = new Set(["Arrived", "At Port", "Cleared Customs", "Delivered"]);
 /** On phones the list keeps the first dozen and offers the rest on request. */
 const COMPACT_LIMIT = 12;
-const FINISHED = new Set(["Arrived", "At Port", "Cleared Customs", "Delivered"]);
 
 export type Lens = "all" | "attention" | "underway" | "arriving";
 const LENSES: { key: Lens; label: string }[] = [
@@ -58,12 +65,16 @@ type Row = {
   finished: boolean;
 };
 
+const field =
+  "focus-ring h-8 w-full rounded-[2px] border border-rule-1 bg-paper px-2.5 text-[13px] text-ink-1 transition-colors placeholder:text-ink-3 hover:border-ink-3";
+
 /**
  * The fleet manifest. Same search, filters and sort as every other
  * shipment list (via `useShipmentFilters`), plus lenses for the three
- * questions a coordinator actually asks of it. Each row reads left to
- * right as: who, where between origin and destination, which phase, the
- * vessel's signal, when, and anything that needs a look.
+ * questions a coordinator actually asks of it. A row reads left to right:
+ * who, where between origin and destination, which phase, the vessel's
+ * signal, when, and anything that needs a look. Colour appears only at
+ * the row's edge (a problem) and in the glyphs (movement, completion).
  */
 export function Manifest({
   shipments,
@@ -77,8 +88,6 @@ export function Manifest({
   lens,
   onLensChange: setLens,
 }: {
-  lens: Lens;
-  onLensChange: (lens: Lens) => void;
   shipments: Shipment[];
   documents: ShipmentDocument[];
   alerts: Alert[];
@@ -87,12 +96,13 @@ export function Manifest({
   now: number | null;
   focusId: string | null;
   onFocus: (id: string | null) => void;
+  lens: Lens;
+  onLensChange: (lens: Lens) => void;
 }) {
   const navigate = useNavigate();
   const config = useMonitoringConfig();
-  const filters = useShipmentFilters(shipments);
   const { query, setQuery, status, setStatus, client, setClient, clients, sort, toggleSort, rows } =
-    filters;
+    useShipmentFilters(shipments);
   const [showAllCompact, setShowAllCompact] = useState(false);
 
   const alertsByShipment = useMemo(() => {
@@ -173,22 +183,18 @@ export function Manifest({
               aria-pressed={active}
               aria-label={isLoading ? l.label : `${l.label}, ${counts[l.key]}`}
               onClick={() => setLens(l.key)}
-              className={`focus-ring group relative flex shrink-0 items-baseline justify-between gap-3 whitespace-nowrap rounded-[2px] px-2 py-1.5 text-[13px] transition-colors xl:py-2 xl:pl-3 ${
-                active
-                  ? "font-medium text-foreground"
-                  : "text-muted-foreground hover:text-foreground"
+              className={`focus-ring group relative flex shrink-0 items-baseline justify-between gap-3 whitespace-nowrap rounded-[1px] px-2 py-1.5 text-[13px] transition-colors xl:py-[7px] xl:pl-3 ${
+                active ? "font-medium text-ink-1" : "text-ink-2 hover:text-ink-1"
               }`}
             >
               <span
                 aria-hidden
-                className={`absolute bottom-0 left-2 right-2 h-[2px] xl:inset-y-1.5 xl:left-0 xl:right-auto xl:h-auto xl:w-[2px] ${
-                  active ? "bg-primary" : "bg-transparent group-hover:bg-foreground/15"
+                className={`absolute bottom-0 left-2 right-2 h-[2px] xl:inset-y-1 xl:left-0 xl:right-auto xl:h-auto xl:w-[2px] ${
+                  active ? "bg-signal" : "bg-transparent group-hover:bg-rule-1"
                 }`}
               />
               {l.label}
-              <span
-                className={`tabular-nums ${active ? "text-foreground" : "text-muted-foreground/70"}`}
-              >
+              <span className={`telemetry text-[11.5px] ${active ? "text-ink-1" : "text-ink-3"}`}>
                 {isLoading ? "" : counts[l.key]}
               </span>
             </button>
@@ -201,17 +207,17 @@ export function Manifest({
           <span className="sr-only">Search shipments</span>
           <Search
             aria-hidden
-            className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
+            className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-ink-3"
           />
           <input
-            className={`${fieldClass} rounded-[3px] border-foreground/15 bg-transparent pl-8`}
+            className={`${field} pl-8`}
             placeholder="ID, client, route, vessel, MMSI"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
         </label>
         <select
-          className={`${fieldClass} rounded-[3px] border-foreground/15 bg-transparent`}
+          className={field}
           aria-label="Filter by status"
           value={status}
           onChange={(e) => setStatus(e.target.value as ShipmentStatus | "all")}
@@ -224,7 +230,7 @@ export function Manifest({
           ))}
         </select>
         <select
-          className={`${fieldClass} rounded-[3px] border-foreground/15 bg-transparent sm:max-w-[13rem] xl:max-w-none`}
+          className={`${field} sm:max-w-[13rem] xl:max-w-none`}
           aria-label="Filter by client"
           value={client}
           onChange={(e) => setClient(e.target.value)}
@@ -256,19 +262,19 @@ export function Manifest({
       {/* Wide: the manifest table */}
       <table className="hidden w-full table-fixed border-collapse text-left md:table">
         <colgroup>
-          <col className="w-[23%] xl:w-[19%]" />
-          <col className="w-[31%] xl:w-[25%]" />
+          <col className="w-[24%] xl:w-[19%]" />
+          <col className="w-[30%] xl:w-[24%]" />
           <col className="w-[17%] xl:w-[14%]" />
-          <col className="hidden w-[15%] xl:table-column" />
+          <col className="hidden w-[16%] xl:table-column" />
           <col className="w-[14%] xl:w-[10%]" />
-          <col className="w-[15%] xl:w-[11%]" />
+          <col className="w-[15%] xl:w-[10%]" />
           <col className="hidden w-[9%] xl:table-column" />
           <col className="hidden w-[6%] min-[1440px]:table-column" />
         </colgroup>
         <thead
-          className={`sticky top-14 z-[5] bg-background ${!isLoading && shipments.length === 0 ? "hidden" : ""}`}
+          className={`sticky top-14 z-[5] bg-paper ${!isLoading && shipments.length === 0 ? "hidden" : ""}`}
         >
-          <tr className="shadow-[inset_0_-1px_0_color-mix(in_oklab,var(--foreground)_20%,transparent)]">
+          <tr className="shadow-[inset_0_-1px_0_var(--ww-rule-1)]">
             <Th sortKey="client_name" sort={sort} onSort={toggleSort}>
               Shipment
             </Th>
@@ -288,25 +294,25 @@ export function Manifest({
         <tbody>
           {isLoading
             ? Array.from({ length: 5 }).map((_, i) => (
-                <tr key={i} className="border-b border-foreground/8">
-                  <td className="py-4 pr-4">
+                <tr key={i} className="border-b border-rule-2">
+                  <td className="py-3.5 pl-4 pr-4">
                     <Skeleton className="h-4 w-3/4" />
                     <Skeleton className="mt-2 h-3 w-16" />
                   </td>
-                  <td className="py-4 pr-4">
+                  <td className="py-3.5 pr-4">
                     <Skeleton className="h-4 w-4/5" />
                     <Skeleton className="mt-2.5 h-1 w-3/4" />
                   </td>
-                  <td className="py-4 pr-4">
+                  <td className="py-3.5 pr-4">
                     <Skeleton className="h-4 w-20" />
                   </td>
-                  <td className="hidden py-4 pr-4 xl:table-cell">
+                  <td className="hidden py-3.5 pr-4 xl:table-cell">
                     <Skeleton className="h-4 w-24" />
                   </td>
-                  <td className="py-4 pr-4">
+                  <td className="py-3.5 pr-4">
                     <Skeleton className="h-4 w-14" />
                   </td>
-                  <td className="py-4 pr-4" />
+                  <td className="py-3.5 pr-4" />
                   <td className="hidden xl:table-cell" />
                   <td className="hidden min-[1440px]:table-cell" />
                 </tr>
@@ -325,10 +331,10 @@ export function Manifest({
       </table>
 
       {/* Narrow: a ruled list keeping only who, phase, when and any flag */}
-      <ul className="border-t border-foreground/20 md:hidden">
+      <ul className="border-t border-rule-1 md:hidden">
         {isLoading
           ? Array.from({ length: 4 }).map((_, i) => (
-              <li key={i} className="space-y-2 border-b border-foreground/8 py-4">
+              <li key={i} className="space-y-2 border-b border-rule-2 py-4">
                 <Skeleton className="h-4 w-2/3" />
                 <Skeleton className="h-3 w-1/2" />
               </li>
@@ -341,26 +347,26 @@ export function Manifest({
         <button
           type="button"
           onClick={() => setShowAllCompact(true)}
-          className="focus-ring mt-4 w-full rounded-[3px] border border-foreground/15 py-2.5 text-[13px] font-medium text-foreground md:hidden"
+          className="focus-ring mt-3 w-full rounded-[2px] border border-rule-1 py-2.5 text-[13px] font-medium text-ink-1 hover:bg-wash md:hidden"
         >
           Show all {visible.length}
         </button>
       ) : null}
 
       {!isLoading && visible.length === 0 ? (
-        <div className="border-b border-foreground/8 py-12">
+        <div className="border-b border-rule-2 py-10">
           {shipments.length === 0 ? (
             <>
-              <p className="text-[15px] font-medium text-foreground">No shipments yet</p>
-              <p className="mt-1 max-w-[52ch] text-sm text-muted-foreground">
-                Create your first shipment with New shipment above to start tracking vessels,
-                documents and arrival dates.
+              <p className="text-[14px] font-medium text-ink-1">No shipments yet</p>
+              <p className="mt-1 max-w-[52ch] text-[13px] text-ink-2">
+                Create the first with New shipment above to start tracking vessels, documents and
+                arrival dates.
               </p>
             </>
           ) : (
             <>
-              <p className="text-[15px] font-medium text-foreground">Nothing matches this view</p>
-              <p className="mt-1 text-sm text-muted-foreground">
+              <p className="text-[14px] font-medium text-ink-1">Nothing matches this view</p>
+              <p className="mt-1 text-[13px] text-ink-2">
                 {filtered
                   ? "Widen the search or filters to see more shipments."
                   : "No shipments to show."}
@@ -369,7 +375,7 @@ export function Manifest({
                 <button
                   type="button"
                   onClick={clearAll}
-                  className="focus-ring mt-4 rounded-[2px] text-[13px] font-medium text-primary hover:underline"
+                  className="focus-ring mt-3 rounded-[1px] text-[13px] font-medium text-signal hover:underline"
                 >
                   Clear search and filters
                 </button>
@@ -380,9 +386,9 @@ export function Manifest({
       ) : null}
 
       {!isLoading && visible.length > 0 ? (
-        <p className="mt-4 text-xs text-muted-foreground">
+        <p className="mt-3 text-[12px] text-ink-3">
           Select a shipment to open it, or{" "}
-          <Link to="/map" className="text-primary hover:underline">
+          <Link to="/map" className="text-signal hover:underline">
             view the fleet map
           </Link>
           .
@@ -406,143 +412,129 @@ function ManifestRow({
   onOpen: () => void;
 }) {
   const { s, health, flagged, risk, docs, alerts, position, condition, finished } = row;
-  const signal = signalState(position, now);
-  const reading = vesselReading(condition, position, Boolean(s.vessel_mmsi), signal, now);
+  const signal = signalOf(position, now);
+  const reading = vesselReading(condition, position, Boolean(s.vessel_mmsi), signal);
 
   return (
     <tr
       onClick={onOpen}
       onMouseEnter={() => onFocus(s.id)}
       onMouseLeave={() => onFocus(null)}
-      className={`group cursor-pointer border-b border-foreground/8 align-top transition-colors duration-150 ${
-        focused ? "bg-atmosphere/70" : "hover:bg-atmosphere/45"
+      className={`group cursor-pointer border-b border-rule-2 align-top transition-colors duration-100 ${
+        focused ? "bg-signal-wash" : "hover:bg-wash"
       }`}
     >
-      <td className="relative py-4 pl-4 pr-4">
-        <span
-          aria-hidden
-          className={`absolute inset-y-0 left-0 w-[2px] ${
-            risk
-              ? "bg-risk"
-              : flagged
-                ? "bg-warning"
-                : focused
-                  ? "bg-primary"
-                  : "bg-transparent group-hover:bg-primary/60"
-          }`}
-        />
+      <td className="relative py-3.5 pl-4 pr-4">
+        {flagged ? (
+          <span
+            aria-hidden
+            className={`absolute inset-y-0 left-0 w-[3px] ${risk ? "bg-alert" : "bg-caution"}`}
+          />
+        ) : null}
         <Link
           to="/shipments/$id"
           params={{ id: s.id }}
           onClick={(e) => e.stopPropagation()}
           onFocus={() => onFocus(s.id)}
           onBlur={() => onFocus(null)}
-          className="focus-ring block truncate rounded-[2px] text-[14.5px] font-medium text-foreground transition-colors group-hover:text-primary-deep"
+          className="focus-ring block truncate rounded-[1px] text-[14px] font-medium text-ink-1"
         >
           {s.client_name}
         </Link>
-        <span className="instrument mt-1 block truncate text-[11px] text-muted-foreground">
+        <span className="telemetry mt-1 block truncate text-[11px] text-ink-3">
           {shortId(s.id)}
         </span>
       </td>
 
-      <td className="py-4 pr-6">
+      <td className="py-3.5 pr-6">
         <span
-          className="flex min-w-0 items-baseline gap-1.5 text-[13.5px]"
+          className="flex min-w-0 items-baseline gap-1.5 text-[13px]"
           title={`${s.origin} to ${s.destination}`}
         >
-          <span className="truncate text-foreground/75">{s.origin}</span>
-          <span aria-hidden className="shrink-0 text-muted-foreground/60">
+          <span className="truncate text-ink-2">{s.origin}</span>
+          <span aria-hidden className="shrink-0 text-ink-4">
             →
           </span>
-          <span className="truncate text-foreground">{s.destination}</span>
+          <span className="truncate text-ink-1">{s.destination}</span>
         </span>
         <Passage s={s} now={now} finished={finished} />
       </td>
 
-      <td className="py-4 pr-4 text-[13px] text-foreground">
+      <td className="py-3.5 pr-4 text-[13px] text-ink-2">
         <PhaseLabel status={s.status} />
       </td>
 
-      <td className="hidden py-4 pr-4 xl:table-cell">
+      <td className="hidden py-3.5 pr-4 xl:table-cell">
         {s.vessel_name ? (
           <>
-            <span className="block truncate text-[13px] text-foreground">{s.vessel_name}</span>
+            <span className="block truncate text-[13px] text-ink-1">{s.vessel_name}</span>
             <span
-              className={`mt-1 flex items-center gap-1.5 text-xs ${reading.tone}`}
+              className="mt-1.5 flex items-center gap-2 text-[11.5px]"
               title={
-                position && signal !== "none"
-                  ? `${formatCoordinates(position.latitude, position.longitude)}${
-                      position.sog != null ? `, ${position.sog.toFixed(1)} kn` : ""
-                    }`
-                  : undefined
+                position && signal.state !== "none"
+                  ? `Last fix ${signal.age} ago at ${formatCoordinates(position.latitude, position.longitude)}`
+                  : "No AIS position received"
               }
             >
-              <SignalGlyph state={signal} moving={condition === "underway"} />
-              <span className="truncate">{reading.text}</span>
+              <SignalBars signal={signal} moving={reading.moving} />
+              <span className={`truncate ${reading.moving ? "telemetry" : ""} ${reading.tone}`}>
+                {reading.text}
+              </span>
+              {signal.age ? (
+                <span className="telemetry shrink-0 text-ink-3">{signal.age}</span>
+              ) : null}
             </span>
           </>
         ) : (
-          <span className="text-[13px] text-muted-foreground">Not assigned</span>
+          <span className="text-[13px] text-ink-3">Not assigned</span>
         )}
       </td>
 
-      <td className="py-4 pr-4">
+      <td className="py-3.5 pr-4">
         {s.eta ? (
           <>
             <span
-              className="block text-[14px] font-medium tabular-nums text-foreground"
+              className="block text-[13.5px] font-medium tabular-nums text-ink-1"
               title={formatEta(s.eta)}
             >
               {shortDate(s.eta, now)}
             </span>
             <span className="mt-1 block">
               {finished ? (
-                <span className="text-[11px] text-muted-foreground">Arrived</span>
+                <span className="text-[11.5px] text-ink-3">Arrived</span>
               ) : (
                 <TCount iso={s.eta} now={now} />
               )}
             </span>
           </>
         ) : (
-          <span className="text-[13px] text-muted-foreground">Not set</span>
+          <span className="text-[13px] text-ink-3">Not set</span>
         )}
       </td>
 
-      <td className="py-4 pr-4">
+      <td className="py-3.5 pr-4">
         {flagged ? (
-          <span
-            className={`block text-[11px] font-semibold uppercase tracking-[0.08em] ${risk ? "text-risk" : "text-warning"}`}
-            title={health.reason}
-          >
+          <span className="block text-[12.5px] font-medium text-ink-1" title={health.reason}>
             {health.level}
           </span>
         ) : (
-          <span className="block text-[12px] text-muted-foreground/70">Clear</span>
+          <span className="sr-only">Clear</span>
         )}
         {alerts ? (
-          <span
-            className={`mt-1 block text-xs ${
-              alerts.severity === "critical"
-                ? "font-medium text-risk"
-                : alerts.severity === "attention"
-                  ? "text-warning"
-                  : "text-muted-foreground"
-            }`}
-          >
+          <span className="mt-1 block text-[11.5px] text-ink-3">
             {alerts.count} alert{alerts.count === 1 ? "" : "s"}
           </span>
         ) : null}
       </td>
 
-      <td className="hidden py-4 pr-4 text-[12.5px] xl:table-cell">
+      <td className="hidden py-3.5 pr-4 xl:table-cell">
         <DocsMeter attached={docs.attached} total={docs.total} />
       </td>
 
-      <td className="hidden py-4 pr-4 text-right min-[1440px]:table-cell">
+      <td className="hidden py-3.5 pr-4 text-right min-[1440px]:table-cell">
         {now != null ? (
           <span
-            className="instrument text-[11px] text-muted-foreground"
+            className="telemetry text-[11px] text-ink-3"
             title={new Date(s.updated_at).toLocaleString()}
           >
             {ago(s.updated_at, now)}
@@ -557,6 +549,8 @@ function ManifestRow({
  * The passage between origin and destination, by schedule: elapsed share
  * of actual departure → current ETA. Time-based, not a position fix, and
  * labelled that way. Before departure it states the planned ETD instead.
+ * Same marks as the schedule: hollow square = departure point, filled =
+ * the vessel's estimated position (blue while under way).
  */
 function Passage({ s, now, finished }: { s: Shipment; now: number | null; finished: boolean }) {
   const departed = Boolean(s.actual_departure);
@@ -567,20 +561,20 @@ function Passage({ s, now, finished }: { s: Shipment; now: number | null; finish
   if (finished) {
     progress = 1;
     label = "Passage complete";
-    note = <span className="text-muted-foreground">Complete</span>;
+    note = <span className="text-ink-3">Complete</span>;
   } else if (!departed) {
     progress = 0;
     if (s.planned_etd && now != null) {
       const overdue = new Date(s.planned_etd).getTime() < now;
       label = `Not yet departed, planned ${formatEta(s.planned_etd)}`;
-      note = overdue ? (
-        <span className="font-medium text-risk">ETD {shortDate(s.planned_etd, now)}</span>
-      ) : (
-        <span className="text-muted-foreground">ETD {shortDate(s.planned_etd, now)}</span>
+      note = (
+        <span className={overdue ? "font-medium text-alert" : "text-ink-3"}>
+          ETD {shortDate(s.planned_etd, now)}
+        </span>
       );
     } else {
       label = "Not yet departed";
-      note = <span className="text-muted-foreground">Not sailed</span>;
+      note = <span className="text-ink-3">Not sailed</span>;
     }
   } else if (s.eta && now != null) {
     const dep = new Date(s.actual_departure!).getTime();
@@ -590,48 +584,45 @@ function Passage({ s, now, finished }: { s: Shipment; now: number | null; finish
     const elapsed = Math.min(total, Math.max(0, Math.round((now - dep) / DAY)));
     label = `Day ${elapsed} of ${total} by schedule`;
     note = (
-      <span className="text-muted-foreground">
-        Day {elapsed} of {total}
+      <span className="text-ink-3">
+        Day <span className="telemetry text-ink-2">{elapsed}</span>/
+        <span className="telemetry">{total}</span>
       </span>
     );
   } else {
     label = "Departed, no ETA to measure against";
-    note = <span className="text-muted-foreground">No ETA</span>;
+    note = <span className="text-ink-3">No ETA</span>;
   }
 
   const underway = departed && !finished && progress != null;
 
   return (
-    <span className="mt-2.5 flex items-center gap-3" title={label}>
+    <span className="mt-2 flex items-center gap-3" title={label}>
       <span className="relative block h-[7px] min-w-0 flex-1" role="img" aria-label={label}>
         <span
           className={`absolute inset-x-0 top-1/2 -translate-y-1/2 ${
-            progress == null
-              ? "border-t border-dashed border-foreground/30"
-              : "h-px bg-foreground/15"
+            progress == null ? "border-t border-dashed border-ink-4" : "h-px bg-off"
           }`}
         />
         {progress != null && progress > 0 ? (
           <span
-            className={`absolute left-0 top-1/2 h-px -translate-y-1/2 ${finished ? "bg-foreground/45" : "bg-primary"}`}
+            className={`absolute left-0 top-1/2 h-px -translate-y-1/2 ${finished ? "bg-ink-3" : "bg-signal"}`}
             style={{ width: `${progress * 100}%` }}
           />
         ) : null}
-        <span className="absolute left-0 top-0 h-[7px] w-px bg-foreground/40" />
-        <span
-          className={`absolute right-0 top-1/2 size-[7px] -translate-y-1/2 translate-x-1/2 rounded-full border ${
-            finished
-              ? "border-foreground/60 bg-foreground/60"
-              : "border-foreground/40 bg-background"
-          }`}
-        />
+        <span className="absolute left-0 top-0 h-[7px] w-px bg-ink-3" />
+        <span className="absolute right-0 top-0 h-[7px] w-px bg-ink-3" />
         {underway ? (
           <span
-            className="absolute top-1/2 size-[7px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary ring-2 ring-background"
+            className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2"
             style={{ left: `${progress! * 100}%` }}
-          />
+          >
+            <Mark filled tone="signal" size={6} className="block" />
+          </span>
         ) : !departed && !finished ? (
-          <span className="absolute left-0 top-1/2 size-[7px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-foreground/60 bg-background" />
+          <span className="absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2">
+            <Mark filled={false} tone="quiet" size={6} className="block" />
+          </span>
         ) : null}
       </span>
       <span className="shrink-0 text-[11.5px]">{note}</span>
@@ -642,36 +633,30 @@ function Passage({ s, now, finished }: { s: Shipment; now: number | null; finish
 function CompactRow({ row, now }: { row: Row; now: number | null }) {
   const { s, health, flagged, risk, finished } = row;
   return (
-    <li className="border-b border-foreground/8">
+    <li className="border-b border-rule-2">
       <Link
         to="/shipments/$id"
         params={{ id: s.id }}
-        className="focus-ring relative grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1.5 py-3.5 pl-3.5"
+        className="focus-ring relative grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1.5 py-3 pl-3.5 hover:bg-wash"
       >
-        <span
-          aria-hidden
-          className={`absolute inset-y-3 left-0 w-[2px] ${risk ? "bg-risk" : flagged ? "bg-warning" : "bg-transparent"}`}
-        />
-        <span className="truncate text-[15px] font-medium text-foreground">{s.client_name}</span>
-        <span className="text-right text-[14px] font-medium tabular-nums text-foreground">
-          {s.eta ? (
-            shortDate(s.eta, now)
-          ) : (
-            <span className="font-normal text-muted-foreground">No ETA</span>
-          )}
+        {flagged ? (
+          <span
+            aria-hidden
+            className={`absolute inset-y-0 left-0 w-[3px] ${risk ? "bg-alert" : "bg-caution"}`}
+          />
+        ) : null}
+        <span className="truncate text-[14px] font-medium text-ink-1">{s.client_name}</span>
+        <span className="text-right text-[13.5px] font-medium tabular-nums text-ink-1">
+          {s.eta ? shortDate(s.eta, now) : <span className="font-normal text-ink-3">No ETA</span>}
         </span>
-        <PhaseLabel status={s.status} className="text-[13px] text-foreground/80" />
+        <PhaseLabel status={s.status} className="text-[12.5px] text-ink-2" />
         <span className="text-right">
           {s.eta && !finished ? <TCount iso={s.eta} now={now} /> : null}
         </span>
         {flagged ? (
-          <span className="col-span-2 flex min-w-0 items-baseline gap-2 text-xs">
-            <span
-              className={`shrink-0 font-semibold uppercase tracking-[0.08em] ${risk ? "text-risk" : "text-warning"}`}
-            >
-              {health.level}
-            </span>
-            <span className="truncate text-muted-foreground">{health.reason}</span>
+          <span className="col-span-2 flex min-w-0 items-baseline gap-2 text-[12px]">
+            <span className="shrink-0 font-medium text-ink-1">{health.level}</span>
+            <span className="truncate text-ink-3">{health.reason}</span>
           </span>
         ) : null}
       </Link>
@@ -709,13 +694,13 @@ function Th({
     <th
       scope="col"
       aria-sort={active ? (sort!.dir === "asc" ? "ascending" : "descending") : undefined}
-      className={`whitespace-nowrap py-3 pr-4 text-[11.5px] font-medium text-muted-foreground first:pl-4 ${className}`}
+      className={`whitespace-nowrap py-2.5 pr-4 text-[11.5px] font-normal text-ink-3 first:pl-4 ${className}`}
     >
       {sortKey && onSort ? (
         <button
           type="button"
           onClick={() => onSort(sortKey)}
-          className={`focus-ring -mx-1 rounded-[2px] px-1 transition-colors hover:text-foreground ${active ? "text-foreground" : ""}`}
+          className={`focus-ring -mx-1 rounded-[1px] px-1 transition-colors hover:text-ink-1 ${active ? "font-medium text-ink-1" : ""}`}
         >
           {inner}
         </button>

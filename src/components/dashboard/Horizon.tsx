@@ -1,20 +1,22 @@
 import { Link } from "@tanstack/react-router";
 import { useMemo } from "react";
 
-import { Skeleton } from "@/components/AppShell";
 import { formatEta, shortId, type Shipment } from "@/lib/api";
 import { useElementWidth } from "@/components/dashboard/useNow";
 import { tCount } from "@/components/dashboard/format";
+import { Mark, Skeleton } from "@/components/dashboard/glyphs";
 
 const DAY = 86_400_000;
 /** Label width used for lane packing; matches the flag's `max-w`. */
 const LABEL_PX = 156;
-const LANE_PX = 30;
+const LANE_PX = 28;
 const MAX_LANES = 4;
 const MAX_LANES_NARROW = 3;
-const BODY_PAD = 14;
+const BODY_PAD = 12;
 const OVERDUE_PX = 168;
 const TIP_PX = 248;
+/** Load strip: one square per movement, up to this many, then a count. */
+const LOAD_CELLS = 5;
 
 const FINISHED = new Set(["Arrived", "At Port", "Cleared Customs", "Delivered"]);
 
@@ -29,19 +31,22 @@ function startOfDay(t: number) {
 }
 
 /**
- * The schedule as a planning sheet: one ruled column per day, today shaded,
- * weekends faintly toned, a hairline at the current moment, and every
- * planned departure (open ring) and arrival (solid) hung from its exact
- * time like a sounding. Departures or arrivals whose date has already
- * passed without being recorded collect in an Overdue column to the left.
- * Fourteen days on wide screens, seven on narrow ones.
+ * The schedule as a planning instrument: a day scale, one ruled column per
+ * day, and every planned departure (hollow square) and arrival (solid
+ * square) hung from its exact time. Beneath the plot a load strip counts
+ * the movements per day, so congestion reads at a glance. The present
+ * moment is the one blue line. Movements whose date has passed without
+ * being recorded collect in an Overdue column to the left. Fourteen days
+ * on wide screens, seven on narrow ones.
  */
 export function Horizon({
   shipments,
   now,
   focusId,
   onFocus,
+  isLoading,
 }: {
+  isLoading: boolean;
   shipments: Shipment[];
   now: number | null;
   focusId: string | null;
@@ -69,6 +74,10 @@ export function Horizon({
 
     const overdue = events.filter((e) => e.at < now).sort((a, b) => a.at - b.at);
     const later = events.filter((e) => e.at >= end).length;
+    const inWindow = events.filter((e) => e.at >= now && e.at < end).sort((a, b) => a.at - b.at);
+
+    const load = Array.from({ length: days }, () => 0);
+    for (const e of inWindow) load[Math.floor((e.at - start) / DAY)]! += 1;
 
     // The overdue column sits beside the plot on wide screens, above it on narrow ones.
     const plotWidth = Math.max(1, width - (overdue.length > 0 && !narrow ? OVERDUE_PX : 0));
@@ -79,7 +88,7 @@ export function Horizon({
     const laneEnds: number[] = [];
     const placed: Placed[] = [];
     const folded = new Map<number, ScheduleEvent[]>();
-    for (const e of events.filter((e) => e.at >= now && e.at < end).sort((a, b) => a.at - b.at)) {
+    for (const e of inWindow) {
       const x = (e.at - start) / (end - start);
       const px = x * plotWidth;
       const flip = px + LABEL_PX > plotWidth;
@@ -108,6 +117,7 @@ export function Horizon({
       later,
       placed,
       folded,
+      load,
       plotWidth,
       columns,
       lanes: Math.max(2, laneEnds.length) + (folded.size > 0 ? 1 : 0),
@@ -122,30 +132,26 @@ export function Horizon({
 
   return (
     <div ref={ref} className="min-w-0">
-      {model == null ? (
-        <Skeleton className="h-28 w-full" />
+      {model == null || isLoading ? (
+        <Skeleton className="h-36 w-full" />
       ) : (
         <div className="flex flex-col gap-5 sm:flex-row sm:gap-0">
           {model.overdue.length > 0 ? <OverdueColumn events={model.overdue} now={now!} /> : null}
 
           <div className="relative min-w-0 flex-1">
             {/* Day scale */}
-            <div className="grid border-b border-foreground/20" style={cols}>
+            <div className="grid border-b border-rule-1" style={cols}>
               {model.columns.map((c, i) => {
                 const today = i === 0;
                 const monthTurn = c.date.getDate() === 1;
                 return (
                   <div
                     key={c.t}
-                    className={`min-w-0 pb-2 pl-1.5 ${i > 0 ? "border-l border-foreground/8" : ""} ${today ? "bg-primary/[0.09]" : ""}`}
+                    className={`min-w-0 pb-2 pl-1.5 ${i > 0 ? "border-l border-rule-3" : ""} ${today ? "bg-sunken" : ""}`}
                   >
                     <span
-                      className={`block text-[11px] ${today ? "relative z-[1] whitespace-nowrap" : "truncate"} ${
-                        today
-                          ? "font-medium text-primary-deep"
-                          : monthTurn
-                            ? "font-medium text-foreground"
-                            : "text-muted-foreground"
+                      className={`block text-[11px] ${today ? "whitespace-nowrap font-medium text-ink-1" : "truncate"} ${
+                        !today && monthTurn ? "font-medium text-ink-1" : !today ? "text-ink-3" : ""
                       }`}
                     >
                       {today
@@ -155,12 +161,8 @@ export function Horizon({
                           : c.date.toLocaleDateString("en-GB", { weekday: "short" })}
                     </span>
                     <span
-                      className={`block text-[17px] leading-tight tabular-nums ${
-                        today
-                          ? "font-semibold text-primary-deep"
-                          : c.weekend
-                            ? "text-foreground/45"
-                            : "text-foreground"
+                      className={`block text-[15px] leading-tight tabular-nums ${
+                        today ? "font-semibold text-ink-1" : c.weekend ? "text-ink-3" : "text-ink-1"
                       }`}
                     >
                       {c.date.getDate()}
@@ -170,25 +172,23 @@ export function Horizon({
               })}
             </div>
 
-            {/* Body */}
+            {/* Plot */}
             <div className="relative" style={{ height: bodyHeight }}>
               <div aria-hidden className="absolute inset-0 grid" style={cols}>
                 {model.columns.map((c, i) => (
                   <div
                     key={c.t}
-                    className={`${i > 0 ? "border-l border-foreground/8" : ""} ${
-                      i === 0 ? "bg-primary/[0.09]" : c.weekend ? "bg-foreground/[0.018]" : ""
-                    }`}
+                    className={`${i > 0 ? "border-l border-rule-3" : ""} ${i === 0 ? "bg-sunken" : ""}`}
                   />
                 ))}
               </div>
 
               <span
                 aria-hidden
-                className="absolute -top-px bottom-0 w-px bg-primary"
+                className="absolute -top-px bottom-0 w-px bg-signal"
                 style={{ left: `${model.nowX * 100}%` }}
               >
-                <span className="absolute -left-[3px] -top-[3px] size-[7px] rounded-full bg-primary" />
+                <span className="absolute -left-[2px] -top-[2px] size-[5px] bg-signal" />
               </span>
 
               {[...model.folded.entries()].map(([day, list]) => (
@@ -204,7 +204,7 @@ export function Horizon({
               ))}
 
               {model.placed.length === 0 ? (
-                <p className="absolute left-4 right-2 top-1/2 -translate-y-1/2 bg-background px-2 py-1 text-sm text-muted-foreground sm:right-auto">
+                <p className="absolute left-4 right-2 top-1/2 -translate-y-1/2 bg-paper px-2 py-1 text-[13px] text-ink-3 sm:right-auto">
                   Nothing departs or arrives in the next {days} days.
                 </p>
               ) : (
@@ -221,18 +221,55 @@ export function Horizon({
               )}
             </div>
 
-            <div className="mt-2.5 flex flex-wrap items-center justify-between gap-x-6 gap-y-1 text-xs text-muted-foreground">
-              <span className="flex items-center gap-4">
+            {/* Load: movements per day */}
+            <div
+              className="grid border-t border-rule-2"
+              style={cols}
+              aria-label="Movements per day"
+            >
+              {model.load.map((n, i) => (
+                <div
+                  key={i}
+                  className={`flex h-6 min-w-0 items-center gap-[2px] pl-1.5 ${i > 0 ? "border-l border-rule-3" : ""} ${
+                    i === 0 ? "bg-sunken" : ""
+                  }`}
+                  title={`${n} movement${n === 1 ? "" : "s"}`}
+                >
+                  {n > 0 ? (
+                    <>
+                      {Array.from({ length: Math.min(n, LOAD_CELLS) }).map((_, k) => (
+                        <span key={k} aria-hidden className="size-[4px] shrink-0 bg-ink-3" />
+                      ))}
+                      {n > LOAD_CELLS ? (
+                        <span className="telemetry ml-0.5 text-[10px] text-ink-2">{n}</span>
+                      ) : null}
+                      <span className="sr-only">{n}</span>
+                    </>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-2.5 flex flex-wrap items-center justify-between gap-x-6 gap-y-1 text-[12px] text-ink-3">
+              <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
                 <span className="inline-flex items-center gap-1.5">
-                  <span
-                    aria-hidden
-                    className="size-[7px] rounded-full border-[1.5px] border-foreground/70"
-                  />
+                  <Mark filled={false} size={7} />
                   Departure
                 </span>
                 <span className="inline-flex items-center gap-1.5">
-                  <span aria-hidden className="size-[7px] rounded-full bg-foreground/80" />
+                  <Mark filled size={7} />
                   Arrival
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span aria-hidden className="h-2.5 w-px bg-signal" />
+                  Now
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span aria-hidden className="inline-flex gap-[2px]">
+                    <span className="size-[4px] bg-ink-3" />
+                    <span className="size-[4px] bg-ink-3" />
+                  </span>
+                  Movements per day
                 </span>
               </span>
               {model.later > 0 ? (
@@ -266,18 +303,10 @@ function Flag({
   const verb = kind === "arrival" ? "Arrives" : "Departs";
   const iso = new Date(at).toISOString();
   const port = kind === "arrival" ? shipment.destination : shipment.origin;
-  const markTone =
-    kind === "arrival"
-      ? focused
-        ? "bg-primary-deep"
-        : "bg-foreground group-hover/flag:bg-primary-deep"
-      : focused
-        ? "border-[1.5px] border-primary-deep bg-background"
-        : "border-[1.5px] border-foreground bg-background group-hover/flag:border-primary-deep";
 
   return (
     <div
-      className={`group/flag absolute inset-y-0 transition-opacity duration-200 focus-within:z-10 hover:z-10 ${
+      className={`group/flag absolute inset-y-0 transition-opacity duration-150 focus-within:z-10 hover:z-10 ${
         dimmed ? "opacity-30" : ""
       }`}
       style={{ left: `${x * 100}%` }}
@@ -285,18 +314,12 @@ function Flag({
       {/* Sounding line from the day scale down to the mark */}
       <span
         aria-hidden
-        className={`absolute left-0 top-0 w-px ${
-          focused ? "bg-primary-deep" : "bg-foreground/25 group-hover/flag:bg-primary-deep"
-        }`}
-        style={{ height: top + 6 }}
+        className={`absolute left-0 top-0 w-px ${focused ? "bg-signal" : "bg-rule-1 group-hover/flag:bg-signal"}`}
+        style={{ height: top + 7 }}
       />
-      <span
-        aria-hidden
-        className={`absolute -left-[4px] size-[9px] rounded-full transition-transform duration-200 ease-[var(--ease-premium)] group-hover/flag:scale-125 ${markTone} ${
-          focused ? "scale-125" : ""
-        }`}
-        style={{ top: top + 6 }}
-      />
+      <span aria-hidden className="absolute -left-[3.5px]" style={{ top: top + 7 }}>
+        <Mark filled={kind === "arrival"} tone={focused ? "signal" : "ink"} size={7} />
+      </span>
       <Link
         to="/shipments/$id"
         params={{ id: shipment.id }}
@@ -305,46 +328,44 @@ function Flag({
         onFocus={() => onFocus(shipment.id)}
         onBlur={() => onFocus(null)}
         aria-label={`${shipment.client_name}, ${shortId(shipment.id)}. ${verb} ${port} ${formatEta(iso)}.`}
-        className={`focus-ring absolute flex h-[22px] max-w-[156px] items-center gap-1.5 whitespace-nowrap rounded-[2px] px-1.5 text-[12.5px] ${
+        className={`focus-ring absolute flex h-[20px] max-w-[156px] items-center gap-1.5 whitespace-nowrap rounded-[1px] px-1.5 text-[12.5px] ${
           flip ? "right-2 flex-row-reverse" : "left-2"
         }`}
-        style={{ top: top }}
+        style={{ top: top + 1 }}
       >
         <span
-          className={`truncate font-medium ${
-            focused ? "text-primary-deep" : "text-foreground group-hover/flag:text-primary-deep"
-          }`}
+          className={`truncate ${focused ? "text-signal" : "text-ink-1 group-hover/flag:text-signal"}`}
         >
           {shipment.client_name}
         </span>
-        <span className="instrument shrink-0 text-[10.5px] text-muted-foreground">
+        <span className="telemetry shrink-0 text-[10.5px] text-ink-3">
           {kind === "arrival" ? "ETA" : "ETD"}
         </span>
       </Link>
 
       <div
         role="presentation"
-        className={`panel-lifted pointer-events-none invisible absolute z-20 w-[248px] max-w-[80vw] rounded-[4px] px-3.5 py-3 opacity-0 transition-opacity duration-150 group-focus-within/flag:visible group-focus-within/flag:opacity-100 group-hover/flag:visible group-hover/flag:opacity-100 ${
+        className={`pointer-events-none invisible absolute z-20 w-[248px] max-w-[80vw] border border-rule-1 bg-paper px-3.5 py-3 opacity-0 group-focus-within/flag:visible group-focus-within/flag:opacity-100 group-hover/flag:visible group-hover/flag:opacity-100 ${
           tipFlip ? "right-0" : "-left-3"
         }`}
-        style={{ top: top + 28 }}
+        style={{ top: top + 26 }}
       >
         <p className="flex items-baseline justify-between gap-3">
-          <span className="truncate text-sm font-semibold text-foreground">
+          <span className="truncate text-[13px] font-medium text-ink-1">
             {verb} {port}
           </span>
-          <span className="instrument shrink-0 text-[11px] text-muted-foreground">
+          <span className="telemetry shrink-0 text-[11px] text-ink-3">
             {tCount(iso, now).label}
           </span>
         </p>
-        <p className="mt-0.5 text-xs text-muted-foreground">{formatEta(iso)}</p>
-        <p className="mt-2.5 border-t border-foreground/10 pt-2.5 text-[13px] font-medium text-foreground">
+        <p className="mt-0.5 text-[12px] text-ink-3">{formatEta(iso)}</p>
+        <p className="mt-2.5 border-t border-rule-2 pt-2.5 text-[13px] text-ink-1">
           {shipment.client_name}
         </p>
-        <p className="truncate text-xs text-muted-foreground">
+        <p className="truncate text-[12px] text-ink-3">
           {shipment.origin} to {shipment.destination}
         </p>
-        <p className="instrument mt-1 truncate text-[11px] text-muted-foreground">
+        <p className="telemetry mt-1 truncate text-[11px] text-ink-3">
           {shortId(shipment.id)}
           {shipment.vessel_name ? `  ${shipment.vessel_name}` : ""}
         </p>
@@ -363,12 +384,12 @@ function FoldedDay({
   now,
   plotWidth,
 }: {
-  plotWidth: number;
   list: ScheduleEvent[];
   day: number;
   days: number;
   top: number;
   now: number;
+  plotWidth: number;
 }) {
   const nearEnd = (day / days) * plotWidth + 240 > plotWidth;
   return (
@@ -379,13 +400,13 @@ function FoldedDay({
       <button
         type="button"
         aria-label={`${list.length} more on this day: ${list.map((e) => e.shipment.client_name).join(", ")}`}
-        className="focus-ring ml-1 h-[22px] rounded-[2px] px-1.5 text-[12px] font-medium text-primary-deep hover:bg-primary/10"
+        className="focus-ring telemetry ml-1 h-[20px] rounded-[1px] px-1.5 text-[11px] text-ink-2 hover:bg-wash hover:text-signal"
       >
         +{list.length}
       </button>
       <div
         role="presentation"
-        className={`panel-lifted pointer-events-none invisible absolute top-7 z-20 w-[232px] max-w-[80vw] rounded-[4px] px-3.5 py-2.5 opacity-0 transition-opacity duration-150 group-focus-within/fold:visible group-focus-within/fold:opacity-100 group-hover/fold:visible group-hover/fold:opacity-100 ${
+        className={`pointer-events-none invisible absolute top-6 z-20 w-[232px] max-w-[80vw] border border-rule-1 bg-paper px-3.5 py-2.5 opacity-0 group-focus-within/fold:visible group-focus-within/fold:opacity-100 group-hover/fold:visible group-hover/fold:opacity-100 ${
           nearEnd ? "right-0" : "left-0"
         }`}
       >
@@ -395,9 +416,11 @@ function FoldedDay({
               key={`${e.shipment.id}-${e.kind}`}
               className="flex items-baseline justify-between gap-3 text-[12.5px]"
             >
-              <span className="truncate font-medium text-foreground">{e.shipment.client_name}</span>
-              <span className="instrument shrink-0 text-[10.5px] text-muted-foreground">
-                {e.kind === "arrival" ? "ETA" : "ETD"}{" "}
+              <span className="flex min-w-0 items-center gap-2">
+                <Mark filled={e.kind === "arrival"} size={6} />
+                <span className="truncate text-ink-1">{e.shipment.client_name}</span>
+              </span>
+              <span className="telemetry shrink-0 text-[10.5px] text-ink-3">
                 {tCount(new Date(e.at).toISOString(), now).label}
               </span>
             </li>
@@ -411,24 +434,24 @@ function FoldedDay({
 function OverdueColumn({ events, now }: { events: ScheduleEvent[]; now: number }) {
   const shown = events.slice(0, 4);
   return (
-    <div className="shrink-0 sm:w-[168px] sm:border-r sm:border-foreground/15 sm:pr-5">
+    <div className="shrink-0 sm:w-[168px] sm:border-r sm:border-rule-1 sm:pr-5">
       {/* Header height matches the day scale so both rules line up */}
-      <p className="flex h-[48px] items-end border-b border-risk/50 pb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-risk">
+      <p className="flex h-[44px] items-end border-b border-rule-1 pb-2 text-[12px] font-medium text-alert">
         Overdue
       </p>
-      <ul className="mt-3 space-y-2.5">
+      <ul className="mt-2.5 space-y-2">
         {shown.map((e) => (
           <li key={`${e.shipment.id}-${e.kind}`}>
             <Link
               to="/shipments/$id"
               params={{ id: e.shipment.id }}
-              className="focus-ring group flex items-baseline justify-between gap-2 rounded-[2px] text-[12.5px]"
+              className="focus-ring group flex items-baseline justify-between gap-2 rounded-[1px] text-[12.5px]"
               title={`${e.kind === "arrival" ? "Arrival" : "Departure"} was due ${formatEta(new Date(e.at).toISOString())}`}
             >
-              <span className="truncate font-medium text-foreground group-hover:text-risk">
+              <span className="truncate text-ink-1 group-hover:text-signal">
                 {e.shipment.client_name}
               </span>
-              <span className="instrument shrink-0 text-[10.5px] text-risk">
+              <span className="telemetry shrink-0 text-[10.5px] text-alert">
                 {e.kind === "arrival" ? "ETA" : "ETD"}{" "}
                 {tCount(new Date(e.at).toISOString(), now).label}
               </span>
@@ -437,7 +460,7 @@ function OverdueColumn({ events, now }: { events: ScheduleEvent[]; now: number }
         ))}
       </ul>
       {events.length > shown.length ? (
-        <p className="mt-2 text-xs text-muted-foreground">{events.length - shown.length} more</p>
+        <p className="mt-2 text-[12px] text-ink-3">{events.length - shown.length} more</p>
       ) : null}
     </div>
   );
