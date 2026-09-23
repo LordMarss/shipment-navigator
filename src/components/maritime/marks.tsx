@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { tCount, type ConditionLevel, type TargetState } from "@/components/dashboard/format";
+import { tCount, type ConditionLevel, type TargetState } from "@/components/maritime/format";
 
 /*
  * WhiteWind's maritime marks. A small, fixed vocabulary used the same way

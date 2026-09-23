@@ -62,7 +62,7 @@ export function AppShell({
   children,
   wide = false,
   bare = false,
-  chrome = "default",
+  chrome = "bridge",
 }: {
   /** Usually plain text; a page needing a richer header (e.g. an inline back
    *  button) may pass a small ReactNode instead. */
@@ -80,8 +80,8 @@ export function AppShell({
   /** The page draws its own header and layout on an open canvas (the
    * dashboard): no atmosphere band, no width cap, no main padding. */
   bare?: boolean;
-  /** "bridge" renders the sidebar and top bar as the navy bridge console
-   * (dashboard only for now; every other route keeps the default). */
+  /** "bridge" (default) renders the sidebar, top bar and page header as
+   * the navy bridge console; "default" keeps the light chrome. */
   chrome?: "default" | "bridge";
 }) {
   const [mobileNav, setMobileNav] = useState(false);
@@ -105,26 +105,35 @@ export function AppShell({
           </main>
         ) : (
           <>
-            {/* The atmosphere: the deliberate pale-blue step between the dark
-             * deck (sidebar) and the white chart below — page identity and,
-             * where it matters, the live operational summary. */}
-            <div className="atmosphere atmosphere-grid border-b border-border">
-              <div className={`mx-auto w-full px-6 pb-7 pt-7 sm:px-8 lg:px-10 ${maxW}`}>
+            {/* The bridge band: page identity and, where a page has one, its
+             * live summary, set on the navy console continuous with the
+             * navigation. Tokens inside re-point to console values, so
+             * headerExtra content restyles without per-page changes. */}
+            <div
+              className="atmosphere border-b border-border"
+              {...(chrome === "bridge" ? { "data-chrome-surface": "" } : {})}
+            >
+              <div className={`mx-auto w-full px-5 pb-6 pt-6 sm:px-8 lg:px-10 ${maxW}`}>
                 <div className="flex flex-wrap items-end justify-between gap-4">
                   <div className="min-w-0">
                     {eyebrow ? <p className="label-xs mb-2">{eyebrow}</p> : null}
-                    <h1 className="text-3xl font-semibold text-foreground">{title}</h1>
-                    {description ? <p className="mt-1.5 text-sm text-muted-foreground">{description}</p> : null}
+                    <h1 className="text-[26px] font-medium leading-tight tracking-[-0.015em] text-foreground">
+                      {title}
+                    </h1>
+                    {description ? <p className="mt-1.5 text-[13.5px] text-muted-foreground">{description}</p> : null}
                   </div>
                   {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
                 </div>
-                {headerExtra ? <div className="mt-7">{headerExtra}</div> : null}
+                {headerExtra ? <div className="mt-6">{headerExtra}</div> : null}
               </div>
             </div>
 
-            <main className={`mx-auto w-full px-6 py-8 sm:px-8 lg:px-10 ${maxW}`}>
-              <div className="animate-in">{children}</div>
-            </main>
+            {/* The chart table: the working surface for every page. */}
+            <div className={chrome === "bridge" ? "chart-paper min-h-[calc(100dvh-3.5rem)]" : ""}>
+              <main className={`mx-auto w-full px-5 py-7 sm:px-8 lg:px-10 ${maxW}`}>
+                <div className="animate-in">{children}</div>
+              </main>
+            </div>
           </>
         )}
       </div>

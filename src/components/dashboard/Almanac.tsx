@@ -2,8 +2,8 @@ import { Link } from "@tanstack/react-router";
 import { useMemo, type ReactNode } from "react";
 
 import { formatEta, type Shipment } from "@/lib/api";
-import { clock, monthName, tCount, weekday } from "@/components/dashboard/format";
-import { ChartPanel, Skeleton } from "@/components/dashboard/marks";
+import { clock, monthName, tCount, weekday } from "@/components/maritime/format";
+import { ChartPanel, Skeleton } from "@/components/maritime/marks";
 
 const DAY = 86_400_000;
 const WINDOW_DAYS = 14;

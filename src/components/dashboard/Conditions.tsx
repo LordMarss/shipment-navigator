@@ -2,8 +2,8 @@ import { Link } from "@tanstack/react-router";
 
 import { shortId, type Shipment } from "@/lib/api";
 import type { Health, HealthLevel } from "@/lib/lifecycle";
-import { ChartPanel, ConditionMark, Skeleton } from "@/components/dashboard/marks";
-import { conditionOf } from "@/components/dashboard/format";
+import { ChartPanel, ConditionMark, Skeleton } from "@/components/maritime/marks";
+import { conditionOf } from "@/components/maritime/format";
 
 export type ConditionItem = { shipment: Shipment; health: Health; alertCount: number };
 

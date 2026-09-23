@@ -3,8 +3,8 @@ import { Fragment, type ReactNode } from "react";
 
 import type { Alert, Shipment, ShipmentEvent } from "@/lib/api";
 import { alertSeverity, type Severity } from "@/lib/lifecycle";
-import { clock, monthName, weekday } from "@/components/dashboard/format";
-import { ChartPanel, ConditionMark, Skeleton } from "@/components/dashboard/marks";
+import { clock, monthName, weekday } from "@/components/maritime/format";
+import { ChartPanel, ConditionMark, Skeleton } from "@/components/maritime/marks";
 
 type Entry = {
   key: string;

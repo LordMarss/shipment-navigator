@@ -43,7 +43,7 @@
 
 @theme inline {
   --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: "Martian Mono", ui-monospace, "SF Mono", "Menlo", monospace;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", "Menlo", monospace;
 
   /* Type scale — deliberately small set of steps, each with its own
    * paired line-height and tracking, used directly as text-xs…text-3xl
@@ -76,10 +76,10 @@
 
   /* Radius — precise and engineered, not soft. Controls are tighter than
    * containers; the ratio is what makes curvature read as intentional. */
-  --radius-sm: 3px;
-  --radius-md: 5px;
-  --radius-lg: 8px;
-  --radius-xl: 8px;
+  --radius-sm: 2px;
+  --radius-md: 2px;
+  --radius-lg: 3px;
+  --radius-xl: 3px;
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -160,16 +160,16 @@
 
 :root {
   /* Container radius — used directly by `.panel` / `.panel-lifted`. */
-  --radius: 8px;
+  --radius: 3px;
 
   /* White paper canvas — brighter than the previous warm tan tone now
    * that dark no longer dominates the top of the screen. */
-  --background: oklch(0.978 0.005 71);
+  --background: var(--sea-paper);
   /* True ink — a neutral near-black, so text never competes with the
    * accent for attention. */
-  --foreground: oklch(0.185 0.004 78);
-  --surface: oklch(0.996 0.002 71);
-  --subtle: oklch(0.951 0.007 71);
+  --foreground: var(--sea-ink);
+  --surface: oklch(0.985 0.005 92);
+  --subtle: var(--sea-paper-2);
   --card: var(--surface);
   --card-foreground: var(--foreground);
   --popover: var(--surface);
@@ -180,38 +180,38 @@
    * emphasis that stays a genuine blue rather than sliding to near-black
    * navy; a pale wash reserved for the atmosphere band and hover/selected
    * states, so those two things are visibly the same idea everywhere. */
-  --primary: oklch(0.6 0.105 231);
-  --primary-hover: oklch(0.525 0.11 230);
-  --primary-foreground: oklch(0.99 0.002 231);
-  --primary-deep: oklch(0.42 0.115 228);
+  --primary: var(--sea-move);
+  --primary-hover: oklch(0.44 0.1 242);
+  --primary-foreground: oklch(0.985 0.004 92);
+  --primary-deep: oklch(0.36 0.08 248);
 
-  --atmosphere: oklch(0.964 0.017 231);
-  --atmosphere-hover: oklch(0.932 0.028 231);
+  --atmosphere: var(--sea-shallows);
+  --atmosphere-hover: var(--sea-shallows-2);
 
-  --secondary: oklch(0.951 0.007 71);
+  --secondary: var(--sea-paper-2);
   --secondary-foreground: var(--foreground);
-  --muted: oklch(0.951 0.007 71);
-  --muted-foreground: oklch(0.475 0.008 78);
-  --accent: oklch(0.951 0.007 71);
+  --muted: var(--sea-paper-2);
+  --muted-foreground: var(--sea-ink-3);
+  --accent: var(--sea-paper-2);
   --accent-foreground: var(--foreground);
 
   /* One true red — also used for destructive actions, no duplicate hue. */
-  --risk: oklch(0.515 0.16 26);
-  --risk-soft: oklch(0.945 0.026 26);
+  --risk: var(--sea-red);
+  --risk-soft: oklch(0.95 0.025 28);
   --destructive: var(--risk);
-  --destructive-foreground: oklch(0.99 0.002 78);
+  --destructive-foreground: oklch(0.985 0.004 92);
 
-  --border: oklch(0.88 0.008 71);
-  --input: oklch(0.88 0.008 71);
+  --border: var(--sea-rule);
+  --input: var(--sea-rule);
   --ring: var(--primary);
 
   /* Green — kept well clear of cyan so it never reads as teal next to
    * the blue accent. */
-  --positive: oklch(0.5 0.095 142);
-  --positive-soft: oklch(0.945 0.024 142);
+  --positive: var(--sea-green);
+  --positive-soft: oklch(0.95 0.02 168);
   /* Amber — brass-lamp warmth, slightly desaturated to stay calm. */
-  --warning: oklch(0.63 0.098 70);
-  --warning-soft: oklch(0.945 0.026 70);
+  --warning: oklch(0.63 0.13 68);
+  --warning-soft: oklch(0.955 0.03 80);
 
   --tint-selected: var(--atmosphere-hover);
 
@@ -236,13 +236,13 @@
    * and `--nav-active-foreground` do double duty as the sidebar's solid
    * active-item pill — a real, saturated colour block that reads
    * intentionally regardless of what surface sits behind it. */
-  --nav: oklch(0.148 0.024 231);
-  --nav-foreground: oklch(0.97 0.004 231);
-  --nav-muted-foreground: oklch(0.735 0.02 231);
-  --nav-active: oklch(0.25 0.05 231);
-  --nav-active-foreground: oklch(0.985 0.003 231);
-  --nav-accent: oklch(0.78 0.09 231);
-  --nav-border: oklch(0.228 0.03 231);
+  --nav: var(--sea-console);
+  --nav-foreground: var(--sea-console-ink);
+  --nav-muted-foreground: var(--sea-console-ink-2);
+  --nav-active: oklch(0.32 0.05 248);
+  --nav-active-foreground: oklch(0.98 0.004 240);
+  --nav-accent: var(--sea-move-bright);
+  --nav-border: var(--sea-console-line);
 
   /*
    * WhiteWind maritime palette. Built from a nautical chart and a ship's
@@ -433,9 +433,10 @@
 }
 
 @utility label-xs {
-  font-size: 11px;
+  font-family: var(--font-chart);
+  font-size: 10.5px;
   font-weight: 500;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
   color: var(--color-muted-foreground);
 }
@@ -594,19 +595,22 @@
 }
 
 [data-chrome="bridge"] [data-chrome-surface] :is(.panel-lifted, [data-chrome-reset]) {
-  --color-foreground: oklch(0.185 0.004 78);
-  --color-muted-foreground: oklch(0.475 0.008 78);
-  --color-border: oklch(0.88 0.008 71);
-  --color-surface: oklch(0.996 0.002 71);
-  --color-ring: oklch(0.6 0.105 231);
-  --foreground: oklch(0.185 0.004 78);
-  --muted-foreground: oklch(0.475 0.008 78);
-  --border: oklch(0.88 0.008 71);
-  --input: oklch(0.88 0.008 71);
-  --surface: oklch(0.996 0.002 71);
-  --subtle: oklch(0.951 0.007 71);
-  --primary: oklch(0.6 0.105 231);
-  --primary-foreground: oklch(0.99 0.002 231);
-  --risk: oklch(0.515 0.16 26);
-  --ring: oklch(0.6 0.105 231);
+  /* Text colour is inherited as a computed value from the console, so
+   * resetting the variables alone is not enough: set the ink directly. */
+  color: var(--sea-ink);
+  --color-foreground: var(--sea-ink);
+  --color-muted-foreground: var(--sea-ink-3);
+  --color-border: var(--sea-rule);
+  --color-surface: oklch(0.985 0.005 92);
+  --color-ring: var(--sea-move);
+  --foreground: var(--sea-ink);
+  --muted-foreground: var(--sea-ink-3);
+  --border: var(--sea-rule);
+  --input: var(--sea-rule);
+  --surface: oklch(0.985 0.005 92);
+  --subtle: var(--sea-paper-2);
+  --primary: var(--sea-move);
+  --primary-foreground: oklch(0.985 0.004 92);
+  --risk: var(--sea-red);
+  --ring: var(--sea-move);
 }

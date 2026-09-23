@@ -8,8 +8,8 @@ import { Almanac } from "@/components/dashboard/Almanac";
 import { BridgeStrip, type BridgeFacts } from "@/components/dashboard/BridgeStrip";
 import { Conditions, type ConditionItem } from "@/components/dashboard/Conditions";
 import { DeckLog } from "@/components/dashboard/DeckLog";
-import { useNow } from "@/components/dashboard/useNow";
-import { VoyageBoard, type Lens } from "@/components/dashboard/VoyageBoard";
+import { useNow } from "@/components/maritime/useNow";
+import { VoyageBoard, type Lens } from "@/components/maritime/VoyageBoard";
 import { useMonitoringConfig } from "@/hooks/useMonitoringConfig";
 import {
   listAllDocuments,

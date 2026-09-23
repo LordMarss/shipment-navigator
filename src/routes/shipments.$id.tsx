@@ -1,14 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import {
-  ArrowLeft,
-  ArrowRight,
-  ChevronRight,
-  MoreHorizontal,
-  RotateCcw,
-  Ship,
-} from "lucide-react";
+import { ArrowLeft, ArrowRight, ChevronRight, MoreHorizontal, RotateCcw, Ship } from "lucide-react";
 import { toast } from "sonner";
 
 import { AppShell, btnGhost, btnPrimary, fieldClass } from "@/components/AppShell";
@@ -17,8 +10,18 @@ import { PortAutocomplete } from "@/components/PortAutocomplete";
 import { ShipmentNotes } from "@/components/ShipmentNotes";
 import { ShipmentTimeline } from "@/components/ShipmentTimeline";
 import { StatusHistory } from "@/components/StatusHistory";
-import { SeverityBadge, StatusPill, VesselConditionBadge, statusAccent, type StatusAccent } from "@/components/StatusPill";
+import {
+  SeverityBadge,
+  StatusPill,
+  VesselConditionBadge,
+  statusAccent,
+  type StatusAccent,
+} from "@/components/StatusPill";
 import { useMonitoringConfig } from "@/hooks/useMonitoringConfig";
+import { conditionOf } from "@/components/maritime/format";
+import { ConditionMark } from "@/components/maritime/marks";
+import { useNow } from "@/components/maritime/useNow";
+import { VoyagePlot } from "@/components/maritime/VoyagePlot";
 import {
   ACTIVE_STATUSES,
   advanceStatus,
@@ -159,6 +162,7 @@ function ShipmentDetail() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const config = useMonitoringConfig();
+  const now = useNow();
   const [tab, setTab] = useState<TabKey>("overview");
 
   const { data: shipment, isLoading } = useQuery({
@@ -282,7 +286,11 @@ function ShipmentDetail() {
   const override = useMutation({
     mutationFn: async () => {
       if (!shipment) return;
-      await saveShipmentDetails(shipment, { status: overrideStatus }, overrideReason.trim() || null);
+      await saveShipmentDetails(
+        shipment,
+        { status: overrideStatus },
+        overrideReason.trim() || null,
+      );
     },
     onSuccess: () => {
       refresh();
@@ -360,7 +368,6 @@ function ShipmentDetail() {
   const lastStatusChange = statusEvents[0]?.occurred_at ?? shipment.updated_at;
   const statusDot = ACCENT_DOT[statusAccent(shipment.status)];
   const showHealth = health.level !== "On Track" && health.level !== "Delivered";
-  const healthDot = health.level === "Attention" ? "bg-warning" : "bg-risk";
 
   const openOverride = () => {
     setOverrideStatus((next ?? shipment.status) as ActiveShipmentStatus);
@@ -398,7 +405,7 @@ function ShipmentDetail() {
               label="Status"
               value={
                 <span className="inline-flex items-center gap-2">
-                  <span aria-hidden className={`size-2 shrink-0 rounded-full ${statusDot}`} />
+                  <span aria-hidden className={`size-2 shrink-0 ${statusDot}`} />
                   {shipment.status}
                 </span>
               }
@@ -407,8 +414,12 @@ function ShipmentDetail() {
               <HeaderStat
                 label="Health"
                 value={
-                  <span className={`inline-flex items-center gap-2 ${health.level === "Attention" ? "text-warning" : "text-risk"}`}>
-                    <span aria-hidden className={`size-2 shrink-0 rounded-full ${healthDot}`} />
+                  <span
+                    className={`inline-flex items-center gap-2 ${health.level === "Attention" ? "text-warning" : "text-risk"}`}
+                  >
+                    {conditionOf(health.level) ? (
+                      <ConditionMark level={conditionOf(health.level)!} size={10} />
+                    ) : null}
                     {health.level}
                   </span>
                 }
@@ -422,7 +433,9 @@ function ShipmentDetail() {
                   {etaDrift && etaDrift.hours !== 0 ? (
                     <span
                       className={`instrument rounded px-1.5 py-0.5 text-xs font-semibold ${
-                        etaDrift.tone === "late" ? "bg-warning-soft text-warning" : "bg-positive-soft text-positive"
+                        etaDrift.tone === "late"
+                          ? "bg-warning-soft text-warning"
+                          : "bg-positive-soft text-positive"
                       }`}
                     >
                       {etaDrift.tone === "late" ? "+" : "−"}
@@ -438,8 +451,6 @@ function ShipmentDetail() {
             <HeaderStat label="Updated" value={relativeTime(lastStatusChange)} />
           </div>
 
-          <RouteBar origin={shipment.origin} destination={shipment.destination} progress={routeProgress} />
-
           {showHealth ? <p className="text-xs text-muted-foreground">{health.reason}</p> : null}
 
           {shipmentAlerts.length > 0 ? (
@@ -448,9 +459,10 @@ function ShipmentDetail() {
               onClick={() => setTab("alerts")}
               className="flex items-center gap-2 border-t border-border pt-5 text-left text-sm"
             >
-              <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-risk" />
+              <span aria-hidden className="size-1.5 shrink-0 bg-risk" />
               <span className="font-medium text-foreground">
-                {shipmentAlerts.length} alert{shipmentAlerts.length === 1 ? "" : "s"} on this shipment
+                {shipmentAlerts.length} alert{shipmentAlerts.length === 1 ? "" : "s"} on this
+                shipment
               </span>
               <span className="text-xs font-medium text-primary">Review →</span>
             </button>
@@ -458,7 +470,17 @@ function ShipmentDetail() {
         </div>
       }
     >
-      <div className="-mt-3 mb-6 flex gap-1 border-b border-border">
+      <div className="mb-7">
+        <VoyagePlot
+          shipment={shipment}
+          position={position ?? null}
+          condition={position ? vesselCondition.kind : null}
+          measured={routeProgress}
+          now={now}
+        />
+      </div>
+
+      <div className="mb-6 flex gap-1 overflow-x-auto border-b border-border">
         {TABS.map((t) => (
           <button
             key={t.key}
@@ -480,12 +502,18 @@ function ShipmentDetail() {
         <div className="flex flex-col gap-9">
           <section>
             <h2 className="label-xs mb-4">Lifecycle</h2>
-            <LifecycleJourney status={shipment.status} legacyTerminal={legacyTerminal} currentIndex={currentIndex} />
+            <LifecycleJourney
+              status={shipment.status}
+              legacyTerminal={legacyTerminal}
+              currentIndex={currentIndex}
+            />
             <div className="mt-5 flex flex-col gap-1 border-t border-border pt-4 text-xs text-muted-foreground sm:flex-row sm:gap-6">
               <p>Monitoring: {monitoring.reason}</p>
               <p>
                 Automation:{" "}
-                {decision.status === shipment.status ? "no pending change" : `will move to ${decision.status}`}
+                {decision.status === shipment.status
+                  ? "no pending change"
+                  : `will move to ${decision.status}`}
                 {" · "}
                 {decision.reason}
               </p>
@@ -507,178 +535,193 @@ function ShipmentDetail() {
            * needs almost no effort to read. Notes, history and editing are
            * all secondary to this, and are composed that way below. */}
           <section className="panel p-5">
-              <div className="flex items-center justify-between">
-                <h2 className="label-xs">Vessel &amp; Live Position</h2>
-                {shipment.vessel_mmsi ? (
-                  <Link
-                    to="/map"
-                    className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-primary hover:underline"
-                  >
-                    View on map <ArrowRight className="size-3.5" />
-                  </Link>
-                ) : null}
-              </div>
+            <div className="flex items-center justify-between">
+              <h2 className="label-xs">Vessel &amp; Live Position</h2>
+              {shipment.vessel_mmsi ? (
+                <Link
+                  to="/map"
+                  className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-primary hover:underline"
+                >
+                  View on map <ArrowRight className="size-3.5" />
+                </Link>
+              ) : null}
+            </div>
 
-              {shipment.vessel_name || shipment.vessel_mmsi ? (
-                <div className="mt-3 flex items-center gap-3">
-                  <span className="flex size-11 shrink-0 items-center justify-center rounded-md border border-border bg-subtle text-muted-foreground">
-                    <Ship className="size-5" />
-                  </span>
-                  <div className="min-w-0">
-                    <p className="truncate text-base font-semibold text-foreground">
-                      {shipment.vessel_name ?? "Unnamed vessel"}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {shipment.carrier ? `${shipment.carrier} · ` : ""}
-                      MMSI <span className="instrument">{shipment.vessel_mmsi ?? "—"}</span>
-                      {conditionLabel ? " · " : ""}
-                      {conditionLabel ? (
-                        <VesselConditionBadge condition={vesselCondition} label={conditionLabel} />
-                      ) : null}
-                    </p>
+            {shipment.vessel_name || shipment.vessel_mmsi ? (
+              <div className="mt-3 flex items-center gap-3">
+                <span className="flex size-11 shrink-0 items-center justify-center rounded-md border border-border bg-subtle text-muted-foreground">
+                  <Ship className="size-5" />
+                </span>
+                <div className="min-w-0">
+                  <p className="truncate text-base font-semibold text-foreground">
+                    {shipment.vessel_name ?? "Unnamed vessel"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {shipment.carrier ? `${shipment.carrier} · ` : ""}
+                    MMSI <span className="instrument">{shipment.vessel_mmsi ?? "Not set"}</span>
+                    {conditionLabel ? " · " : ""}
+                    {conditionLabel ? (
+                      <VesselConditionBadge condition={vesselCondition} label={conditionLabel} />
+                    ) : null}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <p className="mt-3 text-xs text-muted-foreground">
+                No vessel assigned to this shipment yet.
+              </p>
+            )}
+
+            {shipment.vessel_mmsi ? (
+              position ? (
+                <div className="console mt-4 p-5">
+                  <div className="flex items-center justify-between">
+                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.07em] text-nav-foreground">
+                      <span
+                        className={`relative inline-block size-1.5 rounded-full ${hasFreshAis ? "ping-live bg-nav-accent text-nav-accent" : "bg-nav-muted-foreground"}`}
+                        aria-hidden
+                      />
+                      {hasFreshAis ? "Live Position" : "Last Known Position"}
+                    </span>
+                    <span className="instrument text-xs text-nav-muted-foreground">
+                      {relativeTime(position.position_timestamp ?? position.updated_at)}
+                    </span>
+                  </div>
+                  <div className="mt-5 flex items-center gap-5">
+                    <CompassRose cog={position.cog} />
+                    <div className="grid flex-1 grid-cols-2 gap-4 sm:grid-cols-3">
+                      <ConsoleSpeed sog={position.sog} />
+                      <ConsoleField
+                        label="COG"
+                        value={position.cog != null ? `${position.cog}°` : "No COG"}
+                      />
+                      <ConsoleField
+                        label="Nav Status"
+                        value={navStatusLabel(position.nav_status)}
+                      />
+                    </div>
                   </div>
                 </div>
               ) : (
-                <p className="mt-3 text-xs text-muted-foreground">No vessel assigned to this shipment yet.</p>
-              )}
-
-              {shipment.vessel_mmsi ? (
-                position ? (
-                  <div className="console mt-4 p-5">
-                    <div className="flex items-center justify-between">
-                      <span className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.07em] text-nav-foreground">
-                        <span
-                          className={`relative inline-block size-1.5 rounded-full ${hasFreshAis ? "ping-live bg-nav-accent text-nav-accent" : "bg-nav-muted-foreground"}`}
-                          aria-hidden
-                        />
-                        {hasFreshAis ? "Live Position" : "Last Known Position"}
-                      </span>
-                      <span className="instrument text-xs text-nav-muted-foreground">
-                        {relativeTime(position.position_timestamp ?? position.updated_at)}
-                      </span>
-                    </div>
-                    <div className="mt-5 flex items-center gap-5">
-                      <CompassRose cog={position.cog} />
-                      <div className="grid flex-1 grid-cols-2 gap-4 sm:grid-cols-3">
-                        <ConsoleSpeed sog={position.sog} />
-                        <ConsoleField label="COG" value={position.cog != null ? `${position.cog}°` : "—"} />
-                        <ConsoleField label="Nav Status" value={navStatusLabel(position.nav_status)} />
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="mt-4 rounded-lg border border-border bg-subtle/60 p-3.5 text-xs text-muted-foreground">
-                    No AIS position received yet for MMSI{" "}
-                    <span className="instrument">{shipment.vessel_mmsi}</span>.
-                  </p>
-                )
-              ) : null}
-
-              <button
-                type="button"
-                disabled={legacyTerminal}
-                onClick={openOverride}
-                className="mt-4 flex w-full items-center justify-between gap-2 rounded-md border border-border bg-surface px-3.5 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/30 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <span className="inline-flex items-center gap-2">
-                  <RotateCcw className="size-3.5" />
-                  Override Status
-                </span>
-                <ChevronRight className="size-3.5" />
-              </button>
-
-              {legacyTerminal ? (
-                <p className="mt-2 text-xs text-muted-foreground">
-                  This shipment holds a legacy status and has moved past the active lifecycle.
+                <p className="mt-4 rounded-lg border border-border bg-subtle/60 p-3.5 text-xs text-muted-foreground">
+                  No AIS position received yet for MMSI{" "}
+                  <span className="instrument">{shipment.vessel_mmsi}</span>.
                 </p>
-              ) : overrideOpen ? (
-                <div className="mt-3 space-y-3 rounded-lg border border-border bg-subtle/50 p-3.5">
-                  <p className="text-xs text-muted-foreground">
-                    Use this if you need to correct a status change, like an accidental update or
-                    incorrect AIS data. This will create a manual timeline event. Automation remains
-                    primary.
-                  </p>
-                  <label className="block">
-                    <span className="label-xs mb-1 block">New status</span>
-                    <select
-                      className={fieldClass}
-                      value={overrideStatus}
-                      onChange={(e) => setOverrideStatus(e.target.value as ActiveShipmentStatus)}
-                    >
-                      {ACTIVE_STATUSES.map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="block">
-                    <span className="label-xs mb-1 block">Reason (optional)</span>
-                    <textarea
-                      className={`${fieldClass} min-h-[60px] resize-y`}
-                      placeholder="Why is this being changed manually?"
-                      value={overrideReason}
-                      onChange={(e) => setOverrideReason(e.target.value)}
-                    />
-                  </label>
-                  <div className="flex justify-end gap-1.5">
-                    <button
-                      type="button"
-                      className={btnGhost}
-                      onClick={() => {
-                        setOverrideOpen(false);
-                        setOverrideReason("");
-                      }}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      className={btnPrimary}
-                      disabled={override.isPending || overrideStatus === shipment.status}
-                      onClick={() => override.mutate()}
-                    >
-                      {override.isPending ? "Confirming…" : "Confirm change"}
-                    </button>
-                  </div>
+              )
+            ) : null}
+
+            <button
+              type="button"
+              disabled={legacyTerminal}
+              onClick={openOverride}
+              className="mt-4 flex w-full items-center justify-between gap-2 rounded-md border border-border bg-surface px-3.5 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/30 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <span className="inline-flex items-center gap-2">
+                <RotateCcw className="size-3.5" />
+                Override Status
+              </span>
+              <ChevronRight className="size-3.5" />
+            </button>
+
+            {legacyTerminal ? (
+              <p className="mt-2 text-xs text-muted-foreground">
+                This shipment holds a legacy status and has moved past the active lifecycle.
+              </p>
+            ) : overrideOpen ? (
+              <div className="mt-3 space-y-3 rounded-lg border border-border bg-subtle/50 p-3.5">
+                <p className="text-xs text-muted-foreground">
+                  Use this if you need to correct a status change, like an accidental update or
+                  incorrect AIS data. This will create a manual timeline event. Automation remains
+                  primary.
+                </p>
+                <label className="block">
+                  <span className="label-xs mb-1 block">New status</span>
+                  <select
+                    className={fieldClass}
+                    value={overrideStatus}
+                    onChange={(e) => setOverrideStatus(e.target.value as ActiveShipmentStatus)}
+                  >
+                    {ACTIVE_STATUSES.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="label-xs mb-1 block">Reason (optional)</span>
+                  <textarea
+                    className={`${fieldClass} min-h-[60px] resize-y`}
+                    placeholder="Why is this being changed manually?"
+                    value={overrideReason}
+                    onChange={(e) => setOverrideReason(e.target.value)}
+                  />
+                </label>
+                <div className="flex justify-end gap-1.5">
+                  <button
+                    type="button"
+                    className={btnGhost}
+                    onClick={() => {
+                      setOverrideOpen(false);
+                      setOverrideReason("");
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className={btnPrimary}
+                    disabled={override.isPending || overrideStatus === shipment.status}
+                    onClick={() => override.mutate()}
+                  >
+                    {override.isPending ? "Confirming…" : "Confirm change"}
+                  </button>
                 </div>
-              ) : null}
+              </div>
+            ) : null}
           </section>
 
           {/* Secondary rail — quieter by design (Change History carries no
            * panel border at all) so the contrast between "instrument" and
            * "record" is visible, not just implied. */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              <ShipmentNotes shipmentId={id} />
+            <ShipmentNotes shipmentId={id} />
 
-              <section>
-                <h2 className="label-xs mb-3">Change History</h2>
-                {statusEvents.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">No status changes recorded yet.</p>
-                ) : (
-                  <ol>
-                    {statusEvents.map((e, i) => {
-                      const dotColor = ACCENT_DOT[accentForValue(e.to_value)];
-                      return (
-                        <li key={e.id} className="relative flex gap-3 pb-4 last:pb-0">
-                          {i < statusEvents.length - 1 ? (
-                            <span aria-hidden className="absolute left-[4px] top-3 h-full w-px bg-border" />
-                          ) : null}
+            <section>
+              <h2 className="label-xs mb-3">Change History</h2>
+              {statusEvents.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No status changes recorded yet.</p>
+              ) : (
+                <ol>
+                  {statusEvents.map((e, i) => {
+                    const dotColor = ACCENT_DOT[accentForValue(e.to_value)];
+                    return (
+                      <li key={e.id} className="relative flex gap-3 pb-4 last:pb-0">
+                        {i < statusEvents.length - 1 ? (
                           <span
                             aria-hidden
-                            className={`mt-1 size-[9px] shrink-0 rounded-full ${dotColor} ${i === 0 ? "" : "opacity-45"}`}
+                            className="absolute left-[4px] top-3 h-full w-px bg-border"
                           />
-                          <div className="min-w-0">
-                            <p className="text-sm font-semibold text-foreground">{e.to_value ?? e.event_type}</p>
-                            <p className="text-xs text-muted-foreground">{eventSourceLabel(e)}</p>
-                            <p className="text-xs text-muted-foreground">{formatDayTime(e.occurred_at)}</p>
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ol>
-                )}
-              </section>
+                        ) : null}
+                        <span
+                          aria-hidden
+                          className={`mt-1 size-[9px] shrink-0 rounded-full ${dotColor} ${i === 0 ? "" : "opacity-45"}`}
+                        />
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-foreground">
+                            {e.to_value ?? e.event_type}
+                          </p>
+                          <p className="text-xs text-muted-foreground">{eventSourceLabel(e)}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatDayTime(e.occurred_at)}
+                          </p>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ol>
+              )}
+            </section>
           </div>
 
           <div className="border-t border-border pt-6">
@@ -690,7 +733,9 @@ function ShipmentDetail() {
               <span className="label-xs">Shipment Information</span>
               <span className="inline-flex items-center gap-1 text-xs font-medium text-primary">
                 {editOpen ? "Hide" : "Edit details"}
-                <ChevronRight className={`size-3.5 transition-transform duration-200 ${editOpen ? "rotate-90" : ""}`} />
+                <ChevronRight
+                  className={`size-3.5 transition-transform duration-200 ${editOpen ? "rotate-90" : ""}`}
+                />
               </span>
             </button>
 
@@ -702,107 +747,113 @@ function ShipmentDetail() {
                   save.mutate();
                 }}
               >
-            <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
-              <Field label="Client">
-                <input
-                  className={fieldClass}
-                  value={draft.client_name}
-                  onChange={(e) => setDraft({ ...draft, client_name: e.target.value })}
-                />
-              </Field>
-              <Field label="Landed cost (USD)">
-                <input
-                  className={fieldClass}
-                  type="number"
-                  step="0.01"
-                  value={draft.landed_cost ?? ""}
-                  onChange={(e) =>
-                    setDraft({
-                      ...draft,
-                      landed_cost: e.target.value === "" ? null : Number(e.target.value),
-                    })
-                  }
-                />
-              </Field>
-              <PortAutocomplete
-                label="Origin"
-                value={draft.origin}
-                portId={draft.origin_port_id}
-                onChange={({ text, portId }) => setDraft({ ...draft, origin: text, origin_port_id: portId })}
-              />
-              <PortAutocomplete
-                label="Destination"
-                value={draft.destination}
-                portId={draft.destination_port_id}
-                onChange={({ text, portId }) => setDraft({ ...draft, destination: text, destination_port_id: portId })}
-              />
-              <Field label="Vessel">
-                <input
-                  className={fieldClass}
-                  value={draft.vessel_name ?? ""}
-                  onChange={(e) => setDraft({ ...draft, vessel_name: e.target.value })}
-                />
-              </Field>
-              <Field label="MMSI">
-                <input
-                  className={fieldClass}
-                  value={draft.vessel_mmsi ?? ""}
-                  onChange={(e) => setDraft({ ...draft, vessel_mmsi: e.target.value })}
-                />
-              </Field>
-              <Field label="Planned ETD">
-                <input
-                  className={fieldClass}
-                  type="datetime-local"
-                  value={dates.planned_etd}
-                  onChange={(e) => setDates({ ...dates, planned_etd: e.target.value })}
-                />
-              </Field>
-              <Field label="Planned ETA">
-                <input
-                  className={fieldClass}
-                  type="datetime-local"
-                  value={dates.planned_eta}
-                  onChange={(e) => setDates({ ...dates, planned_eta: e.target.value })}
-                />
-              </Field>
-              <Field label="Current ETA">
-                <input
-                  className={fieldClass}
-                  type="datetime-local"
-                  value={dates.eta}
-                  onChange={(e) => setDates({ ...dates, eta: e.target.value })}
-                />
-              </Field>
-              <Field label="Actual Departure">
-                <input
-                  className={fieldClass}
-                  type="datetime-local"
-                  value={dates.actual_departure}
-                  onChange={(e) => setDates({ ...dates, actual_departure: e.target.value })}
-                />
-              </Field>
-              <Field label="Actual Arrival">
-                <input
-                  className={fieldClass}
-                  type="datetime-local"
-                  value={dates.actual_arrival}
-                  onChange={(e) => setDates({ ...dates, actual_arrival: e.target.value })}
-                />
-              </Field>
-              <InfoField
-                label="Last AIS Update"
-                value={
-                  position ? relativeTime(position.position_timestamp ?? position.updated_at) : "No AIS data yet"
-                }
-              />
-            </div>
+                <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
+                  <Field label="Client">
+                    <input
+                      className={fieldClass}
+                      value={draft.client_name}
+                      onChange={(e) => setDraft({ ...draft, client_name: e.target.value })}
+                    />
+                  </Field>
+                  <Field label="Landed cost (USD)">
+                    <input
+                      className={fieldClass}
+                      type="number"
+                      step="0.01"
+                      value={draft.landed_cost ?? ""}
+                      onChange={(e) =>
+                        setDraft({
+                          ...draft,
+                          landed_cost: e.target.value === "" ? null : Number(e.target.value),
+                        })
+                      }
+                    />
+                  </Field>
+                  <PortAutocomplete
+                    label="Origin"
+                    value={draft.origin}
+                    portId={draft.origin_port_id}
+                    onChange={({ text, portId }) =>
+                      setDraft({ ...draft, origin: text, origin_port_id: portId })
+                    }
+                  />
+                  <PortAutocomplete
+                    label="Destination"
+                    value={draft.destination}
+                    portId={draft.destination_port_id}
+                    onChange={({ text, portId }) =>
+                      setDraft({ ...draft, destination: text, destination_port_id: portId })
+                    }
+                  />
+                  <Field label="Vessel">
+                    <input
+                      className={fieldClass}
+                      value={draft.vessel_name ?? ""}
+                      onChange={(e) => setDraft({ ...draft, vessel_name: e.target.value })}
+                    />
+                  </Field>
+                  <Field label="MMSI">
+                    <input
+                      className={fieldClass}
+                      value={draft.vessel_mmsi ?? ""}
+                      onChange={(e) => setDraft({ ...draft, vessel_mmsi: e.target.value })}
+                    />
+                  </Field>
+                  <Field label="Planned ETD">
+                    <input
+                      className={fieldClass}
+                      type="datetime-local"
+                      value={dates.planned_etd}
+                      onChange={(e) => setDates({ ...dates, planned_etd: e.target.value })}
+                    />
+                  </Field>
+                  <Field label="Planned ETA">
+                    <input
+                      className={fieldClass}
+                      type="datetime-local"
+                      value={dates.planned_eta}
+                      onChange={(e) => setDates({ ...dates, planned_eta: e.target.value })}
+                    />
+                  </Field>
+                  <Field label="Current ETA">
+                    <input
+                      className={fieldClass}
+                      type="datetime-local"
+                      value={dates.eta}
+                      onChange={(e) => setDates({ ...dates, eta: e.target.value })}
+                    />
+                  </Field>
+                  <Field label="Actual Departure">
+                    <input
+                      className={fieldClass}
+                      type="datetime-local"
+                      value={dates.actual_departure}
+                      onChange={(e) => setDates({ ...dates, actual_departure: e.target.value })}
+                    />
+                  </Field>
+                  <Field label="Actual Arrival">
+                    <input
+                      className={fieldClass}
+                      type="datetime-local"
+                      value={dates.actual_arrival}
+                      onChange={(e) => setDates({ ...dates, actual_arrival: e.target.value })}
+                    />
+                  </Field>
+                  <InfoField
+                    label="Last AIS Update"
+                    value={
+                      position
+                        ? relativeTime(position.position_timestamp ?? position.updated_at)
+                        : "No AIS data yet"
+                    }
+                  />
+                </div>
 
-            <div className="mt-4 flex items-center justify-end border-t border-border pt-3">
-              <button className={btnPrimary} type="submit" disabled={save.isPending}>
-                {save.isPending ? "Saving…" : "Save changes"}
-              </button>
-            </div>
+                <div className="mt-4 flex items-center justify-end border-t border-border pt-3">
+                  <button className={btnPrimary} type="submit" disabled={save.isPending}>
+                    {save.isPending ? "Saving…" : "Save changes"}
+                  </button>
+                </div>
               </form>
             ) : null}
           </div>
@@ -934,7 +985,9 @@ function HeaderStat({ label, value }: { label: string; value: ReactNode }) {
 function ConsoleField({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
-      <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-nav-muted-foreground">{label}</p>
+      <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-nav-muted-foreground">
+        {label}
+      </p>
       <p className="instrument mt-1 truncate text-base font-medium text-nav-foreground">{value}</p>
     </div>
   );
@@ -947,7 +1000,9 @@ function ConsoleSpeed({ sog }: { sog: number | null }) {
   const pct = sog != null ? Math.max(0, Math.min(100, (sog / 28) * 100)) : 0;
   return (
     <div className="min-w-0">
-      <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-nav-muted-foreground">SOG</p>
+      <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-nav-muted-foreground">
+        SOG
+      </p>
       <p className="instrument mt-1 truncate text-base font-medium text-nav-foreground">
         {sog != null ? `${sog.toFixed(1)} kn` : "—"}
       </p>
@@ -983,7 +1038,15 @@ function CompassRose({ cog }: { cog: number | null }) {
         style={{ transform: `rotate(${cog ?? 0}deg)` }}
         aria-hidden
       >
-        <line x1="28" y1="10" x2="28" y2="28" stroke="var(--color-nav-accent)" strokeWidth="2" strokeLinecap="round" />
+        <line
+          x1="28"
+          y1="10"
+          x2="28"
+          y2="28"
+          stroke="var(--color-nav-accent)"
+          strokeWidth="2"
+          strokeLinecap="round"
+        />
         <line
           x1="28"
           y1="28"
@@ -1000,63 +1063,6 @@ function CompassRose({ cog }: { cog: number | null }) {
   );
 }
 
-/** The route as real distance, not decoration: when the shipment has
- * structured origin/destination ports and a live position, the fill and
- * marker reflect actual great-circle progress toward the destination —
- * a vessel crossing genuine distance, not a stand-in percentage. Falls
- * back to a plain endpoints line when that data isn't available, rather
- * than estimating. */
-/** The route draws itself in on load rather than appearing pre-filled —
- * the one moment on this page that's purely there to delight: the course
- * is charted before your eyes, exactly once per visit, then settles into
- * an ordinary live-updating bar. */
-function RouteBar({
-  origin,
-  destination,
-  progress,
-}: {
-  origin: string;
-  destination: string;
-  progress: { pct: number; totalKm: number; remainingKm: number } | null;
-}) {
-  const [animatedPct, setAnimatedPct] = useState(0);
-  useEffect(() => {
-    if (!progress) return;
-    const raf = requestAnimationFrame(() => setAnimatedPct(progress.pct));
-    return () => cancelAnimationFrame(raf);
-  }, [progress?.pct]);
-
-  return (
-    <div className="min-w-0">
-      <div className="flex items-center justify-between gap-3">
-        <span className="min-w-0 truncate text-lg font-semibold text-foreground">{origin}</span>
-        <ArrowRight className="size-4 shrink-0 text-muted-foreground" />
-        <span className="min-w-0 truncate text-right text-lg font-semibold text-foreground">{destination}</span>
-      </div>
-      <div className="relative mt-3 h-[3px] w-full rounded-full bg-atmosphere-hover">
-        {progress ? (
-          <>
-            <div
-              className="absolute inset-y-0 left-0 rounded-full bg-primary transition-[width] duration-[1400ms] ease-[cubic-bezier(0.16,1,0.3,1)]"
-              style={{ width: `${animatedPct * 100}%` }}
-            />
-            <div
-              aria-hidden
-              className="ping-live absolute top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary text-primary shadow-[0_0_6px_0_var(--primary)] transition-[left] duration-[1400ms] ease-[cubic-bezier(0.16,1,0.3,1)]"
-              style={{ left: `${animatedPct * 100}%` }}
-            />
-          </>
-        ) : null}
-      </div>
-      {progress ? (
-        <p className="instrument mt-2 text-xs text-muted-foreground">
-          {Math.round(progress.pct * 100)}% underway · {Math.round(progress.remainingKm).toLocaleString()} km to
-          destination
-        </p>
-      ) : null}
-    </div>
-  );
-}
 
 /** The shipment's journey as a line, not a generic numbered progress bar:
  * a filled track behind everything already reached, a pulsing marker
@@ -1083,10 +1089,18 @@ function LifecycleJourney({
           return (
             <li key={s} className="flex flex-1 flex-col items-center">
               <div className="flex w-full items-center">
-                <span className={`h-[2px] flex-1 ${isFirst ? "opacity-0" : done || current ? c.bg : "bg-border"}`} />
-                <span className="relative grid shrink-0 place-items-center" style={{ width: 14, height: 14 }}>
+                <span
+                  className={`h-[2px] flex-1 ${isFirst ? "opacity-0" : done || current ? c.bg : "bg-border"}`}
+                />
+                <span
+                  className="relative grid shrink-0 place-items-center"
+                  style={{ width: 14, height: 14 }}
+                >
                   {current ? (
-                    <span aria-hidden className={`live-pulse absolute size-3.5 rounded-full ${c.bg} opacity-20`} />
+                    <span
+                      aria-hidden
+                      className={`live-pulse absolute size-3.5 rounded-full ${c.bg} opacity-20`}
+                    />
                   ) : null}
                   <span
                     aria-hidden
@@ -1099,11 +1113,17 @@ function LifecycleJourney({
                     }`}
                   />
                 </span>
-                <span className={`h-[2px] flex-1 ${isLast ? "opacity-0" : done ? c.bg : "bg-border"}`} />
+                <span
+                  className={`h-[2px] flex-1 ${isLast ? "opacity-0" : done ? c.bg : "bg-border"}`}
+                />
               </div>
               <span
                 className={`mt-2 text-center text-xs leading-tight ${
-                  current ? `font-semibold ${c.text}` : done ? "text-foreground" : "text-muted-foreground"
+                  current
+                    ? `font-semibold ${c.text}`
+                    : done
+                      ? "text-foreground"
+                      : "text-muted-foreground"
                 }`}
               >
                 {s}

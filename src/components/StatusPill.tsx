@@ -1,37 +1,25 @@
-import { Anchor, BookmarkCheck, CalendarClock, CheckCircle2, MapPin, Ship, type LucideIcon } from "lucide-react";
-
 import type { VesselCondition } from "@/lib/aisAutomation";
 import type { ShipmentStatus } from "@/lib/api";
 import type { HealthLevel, MonitoringState, Severity } from "@/lib/lifecycle";
+import { conditionOf } from "@/components/maritime/format";
+import { AisTarget, ConditionMark, ManifestMeter } from "@/components/maritime/marks";
 
-/**
- * One consistent meaning per phase, not a different colour per stage:
- * Scheduled/Booked (not yet moving) — neutral.
- * Departed / In Transit / Approaching Destination (all underway) — the
- * same restrained blue; the icon (anchor / ship / pin) is what tells
- * these apart, not the colour.
- * Arrived (success) — green. At Port (needs follow-up) — amber.
+/*
+ * Status vocabulary, shared by every page. Drawn from the same maritime
+ * marks as the dashboard so a state reads the same everywhere:
  *
- * Colour is carried by exactly one signal — the dot — everywhere this
- * status appears; the label text always stays ink, so a row never shows
- * three simultaneous colour cues (border + background + text) for the
- * same fact.
+ *   phase       a small square in the phase family's colour: slate before
+ *               departure, chart blue under way, marine green arrived,
+ *               amber held at port. The label always stays ink.
+ *   health      alarm (red diamond) / caution (amber triangle) / normal
+ *   severity    the same alarm / caution marks for alerts
+ *   source      filled square = automatic, hollow = operator
+ *   vessel      the AIS target symbol
  */
-const DOT: Record<ShipmentStatus, string> = {
-  Scheduled: "bg-muted-foreground/50",
-  Booked: "bg-muted-foreground/50",
-  Departed: "bg-primary",
-  "In Transit": "bg-primary",
-  "Approaching Destination": "bg-primary",
-  Arrived: "bg-positive",
-  "At Port": "bg-warning",
-  "Cleared Customs": "bg-positive",
-  Delivered: "bg-positive",
-};
 
 export type StatusAccent = "neutral" | "primary" | "positive" | "warning";
 
-/** Which accent family a status belongs to — shared so the lifecycle
+/** Which accent family a status belongs to, shared so the lifecycle
  * stepper and change history on the shipment detail page use exactly the
  * same colour-to-status mapping as StatusPill itself. */
 export function statusAccent(status: ShipmentStatus): StatusAccent {
@@ -51,19 +39,26 @@ export function statusAccent(status: ShipmentStatus): StatusAccent {
   }
 }
 
-const STATUS_ICON: Partial<Record<ShipmentStatus, LucideIcon>> = {
-  Scheduled: CalendarClock,
-  Booked: BookmarkCheck,
-  Departed: Anchor,
-  "In Transit": Ship,
-  "Approaching Destination": MapPin,
-  Arrived: CheckCircle2,
+const ACCENT_FILL: Record<StatusAccent, string> = {
+  neutral: "bg-sea-ink-3",
+  primary: "bg-sea-move",
+  positive: "bg-sea-green",
+  warning: "bg-sea-amber",
 };
 
-/** `size="lg"` renders a quiet bordered chip with a status icon (used for
- * a page's primary status display); `sm` (default) is plain text with a
- * coloured dot — no pill shape, so a table full of these reads as data,
- * not a row of badges. Same colour tokens either way. */
+function PhaseSquare({ status, size = 6 }: { status: ShipmentStatus; size?: number }) {
+  return (
+    <span
+      aria-hidden
+      className={`inline-block shrink-0 ${ACCENT_FILL[statusAccent(status)]}`}
+      style={{ width: size, height: size }}
+    />
+  );
+}
+
+/** `size="lg"` is a ruled chip for a page's primary status display; `sm`
+ * (default) is the phase square and the label, so a table of these reads
+ * as data rather than a row of badges. */
 export function StatusPill({
   status,
   size = "sm",
@@ -72,129 +67,118 @@ export function StatusPill({
   size?: "sm" | "lg";
 }) {
   if (size === "lg") {
-    const Icon = STATUS_ICON[status];
     return (
-      <span className="inline-flex items-center gap-2 rounded-md border border-border px-2.5 py-1.5 text-sm font-medium whitespace-nowrap text-foreground">
-        {Icon ? (
-          <Icon className="size-3.5 text-muted-foreground" aria-hidden />
-        ) : (
-          <span className={`size-1.5 rounded-full ${DOT[status] ?? DOT.Booked}`} aria-hidden />
-        )}
+      <span className="inline-flex items-center gap-2 whitespace-nowrap rounded-[2px] border border-border px-2.5 py-1.5 text-sm font-medium text-foreground">
+        <PhaseSquare status={status} size={7} />
         {status}
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm text-foreground">
-      <span className={`size-1.5 shrink-0 rounded-full ${DOT[status] ?? DOT.Booked}`} aria-hidden />
+    <span className="inline-flex items-center gap-2 whitespace-nowrap text-sm text-foreground">
+      <PhaseSquare status={status} />
       {status}
     </span>
   );
 }
 
-const HEALTH_DOT: Record<HealthLevel, string> = {
-  "On Track": "bg-positive",
-  Attention: "bg-warning",
-  "At Risk": "bg-risk",
-  Delayed: "bg-risk",
-  Delivered: "bg-muted-foreground/50",
-};
-
 export function HealthBadge({ level }: { level: HealthLevel }) {
+  const condition = conditionOf(level);
   return (
-    <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm text-foreground">
-      <span className={`size-1.5 rounded-full ${HEALTH_DOT[level]}`} aria-hidden />
+    <span className="inline-flex items-center gap-2 whitespace-nowrap text-sm text-foreground">
+      {condition ? (
+        <ConditionMark level={condition} size={8} />
+      ) : (
+        <span
+          aria-hidden
+          className={`inline-block size-[7px] shrink-0 rounded-full ${
+            level === "Delivered" ? "bg-sea-green" : "border-[1.5px] border-sea-green"
+          }`}
+        />
+      )}
       {level}
     </span>
   );
 }
 
-const MONITORING_DOT: Record<MonitoringState, string> = {
-  Scheduled: "bg-muted-foreground/50",
-  "Pre-Monitoring": "bg-warning",
-  "Active Monitoring": "bg-primary",
-  Completed: "bg-positive",
+const MONITORING_MARK: Record<MonitoringState, string> = {
+  Scheduled: "bg-sea-ink-3",
+  "Pre-Monitoring": "border-[1.5px] border-sea-amber",
+  "Active Monitoring": "bg-sea-move",
+  Completed: "bg-sea-green",
 };
 
 export function MonitoringBadge({ state }: { state: MonitoringState }) {
   return (
-    <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm text-foreground">
-      <span className={`size-1.5 rounded-full ${MONITORING_DOT[state]}`} aria-hidden />
+    <span className="inline-flex items-center gap-2 whitespace-nowrap text-sm text-foreground">
+      <span aria-hidden className={`inline-block size-[6px] shrink-0 ${MONITORING_MARK[state]}`} />
       {state}
     </span>
   );
 }
 
-/**
- * Severity carries real typographic weight, not just a coloured dot —
- * critical is meant to interrupt a scan of the page, informational is
- * meant to recede. Red is reserved for genuinely critical items so it
- * keeps its meaning instead of appearing on every row.
- */
-const SEVERITY_STYLE: Record<Severity, string> = {
-  critical: "text-risk font-semibold",
-  attention: "text-warning font-medium",
-  informational: "text-muted-foreground/80 font-medium",
+const SEVERITY_TEXT: Record<Severity, string> = {
+  critical: "text-sea-red",
+  attention: "text-sea-amber-ink",
+  informational: "text-muted-foreground",
 };
 
-const SEVERITY_DOT: Record<Severity, string> = {
-  critical: "bg-risk",
-  attention: "bg-warning",
-  informational: "bg-muted-foreground/40",
-};
-
+/** Severity in the bridge alert vocabulary: critical carries the alarm
+ * mark, attention the caution mark; informational recedes. */
 export function SeverityBadge({ severity, label }: { severity: Severity; label: string }) {
   return (
     <span
-      className={`inline-flex items-center gap-1.5 whitespace-nowrap text-xs uppercase tracking-[0.04em] ${SEVERITY_STYLE[severity]}`}
+      className={`label-xs inline-flex items-center gap-1.5 whitespace-nowrap !text-[10.5px] ${SEVERITY_TEXT[severity]}`}
     >
-      <span className={`size-1.5 rounded-full ${SEVERITY_DOT[severity]}`} aria-hidden />
+      {severity === "critical" ? (
+        <ConditionMark level="alarm" size={7} />
+      ) : severity === "attention" ? (
+        <ConditionMark level="caution" size={7} />
+      ) : (
+        <span
+          aria-hidden
+          className="inline-block size-[6px] shrink-0 border-[1.5px] border-sea-ink-4"
+        />
+      )}
       {label}
     </span>
   );
 }
 
 export function SourceTag({ source, automated }: { source: string; automated: boolean }) {
-  const label = source === "ais" ? "AIS" : source === "system" ? "System" : "Manual";
-  const dot = automated ? "bg-primary" : "bg-muted-foreground/40";
+  const code = source === "ais" ? "AIS" : source === "system" ? "SYS" : automated ? "SYS" : "OPR";
   return (
     <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs text-muted-foreground">
-      <span aria-hidden className={`size-1.5 rounded-full ${dot}`} />
-      {label} · {automated ? "Automatic" : "Manual entry"}
+      <span
+        aria-hidden
+        className={`inline-block size-[6px] shrink-0 ${automated ? "bg-sea-ink-2" : "border-[1.5px] border-sea-ink-2"}`}
+      />
+      <span className="telemetry text-[10.5px]">{code}</span>
+      <span>{automated ? "automatic" : "operator entry"}</span>
     </span>
   );
 }
 
 export function DocsIndicator({ attached, total }: { attached: number; total: number }) {
-  const complete = attached >= total;
-  return (
-    <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm">
-      <span
-        aria-hidden
-        className={`size-1.5 rounded-full ${complete ? "bg-positive" : attached === 0 ? "bg-risk" : "bg-warning"}`}
-      />
-      <span className={complete ? "text-foreground" : "text-muted-foreground"}>
-        {attached}/{total}
-      </span>
-    </span>
-  );
+  return <ManifestMeter attached={attached} total={total} />;
 }
 
-const CONDITION_DOT: Record<VesselCondition["kind"], string> = {
-  underway: "bg-primary",
-  stopped: "bg-warning",
-  unknown: "bg-muted-foreground/50",
-};
-
-/** Derived AIS operational read (Underway / Stopped · likely …) — never a
- * lifecycle status. Callers should only render this when `label` (from
- * `vesselConditionLabel()`) is non-null. */
-export function VesselConditionBadge({ condition, label }: { condition: VesselCondition; label: string }) {
+/** Derived AIS operational read (Underway / Stopped · likely …), never a
+ * lifecycle status, drawn with the AIS target symbol. Callers should only
+ * render this when `label` (from `vesselConditionLabel()`) is non-null. */
+export function VesselConditionBadge({
+  condition,
+  label,
+}: {
+  condition: VesselCondition;
+  label: string;
+}) {
   return (
-    <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm text-foreground">
-      <span
-        className={`size-1.5 rounded-full ${CONDITION_DOT[condition.kind]} ${condition.kind === "underway" ? "live-pulse" : ""}`}
-        aria-hidden
+    <span className="inline-flex items-center gap-2 whitespace-nowrap text-sm text-foreground">
+      <AisTarget
+        state={condition.kind === "underway" ? "active" : "idle"}
+        stopped={condition.kind === "stopped"}
+        size={11}
       />
       {label}
     </span>

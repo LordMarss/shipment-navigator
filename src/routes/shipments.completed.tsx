@@ -1,47 +1,48 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
 
 import { AppShell } from "@/components/AppShell";
-import { ShipmentTable } from "@/components/ShipmentTable";
-import { listAllDocuments, listShipments } from "@/lib/api";
+import { VoyageBoard } from "@/components/maritime/VoyageBoard";
+import { useFleet } from "@/components/maritime/useFleet";
+import { useNow } from "@/components/maritime/useNow";
+import type { Shipment } from "@/lib/api";
 
 export const Route = createFileRoute("/shipments/completed")({
   head: () => ({
     meta: [
-      { title: "Completed Shipments — StimTech Solutions" },
+      { title: "Completed Shipments - StimTech Solutions" },
       {
         name: "description",
         content: "Delivered shipments with their final landed cost and document record.",
       },
-      { property: "og:title", content: "Completed Shipments — StimTech Solutions" },
+      { property: "og:title", content: "Completed Shipments - StimTech Solutions" },
       { property: "og:description", content: "Your delivered shipment history." },
     ],
   }),
   component: CompletedShipments,
 });
 
+const isDone = (s: Shipment) => s.status === "Delivered";
+
 function CompletedShipments() {
-  const { data: shipments = [], isLoading } = useQuery({
-    queryKey: ["shipments"],
-    queryFn: listShipments,
-  });
-  const { data: documents = [] } = useQuery({
-    queryKey: ["all-documents"],
-    queryFn: listAllDocuments,
-  });
-  const done = shipments.filter((s) => s.status === "Delivered");
+  const now = useNow();
+  const { shipments, documents, alerts, positions, isLoading } = useFleet(isDone);
 
   return (
     <AppShell
       eyebrow="Shipments"
-      title="Completed"
+      title="Completed voyages"
       description="Delivered shipments and their final record."
       wide
     >
-      <ShipmentTable
-        shipments={done}
+      <VoyageBoard
+        title="Completed"
+        shipments={shipments}
         documents={documents}
+        alerts={alerts}
+        positions={positions}
         isLoading={isLoading}
+        now={now}
+        showLandedCost
         emptyTitle="Nothing delivered yet"
         emptyDescription="Shipments appear here once their status reaches Delivered."
       />

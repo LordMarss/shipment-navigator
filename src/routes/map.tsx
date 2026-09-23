@@ -1,22 +1,28 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { AppShell, Stat, btnGhost, btnPrimary, fieldClass } from "@/components/AppShell";
+import { AppShell, btnGhost, btnPrimary, fieldClass } from "@/components/AppShell";
 import { StatusPill } from "@/components/StatusPill";
-import { listShipments, shortId, updateShipment, type Shipment } from "@/lib/api";
+import { targetOf } from "@/components/maritime/format";
+import { AisTarget, ChartPanel } from "@/components/maritime/marks";
+import { Readouts } from "@/components/maritime/Readouts";
+import { useFleet } from "@/components/maritime/useFleet";
+import { useNow } from "@/components/maritime/useNow";
+import { deriveVesselCondition } from "@/lib/aisAutomation";
+import { shortId, updateShipment, type Shipment } from "@/lib/api";
 
 export const Route = createFileRoute("/map")({
   head: () => ({
     meta: [
-      { title: "Fleet Map — StimTech Solutions" },
+      { title: "Fleet Map - StimTech Solutions" },
       {
         name: "description",
         content:
           "Live vessel traffic across Pacific shipping lanes, with per-shipment vessel tracking by MMSI.",
       },
-      { property: "og:title", content: "Fleet Map — StimTech Solutions" },
+      { property: "og:title", content: "Fleet Map - StimTech Solutions" },
       {
         property: "og:description",
         content: "Watch the vessel carrying each shipment on a live traffic map.",
@@ -26,7 +32,7 @@ export const Route = createFileRoute("/map")({
   component: FleetMap,
 });
 
-// MarineTraffic public embed — no API key or account required.
+// MarineTraffic public embed - no API key or account required.
 const GLOBAL_EMBED =
   "https://www.marinetraffic.com/en/ais/embed/zoom:4/centery:38/centerx:-140/maptype:4/shownames:false/mmsi:0/shipid:0/fleet:/fleet_id:/vessel_type:/remember:false";
 
@@ -41,11 +47,15 @@ function FleetMap() {
   const [tracked, setTracked] = useState<Shipment | null>(null);
   const [mmsiDraft, setMmsiDraft] = useState<Record<string, string>>({});
 
-  const { data: shipments = [], isLoading } = useQuery({
-    queryKey: ["shipments"],
-    queryFn: listShipments,
-  });
+  const now = useNow();
+  const { shipments, positions, isLoading } = useFleet();
   const active = shipments.filter((s) => s.status !== "Delivered");
+  const targetFor = (s: Shipment) => {
+    const position = s.vessel_mmsi ? (positions?.get(s.vessel_mmsi) ?? null) : null;
+    const kind = position ? deriveVesselCondition(s, position).kind : null;
+    return targetOf(position, kind, Boolean(s.vessel_mmsi), now);
+  };
+  const underway = active.filter((s) => targetFor(s).state === "active").length;
   const trackedByAis = active.filter((s) => s.vessel_mmsi).length;
   const inTransitCount = active.filter((s) => s.status === "In Transit").length;
 
@@ -71,19 +81,30 @@ function FleetMap() {
         ) : null
       }
       headerExtra={
-        <div className="flex flex-wrap items-start gap-x-10 gap-y-5">
-          <Stat label="Active Shipments" value={active.length} />
-          <Stat label="Tracked by AIS" value={trackedByAis} />
-          <Stat label="In Transit" value={inTransitCount} />
-        </div>
+        <Readouts
+          loading={isLoading}
+          items={[
+            { label: "Active", value: active.length },
+            { label: "Tracked by AIS", value: trackedByAis },
+            { label: "In transit", value: inTransitCount },
+            {
+              label: "Under way",
+              value: underway,
+              ...(underway > 0 ? { tone: "move" as const } : {}),
+            },
+          ]}
+        />
       }
     >
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
-        <div className="panel overflow-hidden">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
-            <span className="inline-flex items-center gap-2 text-sm font-medium">
+      <div className="grid grid-cols-1 gap-x-10 gap-y-8 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="min-w-0 overflow-hidden border border-border bg-surface">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-2.5">
+            <span className="label-xs inline-flex items-center gap-2 text-foreground">
               {tracked ? (
-                <span className="inline-flex size-1.5 shrink-0 rounded-full bg-primary live-pulse" aria-hidden />
+                <span
+                  className="inline-flex size-1.5 shrink-0 rounded-full bg-primary live-pulse"
+                  aria-hidden
+                />
               ) : null}
               {tracked
                 ? `Tracking ${shortId(tracked.id)} · ${tracked.vessel_name || "vessel"} (MMSI ${tracked.vessel_mmsi})`
@@ -93,7 +114,9 @@ function FleetMap() {
           </div>
           <iframe
             key={tracked?.id ?? "global"}
-            title={tracked ? `Live position for MMSI ${tracked.vessel_mmsi}` : "Live vessel traffic"}
+            title={
+              tracked ? `Live position for MMSI ${tracked.vessel_mmsi}` : "Live vessel traffic"
+            }
             src={tracked?.vessel_mmsi ? vesselEmbed(tracked.vessel_mmsi) : GLOBAL_EMBED}
             className="h-[420px] w-full border-0 lg:h-[560px]"
             loading="lazy"
@@ -105,35 +128,45 @@ function FleetMap() {
           </p>
         </div>
 
-        <aside className="panel overflow-hidden">
-          <div className="border-b border-border px-4 py-3">
-            <h2 className="label-xs">Active shipments</h2>
-            <p className="mt-1 text-xs text-muted-foreground">Not yet delivered</p>
-          </div>
-
+        <ChartPanel
+          id="targets"
+          title="Targets"
+          meta={isLoading ? null : `${active.length} active`}
+        >
           {isLoading ? (
             <p className="px-4 py-6 text-center text-sm text-muted-foreground">Loading…</p>
           ) : active.length === 0 ? (
-            <p className="px-4 py-6 text-center text-sm text-muted-foreground">No active shipments.</p>
+            <p className="px-4 py-6 text-center text-sm text-muted-foreground">
+              No active shipments.
+            </p>
           ) : (
-            <ul className="divide-y divide-border">
+            <ul>
               {active.map((s) => {
                 const isTracked = tracked?.id === s.id;
                 return (
                   <li
                     key={s.id}
-                    className={`border-l-2 px-4 py-3 transition-colors duration-150 ${
-                      isTracked ? "border-l-primary bg-tint-selected/40" : "border-l-transparent hover:bg-atmosphere/60"
+                    className={`relative border-b border-sea-rule-2 py-3 pl-3 pr-1 transition-colors duration-150 ${
+                      isTracked ? "bg-sea-shallows" : "hover:bg-sea-shallows/60"
                     }`}
                   >
+                    {isTracked ? (
+                      <span
+                        aria-hidden
+                        className="absolute inset-y-0 left-0 w-[2px] bg-sea-cursor"
+                      />
+                    ) : null}
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <Link
                           to="/shipments/$id"
                           params={{ id: s.id }}
-                          className="block truncate text-sm font-medium text-primary hover:underline"
+                          className="focus-ring block truncate rounded-[1px] text-[13.5px] font-medium text-sea-ink hover:text-sea-move"
                         >
-                          {shortId(s.id)} · {s.client_name}
+                          {s.client_name}
+                          <span className="telemetry ml-2 text-[11px] font-normal text-sea-ink-3">
+                            {shortId(s.id)}
+                          </span>
                         </Link>
                         <p className="truncate text-xs text-muted-foreground">
                           {s.origin} → {s.destination}
@@ -143,15 +176,34 @@ function FleetMap() {
                     </div>
 
                     {s.vessel_mmsi ? (
-                      <div className="mt-2 flex items-center justify-between gap-2">
-                        <span className="text-xs text-muted-foreground">
-                          {s.vessel_name || "Vessel"} · {s.vessel_mmsi}
+                      <div className="mt-2 flex items-center justify-between gap-3">
+                        <span className="flex min-w-0 items-center gap-2 text-[12px]">
+                          <span className="w-3.5 shrink-0">
+                            <AisTarget
+                              state={targetFor(s).state}
+                              stopped={targetFor(s).stopped}
+                              cursor={isTracked}
+                              size={11}
+                            />
+                          </span>
+                          <span className="truncate text-sea-ink-2">
+                            {s.vessel_name || "Vessel"}
+                          </span>
+                          <span className="telemetry shrink-0 text-[11px] text-sea-ink-3">
+                            {targetFor(s).reading}
+                          </span>
                         </span>
                         <button
-                          className={isTracked ? btnPrimary : btnGhost}
+                          type="button"
+                          aria-pressed={isTracked}
+                          className={`focus-ring h-7 shrink-0 whitespace-nowrap rounded-[2px] px-2.5 text-[12px] font-medium ${
+                            isTracked
+                              ? "bg-sea-move text-sea-paper"
+                              : "border border-sea-rule text-sea-ink hover:bg-sea-shallows"
+                          }`}
                           onClick={() => setTracked(s)}
                         >
-                          {isTracked ? "Tracking" : "Track this shipment"}
+                          {isTracked ? "Tracking" : "Track"}
                         </button>
                       </div>
                     ) : (
@@ -180,7 +232,7 @@ function FleetMap() {
               })}
             </ul>
           )}
-        </aside>
+        </ChartPanel>
       </div>
     </AppShell>
   );

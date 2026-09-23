@@ -5,6 +5,7 @@ import { ArrowDown, ArrowUp, Search } from "lucide-react";
 import { useShipmentFilters, type SortKey } from "@/components/useShipmentFilters";
 import {
   ACTIVE_STATUSES,
+  formatCost,
   formatEta,
   shortId,
   type Alert,
@@ -29,7 +30,7 @@ import {
   ManifestMeter,
   Skeleton,
   TCount,
-} from "@/components/dashboard/marks";
+} from "@/components/maritime/marks";
 import {
   ago,
   formatCoordinates,
@@ -40,9 +41,10 @@ import {
   type ConditionLevel,
   type Target,
   type Voyage,
-} from "@/components/dashboard/format";
+} from "@/components/maritime/format";
 
 const DAY = 86_400_000;
+const noop = () => {};
 const SEVERITY_RANK: Record<Severity, number> = { critical: 0, attention: 1, informational: 2 };
 /** On phones the board keeps the first dozen and offers the rest on request. */
 const COMPACT_LIMIT = 12;
@@ -96,10 +98,15 @@ export function VoyageBoard({
   positions,
   isLoading,
   now,
-  focusId,
-  onFocus,
-  lens,
-  onLensChange: setLens,
+  focusId = null,
+  onFocus = noop,
+  lens: controlledLens,
+  onLensChange,
+  title = "Voyage board",
+  showLandedCost = false,
+  emptyTitle = "No voyages on the board",
+  emptyDescription = "Create a shipment with New shipment above and its passage will be plotted here.",
+  emptyAction,
 }: {
   shipments: Shipment[];
   documents: ShipmentDocument[];
@@ -107,11 +114,22 @@ export function VoyageBoard({
   positions: Map<string, VesselPosition> | undefined;
   isLoading: boolean;
   now: number | null;
-  focusId: string | null;
-  onFocus: (id: string | null) => void;
-  lens: Lens;
-  onLensChange: (lens: Lens) => void;
+  /** Shipment under the cursor elsewhere on the page, for cross-highlighting. */
+  focusId?: string | null;
+  onFocus?: (id: string | null) => void;
+  /** Controlled lens (the dashboard links it to Conditions); uncontrolled otherwise. */
+  lens?: Lens;
+  onLensChange?: (lens: Lens) => void;
+  title?: string;
+  /** The shipment-book pages also show landed cost. */
+  showLandedCost?: boolean;
+  emptyTitle?: string;
+  emptyDescription?: string;
+  emptyAction?: ReactNode;
 }) {
+  const [ownLens, setOwnLens] = useState<Lens>("all");
+  const lens = controlledLens ?? ownLens;
+  const setLens = onLensChange ?? setOwnLens;
   const navigate = useNavigate();
   const config = useMonitoringConfig();
   const { query, setQuery, status, setStatus, client, setClient, clients, sort, toggleSort, rows } =
@@ -252,7 +270,7 @@ export function VoyageBoard({
   return (
     <ChartPanel
       id="board"
-      title="Voyage board"
+      title={title}
       meta={
         isLoading
           ? null
@@ -271,6 +289,7 @@ export function VoyageBoard({
           <col className="w-[13%] xl:w-[10%]" />
           <col className="w-[16%] xl:w-[13%]" />
           <col className="hidden w-[9%] xl:table-column" />
+          {showLandedCost ? <col className="w-[11%] xl:w-[9%]" /> : null}
           <col className="hidden w-[5%] min-[1500px]:table-column" />
         </colgroup>
         <thead
@@ -291,6 +310,11 @@ export function VoyageBoard({
             </Th>
             <Th>Condition</Th>
             <Th className="hidden xl:table-cell">Manifest</Th>
+            {showLandedCost ? (
+              <Th sortKey="landed_cost" sort={sort} onSort={toggleSort} className="text-right">
+                Landed cost
+              </Th>
+            ) : null}
             <Th className="hidden text-right min-[1500px]:table-cell">Upd</Th>
           </tr>
         </thead>
@@ -312,6 +336,7 @@ export function VoyageBoard({
                   </td>
                   <td className="py-4 pr-4" />
                   <td className="hidden xl:table-cell" />
+                  {showLandedCost ? <td /> : null}
                   <td className="hidden min-[1500px]:table-cell" />
                 </tr>
               ))
@@ -322,6 +347,7 @@ export function VoyageBoard({
                   now={now}
                   cursor={focusId === r.s.id}
                   onFocus={onFocus}
+                  showLandedCost={showLandedCost}
                   onOpen={() => navigate({ to: "/shipments/$id", params: { id: r.s.id } })}
                 />
               ))}
@@ -355,10 +381,9 @@ export function VoyageBoard({
         <div className="border-b border-sea-rule-2 py-10">
           {shipments.length === 0 ? (
             <>
-              <p className="text-[14px] font-medium text-sea-ink">No voyages on the board</p>
-              <p className="mt-1 max-w-[52ch] text-[13px] text-sea-ink-2">
-                Create a shipment with New shipment above and its passage will be plotted here.
-              </p>
+              <p className="text-[14px] font-medium text-sea-ink">{emptyTitle}</p>
+              <p className="mt-1 max-w-[52ch] text-[13px] text-sea-ink-2">{emptyDescription}</p>
+              {emptyAction ? <div className="mt-4">{emptyAction}</div> : null}
             </>
           ) : (
             <>
@@ -402,12 +427,14 @@ function BoardRow({
   cursor,
   onFocus,
   onOpen,
+  showLandedCost,
 }: {
   row: Row;
   now: number | null;
   cursor: boolean;
   onFocus: (id: string | null) => void;
   onOpen: () => void;
+  showLandedCost: boolean;
 }) {
   const { s, health, condition, docs, alerts, position, target, voyage } = row;
   const readingTone =
@@ -516,6 +543,14 @@ function BoardRow({
       <td className="hidden py-3.5 pr-4 pt-4 xl:table-cell">
         <ManifestMeter attached={docs.attached} total={docs.total} />
       </td>
+
+      {showLandedCost ? (
+        <td className="py-3.5 pr-4 text-right">
+          <span className="telemetry text-[12.5px] text-sea-ink">
+            {s.landed_cost != null ? formatCost(s.landed_cost) : "Not set"}
+          </span>
+        </td>
+      ) : null}
 
       <td className="hidden py-3.5 pr-3 text-right min-[1500px]:table-cell">
         {now != null ? (

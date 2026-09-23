@@ -2,8 +2,8 @@ import { Plus, X } from "lucide-react";
 
 import type { Shipment } from "@/lib/api";
 import { relativeTime } from "@/lib/lifecycle";
-import { clock, monthName, shortDate, utcClock, weekday } from "@/components/dashboard/format";
-import { ConditionMark } from "@/components/dashboard/marks";
+import { clock, monthName, shortDate, utcClock, weekday } from "@/components/maritime/format";
+import { ConditionMark } from "@/components/maritime/marks";
 
 export type BridgeFacts = {
   alarm: number;
