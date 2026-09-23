@@ -131,23 +131,22 @@ function Dashboard() {
 
   return (
     <AppShell title="Dashboard" bare>
-      <div className="mx-auto w-full max-w-[1480px] px-4 pb-16 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-[1520px] px-4 pb-16 sm:px-6 lg:px-8">
         {/* The watch line: when, where the network stands, the one action */}
-        <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4 border-b border-sea-rule pb-5 pt-6">
+        <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4 pb-6 pt-7">
           <div className="min-w-0">
-            <h1 className="display text-[26px] leading-[30px] text-sea-ink">Dashboard</h1>
-            <p className="mt-1.5 flex flex-wrap items-baseline gap-x-5 gap-y-1 text-[12.5px] text-sea-ink-3">
+            <h1 className="display text-[28px] leading-[32px] text-sea-ink">Dashboard</h1>
+            <p className="mt-2 flex flex-wrap items-baseline gap-x-5 gap-y-1 text-[13px] text-sea-ink-3">
               {now != null ? (
-                <span className="telemetry text-[11.5px] text-sea-ink-2">
-                  {utcDate(now)}, {utcClock(now)} UTC
+                <span className="telemetry text-[11.5px] uppercase text-sea-ink-2">
+                  {utcDate(now)} {utcClock(now)} UTC
                 </span>
               ) : (
-                <span className="inline-block h-3 w-36 animate-pulse bg-sea-paper-2" />
+                <span className="inline-block h-3 w-36 animate-pulse rounded-sm bg-sea-paper-2" />
               )}
               {!isLoading && shipments.length > 0 ? (
                 <span>
-                  {shipments.length} voyages: {network.alongside} alongside, {network.atSea} at sea,{" "}
-                  {network.arrived} arrived
+                  {shipments.length} voyage{shipments.length === 1 ? "" : "s"} on the book
                 </span>
               ) : null}
               {!isLoading && network.arriving72h > 0 ? (
@@ -178,74 +177,78 @@ function Dashboard() {
         </header>
 
         {open ? (
-          <div id="new-shipment" className="animate-in mt-8">
+          <div id="new-shipment" className="animate-in mb-6">
             <NewShipmentForm onClose={() => setOpen(false)} />
           </div>
         ) : null}
 
-        {/* Primary: what needs a decision. Secondary: what is moving. */}
-        <div className="mt-8 grid gap-x-12 gap-y-12 xl:grid-cols-[minmax(0,1fr)_340px] 2xl:grid-cols-[minmax(0,1fr)_380px]">
-          <AttentionQueue
-            shipments={shipments}
-            documents={documents}
-            positions={positions}
-            now={now}
-            isLoading={isLoading}
-            onFocus={setFocusId}
-            onShowAll={() => showOnBoard("attention")}
-          />
-          <AtSea
-            shipments={shipments}
-            positions={positions}
-            now={now}
-            isLoading={isLoading}
-            focusId={focusId}
-            onFocus={setFocusId}
-            onShowAll={() => showOnBoard("underway")}
-          />
-        </div>
+        {/* One grid, one gutter. Row one: the decisions and their context. */}
+        <div className="grid gap-5 xl:grid-cols-12">
+          <div className="min-w-0 xl:col-span-8">
+            <AttentionQueue
+              shipments={shipments}
+              documents={documents}
+              positions={positions}
+              now={now}
+              isLoading={isLoading}
+              onFocus={setFocusId}
+              onShowAll={() => showOnBoard("attention")}
+            />
+          </div>
+          <div className="min-w-0 xl:col-span-4">
+            <AtSea
+              shipments={shipments}
+              positions={positions}
+              now={now}
+              isLoading={isLoading}
+              focusId={focusId}
+              onFocus={setFocusId}
+              onShowAll={() => showOnBoard("underway")}
+            />
+          </div>
 
-        {/* Tertiary: what comes next, and what has just changed */}
-        <div className="mt-14 grid gap-x-12 gap-y-12 lg:grid-cols-2">
-          <Almanac
-            shipments={shipments}
-            now={now}
-            isLoading={isLoading}
-            focusId={focusId}
-            onFocus={setFocusId}
-          />
-          <DeckLog
-            events={events}
-            alerts={alerts}
-            shipmentById={shipmentById}
-            isLoading={alertsLoading || eventsLoading}
-            now={now}
-          />
-        </div>
+          {/* Row two: the whole book */}
+          <div className="min-w-0 xl:col-span-12">
+            <VoyageBoard
+              title="Shipment board"
+              shipments={shipments}
+              documents={documents}
+              alerts={alerts}
+              positions={positions}
+              isLoading={isLoading}
+              now={now}
+              focusId={focusId}
+              onFocus={setFocusId}
+              lens={lens}
+              onLensChange={setLens}
+              changedIds={changedIds}
+              emptyTitle="No voyages on the board"
+              emptyDescription="Create a shipment with its ports, vessel MMSI and planned dates. Its passage is plotted here and followed on AIS from departure."
+              emptyAction={
+                <button className={btnPrimary} onClick={() => setOpen(true)}>
+                  <Plus className="size-3.5" aria-hidden /> New shipment
+                </button>
+              }
+            />
+          </div>
 
-        {/* Supporting: the whole book, for investigation */}
-        <div className="mt-16">
-          <VoyageBoard
-            title="All voyages"
-            shipments={shipments}
-            documents={documents}
-            alerts={alerts}
-            positions={positions}
-            isLoading={isLoading}
-            now={now}
-            focusId={focusId}
-            onFocus={setFocusId}
-            lens={lens}
-            onLensChange={setLens}
-            changedIds={changedIds}
-            emptyTitle="No voyages on the board"
-            emptyDescription="Create a shipment with its ports, vessel MMSI and planned dates. Its passage is plotted here and followed on AIS from departure."
-            emptyAction={
-              <button className={btnPrimary} onClick={() => setOpen(true)}>
-                <Plus className="size-3.5" aria-hidden /> New shipment
-              </button>
-            }
-          />
+          {/* Row three: what comes next, and what has just changed */}
+          <div className="min-w-0 lg:grid lg:grid-cols-2 lg:items-start lg:gap-5 xl:col-span-12 max-lg:space-y-5">
+            <Almanac
+              shipments={shipments}
+              now={now}
+              isLoading={isLoading}
+              focusId={focusId}
+              onFocus={setFocusId}
+            />
+            <DeckLog
+              events={events}
+              alerts={alerts}
+              shipmentById={shipmentById}
+              isLoading={alertsLoading || eventsLoading}
+              now={now}
+            />
+          </div>
         </div>
       </div>
     </AppShell>
@@ -267,7 +270,7 @@ function LensLink({ onClick, children }: { onClick: () => void; children: ReactN
     <button
       type="button"
       onClick={onClick}
-      className="focus-ring text-sea-ink-2 underline decoration-sea-ink-4 underline-offset-[3px] transition-colors hover:text-sea-ink hover:decoration-sea-ink"
+      className="focus-ring rounded-sm font-medium text-ww-blue underline decoration-ww-blue-line underline-offset-[3px] transition-colors hover:text-ww-blue-hover hover:decoration-ww-blue"
     >
       {children}
     </button>

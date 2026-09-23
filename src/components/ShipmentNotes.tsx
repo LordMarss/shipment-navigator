@@ -31,9 +31,12 @@ export function ShipmentNotes({ shipmentId }: { shipmentId: string }) {
   });
 
   return (
-    <section aria-labelledby="ops-log-title">
-      <div className="flex items-end justify-between border-b border-sea-ink pb-2">
-        <h2 id="ops-log-title" className="chart-label text-sea-ink">
+    <section
+      aria-labelledby="ops-log-title"
+      className="panel min-w-0 px-4 pb-3 sm:px-5 [&_li:last-child]:border-b-0"
+    >
+      <div className="-mx-4 flex min-h-[52px] items-center justify-between border-b border-sea-rule px-4 py-2.5 sm:-mx-5 sm:px-5">
+        <h2 id="ops-log-title" className="panel-title">
           Operations log
           <span className="telemetry ml-2 font-normal normal-case tracking-normal text-sea-ink-3">
             {isLoading ? "" : `${notes.length} ${notes.length === 1 ? "entry" : "entries"}, UTC`}
@@ -160,14 +163,14 @@ function NoteRow({ note, onChanged }: { note: ShipmentNote; onChanged: () => voi
           <span className="flex shrink-0 gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100">
             <button
               type="button"
-              className="focus-ring h-7 rounded-[2px] px-2 text-[12px] text-sea-ink-3 hover:bg-sea-paper-2 hover:text-sea-ink"
+              className="focus-ring h-7 rounded-md px-2 text-[12px] text-sea-ink-3 hover:bg-sea-paper-2 hover:text-sea-ink"
               onClick={() => setEditing(true)}
             >
               Edit
             </button>
             <button
               type="button"
-              className="focus-ring h-7 rounded-[2px] px-2 text-[12px] text-sea-ink-3 hover:bg-sea-red-soft hover:text-sea-red"
+              className="focus-ring h-7 rounded-md px-2 text-[12px] text-sea-ink-3 hover:bg-sea-red-soft hover:text-sea-red"
               disabled={remove.isPending}
               onClick={() => {
                 if (confirm("Delete this log entry?")) remove.mutate();

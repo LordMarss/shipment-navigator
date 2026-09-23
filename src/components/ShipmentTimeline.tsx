@@ -50,8 +50,14 @@ export function ShipmentTimeline({
   ];
 
   return (
-    <section aria-labelledby="milestones-title">
-      <h2 id="milestones-title" className="chart-label border-b border-sea-ink pb-2 text-sea-ink">
+    <section
+      aria-labelledby="milestones-title"
+      className="panel min-w-0 px-4 pb-3 sm:px-5 [&_li:last-child]:border-b-0"
+    >
+      <h2
+        id="milestones-title"
+        className="panel-title -mx-4 border-b border-sea-rule px-4 py-3.5 sm:-mx-5 sm:px-5"
+      >
         Milestones{" "}
         <span className="ml-2 font-normal normal-case tracking-normal text-sea-ink-3">UTC</span>
       </h2>

@@ -18,32 +18,36 @@
 }
 
 /*
- * WhiteWind design system: "Chart & Ink".
+ * WhiteWind design system: "Marine".
  *
- * One light working surface for the whole product, a cool fog ground with
- * near-white tables on it. The sidebar is a half-step darker fog, so the
- * workspace reads as the lit surface and navigation recedes. One dark
- * register remains: the live AIS console on the shipment page. Nothing
- * else inverts.
+ * FRAME. A navy sidebar and a white top bar frame a cool blue-grey
+ * workspace. Work sits in white panels on that ground: structural areas
+ * (a board, a queue, a log) are panels; the information inside them is
+ * grouped by type and rules, not by more boxes. The live AIS console is
+ * the one dark surface inside the workspace, in the sidebar's navy.
  *
- * COLOUR MEANS STATE, NEVER DECORATION.
- *   ink        text, rules, primary actions. Buttons are ink, not blue.
- *   move       bearing blue: a vessel under way, track made good. Nothing
- *              that is not moving is ever drawn in this blue.
+ * COLOUR. WhiteWind is blue: navy for the frame, marine blue for anything
+ * the operator can act on (primary actions, links, the active page, the
+ * selected row, focus). Movement is a brighter sea blue, used only for a
+ * vessel under way and its track. Then state, sparingly:
  *   amber      caution: something to review.
  *   red        alarm: something needs intervention now.
  *   green      arrived, complete.
- * Every colour signal is paired with a shape (diamond, triangle, AIS
+ * Every state colour is paired with a shape (diamond, triangle, AIS
  * target, filled vs hollow) so no state relies on colour alone.
  *
  * TYPE. Archivo carries every word; its width axis gives the system its
- * voice: condensed caps for chart labels and column heads, condensed
- * figures for the few numbers that lead a screen, normal width for prose.
- * Martian Mono, narrowed, is reserved for machine readings (IDs, MMSI,
- * knots, T-counts, clock times), never for prose or labels.
+ * voice: condensed caps only for column heads and table annotations,
+ * condensed figures for the numbers that lead a panel, normal width for
+ * prose and panel titles. Martian Mono, narrowed, is reserved for machine
+ * readings: shipment references, MMSI, coordinates, knots, T-counts, UTC.
  *
- * SHAPE. Sharp. Structure is drawn with rules, not boxes; the only radius
- * is 2px on controls. Shadow only on things that float (menus, dialogs).
+ * GRAMMAR. A shipment reference is always a blue mono tag (SHP-5AE202). A
+ * voyage is always drawn as the passage line: origin ring, track made
+ * good, vessel target, planned track dotted, destination ring.
+ *
+ * SHAPE. Tags 4px, controls 6px, panels 8px. Panels carry a hairline and
+ * the faintest navy shadow; only things that float (menus, dialogs) lift.
  */
 
 @theme inline {
@@ -70,10 +74,10 @@
   --text-4xl--line-height: 40px;
   --text-4xl--letter-spacing: -0.02em;
 
-  --radius-sm: 2px;
-  --radius-md: 2px;
-  --radius-lg: 2px;
-  --radius-xl: 2px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -153,47 +157,88 @@
   --color-sea-red-soft: var(--sea-red-soft);
   --color-sea-green: var(--sea-green);
   --color-sea-cursor: var(--sea-cursor);
+  --color-sea-green-soft: var(--sea-green-soft);
+  --color-ww-navy: var(--ww-navy);
+  --color-ww-navy-2: var(--ww-navy-2);
+  --color-ww-navy-3: var(--ww-navy-3);
+  --color-ww-navy-line: var(--ww-navy-line);
+  --color-ww-navy-ink: var(--ww-navy-ink);
+  --color-ww-navy-ink-2: var(--ww-navy-ink-2);
+  --color-ww-blue: var(--ww-blue);
+  --color-ww-blue-hover: var(--ww-blue-hover);
+  --color-ww-blue-bright: var(--ww-blue-bright);
+  --color-ww-steel: var(--ww-steel);
+  --color-ww-blue-soft: var(--ww-blue-soft);
+  --color-ww-blue-soft-2: var(--ww-blue-soft-2);
+  --color-ww-blue-line: var(--ww-blue-line);
 }
 
 :root {
-  --radius: 2px;
+  /* Shape: tags 4px, controls 6px, panels 8px. */
+  --radius: 8px;
 
   /* ---------------------------------------------------------- palette --- */
-  /* Ground and surfaces: a cool, faintly blue-grey fog, never warm paper. */
-  --sea-paper: oklch(0.968 0.004 240);
-  --sea-paper-2: oklch(0.945 0.006 240);
-  --sea-surface: oklch(0.993 0.002 240);
-  /* Selection: the row or item under the cursor, a cool tint of the ground. */
-  --sea-shallows: oklch(0.935 0.012 240);
-  --sea-shallows-2: oklch(0.905 0.018 240);
-  /* Chart ink, from full strength to the faintest mark. ink-3 still passes
-   * 4.5:1 on the ground; ink-4 is for marks and dotted track only. */
-  --sea-ink: oklch(0.215 0.02 255);
-  --sea-ink-2: oklch(0.39 0.018 255);
-  --sea-ink-3: oklch(0.505 0.015 250);
-  --sea-ink-4: oklch(0.74 0.01 245);
-  --sea-rule: oklch(0.855 0.007 245);
-  --sea-rule-2: oklch(0.915 0.005 245);
-  /* The bridge register: the rail and the live AIS console. */
-  --sea-console: oklch(0.2 0.018 255);
-  --sea-console-2: oklch(0.255 0.02 255);
-  --sea-console-line: oklch(0.32 0.02 255);
-  --sea-console-ink: oklch(0.965 0.004 240);
-  --sea-console-ink-2: oklch(0.72 0.012 245);
+  /*
+   * One blue family, hue 245-258, from the navy of the frame to the tint of
+   * a selected row. Every neutral carries a trace of the same hue, so grey
+   * never reads as a different product.
+   *
+   *   navy        the frame: sidebar, live AIS console
+   *   blue        WhiteWind: primary actions, links, selection, focus
+   *   move        a vessel under way, track made good (a brighter sea blue)
+   *   steel       secondary marks, idle tracks
+   *   blue-soft   selected and hovered rows, reference tags
+   */
+  --ww-navy: oklch(0.205 0.048 258);
+  --ww-navy-2: oklch(0.245 0.055 257);
+  --ww-navy-3: oklch(0.3 0.066 256);
+  --ww-navy-line: oklch(0.31 0.045 256);
+  --ww-navy-ink: oklch(0.955 0.008 250);
+  --ww-navy-ink-2: oklch(0.75 0.03 250);
+  --ww-blue: oklch(0.47 0.135 256);
+  --ww-blue-hover: oklch(0.41 0.125 257);
+  --ww-blue-bright: oklch(0.75 0.105 243);
+  --ww-steel: oklch(0.56 0.045 250);
+  --ww-blue-soft: oklch(0.955 0.02 250);
+  --ww-blue-soft-2: oklch(0.915 0.038 250);
+  --ww-blue-line: oklch(0.85 0.045 250);
+
+  /* Ground and surfaces: a cool blue-grey workspace, white panels on it. */
+  --sea-paper: oklch(0.965 0.007 250);
+  --sea-paper-2: oklch(0.94 0.01 250);
+  --sea-surface: oklch(0.997 0.002 250);
+  /* Selection and hover: tints of WhiteWind blue. */
+  --sea-shallows: var(--ww-blue-soft);
+  --sea-shallows-2: var(--ww-blue-soft-2);
+  /* Ink, near-black navy to the faintest mark. ink-3 passes 4.5:1 on the
+   * ground; ink-4 is for marks and dotted track only. */
+  --sea-ink: oklch(0.225 0.03 258);
+  --sea-ink-2: oklch(0.4 0.03 256);
+  --sea-ink-3: oklch(0.51 0.028 252);
+  --sea-ink-4: oklch(0.74 0.02 250);
+  --sea-rule: oklch(0.88 0.013 250);
+  --sea-rule-2: oklch(0.93 0.009 250);
+  /* The navy register: the sidebar and the live AIS console. */
+  --sea-console: var(--ww-navy);
+  --sea-console-2: var(--ww-navy-2);
+  --sea-console-line: var(--ww-navy-line);
+  --sea-console-ink: var(--ww-navy-ink);
+  --sea-console-ink-2: var(--ww-navy-ink-2);
   /* Signals. */
-  --sea-move: oklch(0.5 0.135 250);
-  --sea-move-bright: oklch(0.74 0.115 242);
-  --sea-move-soft: oklch(0.94 0.025 245);
+  --sea-move: oklch(0.54 0.14 245);
+  --sea-move-bright: oklch(0.76 0.11 240);
+  --sea-move-soft: oklch(0.95 0.025 245);
   --sea-amber: oklch(0.78 0.15 74);
   --sea-amber-ink: oklch(0.5 0.115 62);
-  --sea-amber-soft: oklch(0.96 0.035 82);
+  --sea-amber-soft: oklch(0.965 0.035 82);
   --sea-red: oklch(0.53 0.19 27);
   --sea-red-bright: oklch(0.7 0.17 27);
-  --sea-red-soft: oklch(0.955 0.025 25);
-  --sea-green: oklch(0.54 0.09 162);
-  /* The cursor is ink: pointing at something is not a state. */
-  --sea-cursor: var(--sea-ink);
-  --sea-grid: oklch(0.945 0.006 240);
+  --sea-red-soft: oklch(0.96 0.022 25);
+  --sea-green: oklch(0.54 0.1 162);
+  --sea-green-soft: oklch(0.96 0.025 162);
+  /* The cursor is WhiteWind blue: pointing at a row selects it. */
+  --sea-cursor: var(--ww-blue);
+  --sea-grid: oklch(0.95 0.008 250);
 
   /* ------------------------------------------------- semantic aliases --- */
   --background: var(--sea-paper);
@@ -205,9 +250,9 @@
   --popover: var(--surface);
   --popover-foreground: var(--foreground);
 
-  /* Primary action is ink. Blue is reserved for movement. */
-  --primary: var(--sea-ink);
-  --primary-hover: oklch(0.31 0.022 255);
+  /* Primary action is WhiteWind blue. */
+  --primary: var(--ww-blue);
+  --primary-hover: var(--ww-blue-hover);
   --primary-foreground: var(--sea-surface);
   --primary-deep: var(--sea-ink);
 
@@ -232,7 +277,7 @@
 
   --border: var(--sea-rule);
   --input: var(--sea-rule);
-  --ring: var(--sea-move);
+  --ring: var(--ww-blue);
   --tint-selected: var(--sea-shallows);
 
   --chart-1: var(--sea-move);
@@ -258,19 +303,13 @@
   --sidebar-border: var(--nav-border);
   --sidebar-ring: var(--ring);
 
-  /* Layout: the height of the top bar on phones and tablets, used by every
-   * sticky element below it. On desktop navigation is the sidebar, so
-   * sticky elements pin to the top of the viewport. */
-  --rail-h: 48px;
+  /* Layout: the workspace top bar, at every width. Sticky elements below
+   * it pin to its bottom edge. */
+  --bar-h: 52px;
+  --rail-h: var(--bar-h);
 
   /* Motion: one decelerating curve, short durations. */
   --ease-premium: cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-@media (min-width: 1024px) {
-  :root {
-    --rail-h: 0px;
-  }
 }
 
 @layer base {
@@ -315,6 +354,43 @@
   background-color: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
+  box-shadow: 0 1px 2px color-mix(in oklab, var(--ww-navy) 5%, transparent);
+}
+
+/* A shipment reference, the product's most repeated identifier. */
+@utility ref-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background-color: var(--ww-blue-soft);
+  color: var(--ww-blue);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  font-variation-settings: "wdth" 82;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+/* A vessel's name, set in capitals as it is on the hull and in the
+ * register. */
+@utility vessel {
+  text-transform: uppercase;
+  letter-spacing: 0.035em;
+  font-weight: 500;
+}
+
+/* The title of a panel: sentence case, semibold, never caps. */
+@utility panel-title {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: var(--sea-ink);
 }
 
 /* The only surface with shadow: things that float above the page. */

@@ -412,29 +412,26 @@ function ShipmentDetail() {
         {/* ----------------------------------------------------- record header */}
         <header className="pt-5">
           <div className="flex items-center justify-between gap-4">
-            <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2 text-[12px]">
+            <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 text-[12px]">
               <Link
                 to="/shipments"
-                className="focus-ring inline-flex shrink-0 items-center gap-1 text-sea-ink-3 hover:text-sea-ink"
+                aria-label="Back to shipments"
+                className="focus-ring grid size-7 shrink-0 place-items-center rounded-md border border-sea-rule bg-sea-surface text-sea-ink-2 transition-colors hover:border-ww-blue-line hover:text-ww-blue"
               >
                 <ArrowLeft className="size-3.5" aria-hidden />
-                Shipments
               </Link>
-              <span aria-hidden className="text-sea-ink-4">
-                /
-              </span>
-              <span className="telemetry truncate text-[11px] text-sea-ink-2">
-                {shortId(shipment.id)}
-                {shipment.reference ? (
-                  <span className="ml-2 text-sea-ink-3">{shipment.reference}</span>
-                ) : null}
-                {shipment.container_number ? (
-                  <span className="ml-2 hidden text-sea-ink-3 sm:inline">
-                    {shipment.container_number}
-                  </span>
-                ) : null}
-              </span>
-            </nav>
+              <span className="ref-tag">{shortId(shipment.id)}</span>
+              {shipment.reference ? (
+                <span className="telemetry text-[10.5px] uppercase text-sea-ink-3">
+                  Ref {shipment.reference}
+                </span>
+              ) : null}
+              {shipment.container_number ? (
+                <span className="telemetry hidden text-[10.5px] uppercase text-sea-ink-3 sm:inline">
+                  Cntr {shipment.container_number}
+                </span>
+              ) : null}
+            </div>
             <div className="flex shrink-0 items-center gap-1.5">
               {next && !legacyTerminal ? (
                 <span className="hidden sm:block">
@@ -463,7 +460,7 @@ function ShipmentDetail() {
             {shipment.client_name}
           </h1>
 
-          <dl className="mt-5 grid grid-cols-2 border-y border-sea-rule sm:grid-cols-3 lg:grid-cols-[1.1fr_1.1fr_1.2fr_1.1fr_0.9fr]">
+          <dl className="panel mt-5 grid grid-cols-2 overflow-hidden px-4 sm:grid-cols-3 sm:px-5 lg:grid-cols-[1.1fr_1.1fr_1.2fr_1.1fr_0.9fr]">
             <HeaderStat label="Phase">
               <span className="flex items-center gap-2.5">
                 <PhaseLadder status={shipment.status} size="md" />
@@ -484,7 +481,9 @@ function ShipmentDetail() {
               </HeaderSub>
             </HeaderStat>
             <HeaderStat label="Vessel">
-              <span className={`truncate ${shipment.vessel_name ? "" : "text-sea-ink-3"}`}>
+              <span
+                className={`truncate ${shipment.vessel_name ? "vessel !font-semibold" : "text-sea-ink-3"}`}
+              >
                 {shipment.vessel_name ?? "Not assigned"}
               </span>
               <HeaderSub mono>
@@ -572,8 +571,8 @@ function ShipmentDetail() {
           {level || automationHold ? (
             <div
               role="status"
-              className={`animate-in mt-4 flex flex-col gap-3 border-l-[3px] bg-sea-surface py-3 pl-4 pr-4 sm:flex-row sm:items-center sm:justify-between ${
-                level === "alarm" ? "border-sea-red" : "border-sea-amber"
+              className={`panel animate-in mt-3 flex flex-col gap-3 !border-l-[3px] py-3 pl-4 pr-4 sm:flex-row sm:items-center sm:justify-between sm:pl-5 ${
+                level === "alarm" ? "!border-l-sea-red" : "!border-l-sea-amber"
               }`}
             >
               <div className="min-w-0">
@@ -626,7 +625,7 @@ function ShipmentDetail() {
         </header>
 
         {/* ------------------------------------------------------- the passage */}
-        <div className="mt-7">
+        <div className="panel mt-3 px-4 pb-4 pt-4 sm:px-5">
           <VoyagePlot
             shipment={shipment}
             position={position ?? null}
@@ -640,7 +639,7 @@ function ShipmentDetail() {
         <div
           role="tablist"
           aria-label="Voyage record"
-          className="mt-8 flex gap-6 overflow-x-auto border-b border-sea-rule"
+          className="mt-7 flex gap-6 overflow-x-auto border-b border-sea-rule [scrollbar-width:none]"
           onKeyDown={(e) => {
             if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
             const i = TABS.findIndex((t) => t.key === tab);
@@ -670,7 +669,7 @@ function ShipmentDetail() {
                 onClick={() => setTab(t.key)}
                 className={`focus-ring -mb-px flex shrink-0 items-center gap-2 border-b-2 pb-2.5 text-[13.5px] transition-colors duration-150 ${
                   tab === t.key
-                    ? "border-sea-ink font-medium text-sea-ink"
+                    ? "border-ww-blue font-medium text-sea-ink"
                     : "border-transparent text-sea-ink-3 hover:text-sea-ink"
                 }`}
               >
@@ -689,14 +688,17 @@ function ShipmentDetail() {
           })}
         </div>
 
-        <div role="tabpanel" aria-labelledby={`tab-${tab}`} key={tab} className="animate-in pt-7">
+        <div role="tabpanel" aria-labelledby={`tab-${tab}`} key={tab} className="animate-in pt-5">
           {tab === "overview" ? (
-            <div className="grid grid-cols-1 gap-x-12 gap-y-10 lg:grid-cols-[minmax(0,1fr)_minmax(320px,380px)]">
-              <div className="flex min-w-0 flex-col gap-10">
-                <section aria-labelledby="lifecycle-title">
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(320px,380px)]">
+              <div className="flex min-w-0 flex-col gap-5">
+                <section
+                  aria-labelledby="lifecycle-title"
+                  className="panel min-w-0 px-4 pb-3 sm:px-5 [&_li:last-child]:border-b-0"
+                >
                   <h2
                     id="lifecycle-title"
-                    className="chart-label border-b border-sea-ink pb-2 text-sea-ink"
+                    className="panel-title -mx-4 border-b border-sea-rule px-4 py-3.5 sm:-mx-5 sm:px-5"
                   >
                     Lifecycle
                   </h2>
@@ -708,10 +710,13 @@ function ShipmentDetail() {
                   />
                 </section>
 
-                <section aria-labelledby="watch-title">
+                <section
+                  aria-labelledby="watch-title"
+                  className="panel min-w-0 px-4 pb-3 sm:px-5 [&_li:last-child]:border-b-0"
+                >
                   <h2
                     id="watch-title"
-                    className="chart-label border-b border-sea-ink pb-2 text-sea-ink"
+                    className="panel-title -mx-4 border-b border-sea-rule px-4 py-3.5 sm:-mx-5 sm:px-5"
                   >
                     Monitoring
                   </h2>
@@ -743,16 +748,19 @@ function ShipmentDetail() {
                   </dl>
                 </section>
 
-                <section aria-labelledby="latest-title">
-                  <div className="flex items-end justify-between border-b border-sea-ink pb-2">
-                    <h2 id="latest-title" className="chart-label text-sea-ink">
+                <section
+                  aria-labelledby="latest-title"
+                  className="panel min-w-0 px-4 pb-3 sm:px-5 [&_li:last-child]:border-b-0"
+                >
+                  <div className="-mx-4 flex min-h-[52px] items-center justify-between border-b border-sea-rule px-4 py-2.5 sm:-mx-5 sm:px-5">
+                    <h2 id="latest-title" className="panel-title">
                       Latest entries
                     </h2>
                     {events.length > 0 ? (
                       <button
                         type="button"
                         onClick={() => setTab("timeline")}
-                        className="focus-ring inline-flex items-center gap-1 text-[12px] text-sea-ink-2 hover:text-sea-ink"
+                        className="focus-ring inline-flex items-center gap-1 rounded-sm text-[12.5px] font-medium text-ww-blue hover:text-ww-blue-hover"
                       >
                         Full voyage log <ArrowRight className="size-3" aria-hidden />
                       </button>
@@ -805,15 +813,15 @@ function ShipmentDetail() {
                   )}
                 </section>
 
-                <section>
+                <section className="panel min-w-0 px-4 pb-3 sm:px-5 [&_li:last-child]:border-b-0">
                   <button
                     type="button"
                     onClick={() => setEditOpen((v) => !v)}
                     aria-expanded={editOpen}
-                    className="focus-ring flex w-full items-center justify-between border-b border-sea-ink pb-2 text-left"
+                    className="focus-ring -mx-4 flex w-[calc(100%+2rem)] items-center justify-between border-b border-sea-rule px-4 py-3.5 text-left sm:-mx-5 sm:w-[calc(100%+2.5rem)] sm:px-5"
                   >
-                    <span className="chart-label text-sea-ink">Shipment information</span>
-                    <span className="inline-flex items-center gap-1 text-[12px] text-sea-ink-2">
+                    <span className="panel-title">Shipment information</span>
+                    <span className="inline-flex items-center gap-1 text-[12.5px] font-medium text-ww-blue">
                       {editOpen ? "Close" : "Edit details"}
                       <ChevronRight
                         className={`size-3.5 transition-transform duration-200 ${editOpen ? "rotate-90" : ""}`}
@@ -1002,11 +1010,14 @@ function ShipmentDetail() {
               </div>
 
               {/* Right: the live instrument and the correction control */}
-              <aside className="flex min-w-0 flex-col gap-6 max-lg:order-first" aria-label="Vessel">
-                <section aria-labelledby="console-title">
+              <aside className="flex min-w-0 flex-col gap-5 max-lg:order-first" aria-label="Vessel">
+                <section
+                  aria-labelledby="console-title"
+                  className="panel min-w-0 px-4 pb-3 sm:px-5 [&_li:last-child]:border-b-0"
+                >
                   <h2
                     id="console-title"
-                    className="chart-label border-b border-sea-ink pb-2 text-sea-ink"
+                    className="panel-title -mx-4 border-b border-sea-rule px-4 py-3.5 sm:-mx-5 sm:px-5"
                   >
                     Vessel and live position
                   </h2>
@@ -1087,17 +1098,20 @@ function ShipmentDetail() {
                   {shipment.vessel_mmsi ? (
                     <Link
                       to="/map"
-                      className="focus-ring mt-2 inline-flex items-center gap-1 text-[12px] text-sea-ink-2 hover:text-sea-ink"
+                      className="focus-ring mt-2 inline-flex items-center gap-1 rounded-sm text-[12.5px] font-medium text-ww-blue hover:text-ww-blue-hover"
                     >
                       Fleet map <ArrowRight className="size-3" aria-hidden />
                     </Link>
                   ) : null}
                 </section>
 
-                <section aria-labelledby="override-title">
+                <section
+                  aria-labelledby="override-title"
+                  className="panel min-w-0 px-4 pb-3 sm:px-5 [&_li:last-child]:border-b-0"
+                >
                   <h2
                     id="override-title"
-                    className="chart-label border-b border-sea-rule pb-2 text-sea-ink-2"
+                    className="panel-title -mx-4 border-b border-sea-rule px-4 py-3.5 sm:-mx-5 sm:px-5"
                   >
                     Correct the phase
                   </h2>
@@ -1176,7 +1190,7 @@ function ShipmentDetail() {
           ) : null}
 
           {tab === "timeline" ? (
-            <div className="grid grid-cols-1 gap-x-12 gap-y-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
+            <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
               <ShipmentTimeline shipment={shipment} events={events} />
               <StatusHistory events={events} />
             </div>
@@ -1187,9 +1201,12 @@ function ShipmentDetail() {
           {tab === "notes" ? <ShipmentNotes shipmentId={id} /> : null}
 
           {tab === "alerts" ? (
-            <section aria-labelledby="signals-title">
-              <div className="flex flex-wrap items-end justify-between gap-2 border-b border-sea-ink pb-2">
-                <h2 id="signals-title" className="chart-label text-sea-ink">
+            <section
+              aria-labelledby="signals-title"
+              className="panel min-w-0 px-4 pb-3 sm:px-5 [&_li:last-child]:border-b-0"
+            >
+              <div className="-mx-4 flex min-h-[52px] flex-wrap items-center justify-between gap-2 border-b border-sea-rule px-4 py-2.5 sm:-mx-5 sm:px-5">
+                <h2 id="signals-title" className="panel-title">
                   Signals
                   <span className="telemetry ml-2 font-normal normal-case tracking-normal text-sea-ink-3">
                     {shipmentAlerts.length} on this voyage, UTC
@@ -1283,7 +1300,7 @@ function HeaderMenu({
     <div className="relative" ref={ref}>
       <button
         type="button"
-        className="focus-ring grid size-8 place-items-center rounded-[2px] border border-sea-rule bg-sea-surface text-sea-ink-2 transition-colors hover:bg-sea-paper-2 hover:text-sea-ink"
+        className="focus-ring grid size-8 place-items-center rounded-md border border-sea-rule bg-sea-surface text-sea-ink-2 transition-colors hover:bg-sea-paper-2 hover:text-sea-ink"
         aria-label="More actions"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
@@ -1326,7 +1343,7 @@ function HeaderMenu({
 function HeaderStat({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="min-w-0 border-sea-rule-2 py-3 pr-4 [&:not(:first-child)]:pl-4 [&:not(:first-child)]:border-l max-sm:[&:nth-child(odd)]:border-l-0 max-sm:[&:nth-child(odd)]:pl-0 max-sm:[&:nth-child(n+3)]:border-t max-sm:[&:last-child]:col-span-2 sm:max-lg:[&:nth-child(3n+1)]:border-l-0 sm:max-lg:[&:nth-child(3n+1)]:pl-0 sm:max-lg:[&:nth-child(n+4)]:border-t">
-      <dt className="chart-label text-sea-ink-3">{label}</dt>
+      <dt className="text-[12px] font-medium text-sea-ink-3">{label}</dt>
       <dd className="mt-1 flex min-w-0 flex-col text-[15px] font-medium leading-[21px] text-sea-ink">
         {children}
       </dd>
@@ -1466,9 +1483,15 @@ function LifecycleJourney({
                   <li key={phase} className="min-w-0 pr-2">
                     <span
                       aria-hidden
-                      className={`block ${current || arrived ? "h-[5px]" : "h-[3px]"} ${
-                        arrived ? "bg-sea-green" : done || current ? "bg-sea-ink" : "bg-sea-rule"
-                      } ${done && !arrived ? "opacity-45" : ""}`}
+                      className={`block rounded-full ${current || arrived ? "h-[5px]" : "h-[3px]"} ${
+                        arrived
+                          ? "bg-sea-green"
+                          : current
+                            ? "bg-ww-blue"
+                            : done
+                              ? "bg-ww-steel/70"
+                              : "bg-sea-rule"
+                      }`}
                     />
                     <span
                       className={`mt-2 block truncate text-[12.5px] leading-tight ${

@@ -145,7 +145,7 @@ export function AppShell({
   bare?: boolean;
 }) {
   const mode = useSideMode();
-  const maxW = wide ? "max-w-[1600px]" : "max-w-[1160px]";
+  const maxW = wide ? "max-w-[1600px]" : "max-w-[1180px]";
 
   // "[" toggles the sidebar, as in most desktop tools.
   useEffect(() => {
@@ -169,35 +169,35 @@ export function AppShell({
         Skip to content
       </a>
       <Sidebar mode={mode} />
-      <MobileBar />
 
       <div className="pb-[calc(56px+env(safe-area-inset-bottom))] transition-[padding] duration-200 ease-[var(--ease-premium)] lg:pb-0 lg:pl-16 lg:side-open:pl-60">
+        <TopBar />
         {bare ? (
           <main id="main" className="w-full">
             {children}
           </main>
         ) : (
           <>
-            <header className="border-b border-sea-rule">
+            <header className={tabs ? "border-b border-sea-rule" : ""}>
               <div
-                className={`mx-auto w-full px-4 pt-6 sm:px-6 lg:px-8 ${maxW} ${tabs ? "" : "pb-5"}`}
+                className={`mx-auto w-full px-4 pt-7 sm:px-6 lg:px-8 ${maxW} ${tabs ? "" : "pb-1"}`}
               >
                 <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
                   <div className="min-w-0">
-                    <h1 className="display text-[26px] leading-[30px] text-sea-ink">{title}</h1>
+                    <h1 className="display text-[28px] leading-[32px] text-sea-ink">{title}</h1>
                     {description ? (
-                      <p className="mt-1 text-[13px] text-sea-ink-3">{description}</p>
+                      <p className="mt-1.5 text-[13.5px] text-sea-ink-3">{description}</p>
                     ) : null}
                   </div>
                   {actions ? (
                     <div className="flex flex-wrap items-center gap-2">{actions}</div>
                   ) : null}
                 </div>
-                {headerExtra ? <div className="mt-5">{headerExtra}</div> : null}
-                {tabs ? <div className="mt-4">{tabs}</div> : null}
+                {headerExtra ? <div className="mt-6">{headerExtra}</div> : null}
+                {tabs ? <div className="mt-5">{tabs}</div> : null}
               </div>
             </header>
-            <main id="main" className={`mx-auto w-full px-4 py-6 sm:px-6 lg:px-8 ${maxW}`}>
+            <main id="main" className={`mx-auto w-full px-4 pb-12 pt-6 sm:px-6 lg:px-8 ${maxW}`}>
               <div className="animate-in">{children}</div>
             </main>
           </>
@@ -240,7 +240,7 @@ function useFleetCounts() {
 
 function Sidebar({ mode }: { mode: SideMode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const { active, alarms, loaded, lastSync, isLoading } = useFleetCounts();
+  const { active, alarms, loaded } = useFleetCounts();
   const expanded = mode === "open";
 
   const countFor = (to: string) =>
@@ -255,13 +255,13 @@ function Sidebar({ mode }: { mode: SideMode }) {
   return (
     <aside
       aria-label="Sidebar"
-      className="fixed inset-y-0 left-0 z-30 hidden w-16 flex-col border-r border-sea-rule bg-sea-paper-2 transition-[width] duration-200 ease-[var(--ease-premium)] lg:flex side-open:w-60"
+      className="fixed inset-y-0 left-0 z-30 hidden w-16 flex-col bg-ww-navy text-ww-navy-ink transition-[width] duration-200 ease-[var(--ease-premium)] lg:flex side-open:w-60"
     >
-      {/* Identity */}
-      <div className="flex h-14 shrink-0 items-center justify-center px-3 side-open:justify-start side-open:px-4">
+      {/* Identity, level with the top bar */}
+      <div className="flex h-[var(--bar-h)] shrink-0 items-center justify-center border-b border-ww-navy-line px-3 side-open:justify-start side-open:px-4">
         <Link
           to="/"
-          className="focus-ring flex items-center gap-2.5"
+          className="focus-ring flex items-center gap-2.5 rounded-md"
           aria-label="WhiteWind, dashboard"
         >
           <BrandMark />
@@ -269,12 +269,11 @@ function Sidebar({ mode }: { mode: SideMode }) {
         </Link>
       </div>
 
-      <div className="shrink-0 px-3">
-        <GlobalSearch variant="sidebar" />
-      </div>
-
-      <nav aria-label="Primary" className="mt-4 min-h-0 flex-1 overflow-y-auto px-3 pb-4">
-        <ul className="space-y-px">
+      <nav aria-label="Primary" className="min-h-0 flex-1 overflow-y-auto px-3 pb-4 pt-4">
+        <p className="mb-1.5 hidden px-2.5 text-[10.5px] font-medium uppercase tracking-[0.08em] text-ww-navy-ink-2/80 side-open:block">
+          Operations
+        </p>
+        <ul className="space-y-0.5">
           {OPERATE.map((item) => (
             <SideLink
               key={item.to}
@@ -284,30 +283,34 @@ function Sidebar({ mode }: { mode: SideMode }) {
             />
           ))}
         </ul>
-        <div aria-hidden className="mx-2.5 my-3 h-px bg-sea-rule" />
-        <ul className="space-y-px">
+        <div aria-hidden className="mx-2.5 my-4 h-px bg-ww-navy-line" />
+        <p className="mb-1.5 hidden px-2.5 text-[10.5px] font-medium uppercase tracking-[0.08em] text-ww-navy-ink-2/80 side-open:block">
+          Records
+        </p>
+        <ul className="space-y-0.5">
           {RECORDS.map((item) => (
             <SideLink key={item.to} item={item} on={item.match(pathname)} count={null} />
           ))}
         </ul>
       </nav>
 
-      {/* The watch: clock, monitor, workspace */}
-      <div className="shrink-0 border-t border-sea-rule px-3 pb-3 pt-3">
-        <Watch lastSync={lastSync} isLoading={isLoading} />
-        <div className="mt-3 flex flex-col items-center gap-2 side-open:flex-row side-open:gap-1">
-          <WorkspaceMenu />
-          <button
-            type="button"
-            onClick={toggleSide}
-            aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
-            title={`${expanded ? "Collapse" : "Expand"} sidebar  [`}
-            className="focus-ring grid size-8 shrink-0 place-items-center rounded-[2px] text-sea-ink-3 transition-colors hover:bg-sea-shallows hover:text-sea-ink"
-          >
-            <PanelLeftClose className="hidden size-4 side-open:block" aria-hidden />
-            <PanelLeftOpen className="size-4 side-open:hidden" aria-hidden />
-          </button>
-        </div>
+      {/* Workspace */}
+      <div className="flex shrink-0 flex-col items-center gap-2 border-t border-ww-navy-line px-3 py-3 side-open:flex-row side-open:gap-1">
+        <WorkspaceMenu variant="sidebar" />
+        <button
+          type="button"
+          onClick={toggleSide}
+          aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
+          title={`${expanded ? "Collapse" : "Expand"} sidebar  [`}
+          className="focus-ring grid size-8 shrink-0 place-items-center rounded-md text-ww-navy-ink-2 transition-colors hover:bg-ww-navy-2 hover:text-ww-navy-ink"
+        >
+          <PanelLeftClose
+            className="hidden size-4 side-open:block"
+            strokeWidth={1.75}
+            aria-hidden
+          />
+          <PanelLeftOpen className="size-4 side-open:hidden" strokeWidth={1.75} aria-hidden />
+        </button>
       </div>
     </aside>
   );
@@ -329,18 +332,18 @@ function SideLink({
         to={item.to}
         aria-current={on ? "page" : undefined}
         title={item.label}
-        className={`focus-ring group relative flex h-8 items-center justify-center gap-2.5 rounded-[2px] px-2.5 text-[13px] transition-colors duration-150 side-open:justify-start ${
+        className={`focus-ring group relative flex h-9 items-center justify-center gap-3 rounded-md px-2.5 text-[13.5px] transition-colors duration-150 side-open:justify-start ${
           on
-            ? "bg-sea-surface font-medium text-sea-ink shadow-[inset_0_0_0_1px_var(--sea-rule)]"
-            : "text-sea-ink-2 hover:bg-sea-shallows hover:text-sea-ink"
+            ? "bg-ww-navy-3 font-medium text-white"
+            : "text-ww-navy-ink-2 hover:bg-ww-navy-2 hover:text-ww-navy-ink"
         }`}
       >
         <span
           aria-hidden
-          className={`absolute inset-y-[7px] left-0 w-[2px] ${on ? "bg-sea-ink" : "bg-transparent"}`}
+          className={`absolute inset-y-2 left-0 w-[3px] rounded-r-full transition-colors ${on ? "bg-ww-blue-bright" : "bg-transparent"}`}
         />
         <Icon
-          className={`size-4 shrink-0 ${on ? "text-sea-ink" : "text-sea-ink-3 group-hover:text-sea-ink-2"}`}
+          className={`size-[17px] shrink-0 ${on ? "text-ww-blue-bright" : "text-ww-navy-ink-2 group-hover:text-ww-navy-ink"}`}
           strokeWidth={1.75}
           aria-hidden
         />
@@ -348,14 +351,18 @@ function SideLink({
         {count ? (
           <>
             <span
-              className={`telemetry hidden text-[10.5px] side-open:inline ${count.alarm ? "font-medium text-sea-red" : "text-sea-ink-3"}`}
+              className={`telemetry hidden text-[10.5px] side-open:inline-flex ${
+                count.alarm
+                  ? "h-[18px] min-w-[20px] items-center justify-center rounded-[4px] bg-sea-red px-1 font-medium text-white"
+                  : "text-ww-navy-ink-2"
+              }`}
             >
               {count.n}
             </span>
             {count.alarm ? (
               <span
                 aria-hidden
-                className="telemetry absolute right-1 top-0.5 min-w-[15px] rounded-[2px] bg-sea-red px-[3px] text-center text-[9px] leading-[14px] text-sea-surface side-open:hidden"
+                className="telemetry absolute right-1 top-0.5 min-w-[15px] rounded-[4px] bg-sea-red px-[3px] text-center text-[9px] leading-[14px] text-white side-open:hidden"
               >
                 {count.n}
               </span>
@@ -368,57 +375,17 @@ function SideLink({
   );
 }
 
-/** UTC first (the voyage record's clock), local beneath; then the state of
- * the automation run, the one system fact an operator needs at a glance. */
-function Watch({ lastSync, isLoading }: { lastSync: string | undefined; isLoading: boolean }) {
-  const now = useNow(30_000);
-  const stale = !lastSync || (now != null && now - new Date(lastSync).getTime() > MONITOR_STALE_MS);
-  return (
-    <div className="flex flex-col items-center side-open:items-stretch">
-      {now != null ? (
-        <p className="telemetry flex items-baseline gap-2 text-[12px] text-sea-ink">
-          <span title="Coordinated Universal Time">
-            {utcClock(now)}
-            <span className="ml-1 hidden text-[9.5px] text-sea-ink-3 side-open:inline">UTC</span>
-          </span>
-          <span className="hidden text-[11px] text-sea-ink-3 side-open:inline">
-            {clock(now)} local
-          </span>
-        </p>
-      ) : (
-        <span className="block h-4 w-12 animate-pulse bg-sea-paper" />
-      )}
-      <p
-        className="mt-1.5 hidden items-center gap-1.5 text-[11.5px] text-sea-ink-3 side-open:flex"
-        title="The automated AIS and status pass runs server-side on a schedule"
-      >
-        <span
-          aria-hidden
-          className={`inline-block size-[6px] shrink-0 rotate-45 ${
-            isLoading ? "bg-sea-rule" : stale ? "bg-sea-amber" : "bg-sea-green"
-          }`}
-        />
-        {isLoading
-          ? "AIS monitor"
-          : lastSync
-            ? `AIS monitor ran ${relativeTime(lastSync)}`
-            : "AIS monitor has not run"}
-      </p>
-    </div>
-  );
-}
-
-/** The mark alone, for the icon rail and the phone bar: a vane over a
- * rule, the one drawn symbol in the product. */
+/** The mark: a vane over a rule, white on WhiteWind blue. The one drawn
+ * symbol in the product. */
 function BrandMark() {
   return (
     <span
       aria-hidden
-      className="grid size-7 shrink-0 place-items-center rounded-[2px] bg-sea-ink text-sea-surface"
+      className="grid size-7 shrink-0 place-items-center rounded-md bg-ww-blue text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.18)]"
     >
       <svg width="14" height="14" viewBox="0 0 14 14">
         <path d="M7 1.5 L11 10 L7 8.2 L3 10 Z" fill="currentColor" />
-        <rect x="2" y="11.6" width="10" height="1.2" fill="currentColor" opacity="0.55" />
+        <rect x="2" y="11.6" width="10" height="1.2" fill="currentColor" opacity="0.6" />
       </svg>
     </span>
   );
@@ -426,46 +393,139 @@ function BrandMark() {
 
 /** Extended caps set against the condensed labels everywhere else: the
  * one place the type system goes wide. */
-function Wordmark({ className = "" }: { className?: string }) {
+function Wordmark({
+  className = "",
+  tone = "navy",
+}: {
+  className?: string;
+  tone?: "navy" | "light";
+}) {
   return (
     <span
-      className={`text-[12.5px] font-bold uppercase tracking-[0.16em] text-sea-ink ${className}`}
+      className={`text-[12.5px] font-bold uppercase tracking-[0.16em] ${tone === "navy" ? "text-white" : "text-sea-ink"} ${className}`}
       style={{ fontVariationSettings: '"wdth" 125' }}
     >
-      White<span className="text-sea-ink-3">wind</span>
+      White
+      <span className={tone === "navy" ? "text-ww-navy-ink-2" : "text-ww-blue"}>wind</span>
     </span>
   );
 }
 
-/* -------------------------------------------------- phones and tablets --- */
+/* ------------------------------------------------------------- top bar --- */
 
-function MobileBar() {
-  const { alarms, loaded } = useFleetCounts();
+/** Where the operator is, as a trail: section, then the record. */
+function useTrail(pathname: string) {
+  const section = ALL_NAV.find((n) => n.match(pathname)) ?? null;
+  const record = /^\/shipments\/[0-9a-f-]{8,}/i.test(pathname)
+    ? "Voyage record"
+    : pathname === "/shipments/active"
+      ? "Active"
+      : pathname === "/shipments/completed"
+        ? "Completed"
+        : null;
+  return { section, record };
+}
+
+/**
+ * The top of the workspace at every width: where you are, search, and the
+ * watch (UTC clock and the state of the automation run). On phones and
+ * tablets it also carries the mark and the standing alarm count.
+ */
+function TopBar() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { section, record } = useTrail(pathname);
+  const { alarms, loaded, lastSync, isLoading } = useFleetCounts();
+  const now = useNow(30_000);
+  const stale = !lastSync || (now != null && now - new Date(lastSync).getTime() > MONITOR_STALE_MS);
+
   return (
-    <header className="sticky top-0 z-30 flex h-[var(--rail-h)] items-center gap-3 border-b border-sea-rule bg-sea-surface/95 px-4 backdrop-blur-sm sm:px-6 lg:hidden">
-      <Link
-        to="/"
-        className="focus-ring flex items-center gap-2.5"
-        aria-label="WhiteWind, dashboard"
-      >
-        <BrandMark />
-        <Wordmark />
-      </Link>
-      <div className="ml-auto flex items-center gap-1">
-        <GlobalSearch variant="bar" />
-        {loaded && alarms > 0 ? (
-          <Link
-            to="/"
-            className="focus-ring flex h-9 items-center gap-1.5 px-2 text-[12px] font-medium text-sea-red"
-            aria-label={`${alarms} voyages in alarm, open the dashboard`}
-          >
-            <span aria-hidden className="inline-block size-[7px] rotate-45 bg-sea-red" />
-            <span className="telemetry">{alarms}</span>
-          </Link>
-        ) : null}
-        <WorkspaceMenu />
+    <div className="sticky top-0 z-20 border-b border-sea-rule bg-sea-surface/92 backdrop-blur-md">
+      <div className="flex h-[var(--bar-h)] items-center gap-3 px-4 sm:px-6 lg:px-8">
+        <Link
+          to="/"
+          className="focus-ring flex shrink-0 items-center rounded-md lg:hidden"
+          aria-label="WhiteWind, dashboard"
+        >
+          <BrandMark />
+        </Link>
+
+        {/* Trail */}
+        <nav aria-label="You are here" className="flex min-w-0 items-center gap-2 text-[13px]">
+          <span className="hidden shrink-0 text-sea-ink-3 sm:inline">WhiteWind</span>
+          <span aria-hidden className="hidden text-sea-ink-4 sm:inline">
+            /
+          </span>
+          {section ? (
+            record ? (
+              <Link
+                to={section.to}
+                className="focus-ring shrink-0 rounded-sm text-sea-ink-3 transition-colors hover:text-ww-blue"
+              >
+                {section.label}
+              </Link>
+            ) : (
+              <span className="truncate font-medium text-sea-ink">{section.label}</span>
+            )
+          ) : null}
+          {record ? (
+            <>
+              <span aria-hidden className="text-sea-ink-4">
+                /
+              </span>
+              <span className="truncate font-medium text-sea-ink">{record}</span>
+            </>
+          ) : null}
+        </nav>
+
+        <div className="ml-auto flex items-center gap-2 sm:gap-4">
+          <GlobalSearch />
+
+          {/* The watch */}
+          <div className="hidden items-center gap-4 border-l border-sea-rule pl-4 md:flex">
+            <span
+              className="flex items-center gap-1.5 text-[12px] text-sea-ink-3"
+              title="The automated AIS and status pass runs server-side on a schedule"
+            >
+              <span
+                aria-hidden
+                className={`inline-block size-[7px] rotate-45 ${
+                  isLoading ? "bg-sea-rule" : stale ? "bg-sea-amber" : "bg-sea-green"
+                }`}
+              />
+              <span className="hidden xl:inline">AIS monitor</span>
+              <span className="telemetry text-[11px] text-sea-ink-2">
+                {isLoading ? "" : lastSync ? relativeTime(lastSync) : "not run"}
+              </span>
+            </span>
+            {now != null ? (
+              <span
+                className="telemetry whitespace-nowrap text-[12.5px] font-medium text-sea-ink"
+                title={`Coordinated Universal Time. Local ${clock(now)}`}
+              >
+                {utcClock(now)}
+                <span className="ml-1 text-[10px] font-normal text-sea-ink-3">UTC</span>
+              </span>
+            ) : (
+              <span className="block h-4 w-14 animate-pulse rounded-sm bg-sea-paper-2" />
+            )}
+          </div>
+
+          {loaded && alarms > 0 ? (
+            <Link
+              to="/"
+              className="focus-ring flex h-8 items-center gap-1.5 rounded-md bg-sea-red-soft px-2 text-[12px] font-medium text-sea-red lg:hidden"
+              aria-label={`${alarms} voyages in alarm, open the dashboard`}
+            >
+              <span aria-hidden className="inline-block size-[7px] rotate-45 bg-sea-red" />
+              <span className="telemetry">{alarms}</span>
+            </Link>
+          ) : null}
+          <div className="lg:hidden">
+            <WorkspaceMenu variant="bar" />
+          </div>
+        </div>
       </div>
-    </header>
+    </div>
   );
 }
 
@@ -484,22 +544,26 @@ function BottomBar() {
       {more ? (
         <div className="fixed inset-0 z-40 lg:hidden">
           <button
-            className="absolute inset-0 bg-sea-ink/30"
+            className="absolute inset-0 bg-ww-navy/40"
             aria-label="Close menu"
             onClick={() => setMore(false)}
           />
-          <div className="animate-in absolute inset-x-0 bottom-[calc(56px+env(safe-area-inset-bottom))] border-t border-sea-rule bg-sea-surface">
-            <ul>
+          <div className="animate-in absolute inset-x-0 bottom-[calc(60px+env(safe-area-inset-bottom))] overflow-hidden rounded-t-xl bg-ww-navy">
+            <ul className="py-1">
               {rest.map((item) => {
                 const on = item.match(pathname);
                 return (
-                  <li key={item.to} className="border-b border-sea-rule-2 last:border-b-0">
+                  <li key={item.to}>
                     <Link
                       to={item.to}
                       aria-current={on ? "page" : undefined}
-                      className={`focus-ring flex h-12 items-center gap-3 px-5 text-[15px] ${on ? "font-medium text-sea-ink" : "text-sea-ink-2"}`}
+                      className={`focus-ring flex h-12 items-center gap-3 px-5 text-[15px] ${on ? "font-medium text-white" : "text-ww-navy-ink-2"}`}
                     >
-                      <item.icon className="size-4 text-sea-ink-3" strokeWidth={1.75} aria-hidden />
+                      <item.icon
+                        className={`size-[18px] ${on ? "text-ww-blue-bright" : ""}`}
+                        strokeWidth={1.75}
+                        aria-hidden
+                      />
                       {item.label}
                     </Link>
                   </li>
@@ -511,9 +575,9 @@ function BottomBar() {
       ) : null}
       <nav
         aria-label="Primary"
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-sea-rule bg-sea-surface pb-[env(safe-area-inset-bottom)] lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 bg-ww-navy pb-[env(safe-area-inset-bottom)] lg:hidden"
       >
-        <ul className="grid h-14 grid-cols-5">
+        <ul className="grid h-[60px] grid-cols-5">
           {tabs.map((item) => {
             const on = item.match(pathname);
             const badge = item.to === "/" && loaded && alarms > 0 ? alarms : null;
@@ -523,17 +587,21 @@ function BottomBar() {
                   to={item.to}
                   aria-current={on ? "page" : undefined}
                   className={`focus-ring relative flex h-full flex-col items-center justify-center gap-1 text-[11px] ${
-                    on ? "font-medium text-sea-ink" : "text-sea-ink-3"
+                    on ? "font-medium text-white" : "text-ww-navy-ink-2"
                   }`}
                 >
                   <span
                     aria-hidden
-                    className={`absolute inset-x-5 top-0 h-[2px] ${on ? "bg-sea-ink" : ""}`}
+                    className={`absolute inset-x-6 top-0 h-[3px] rounded-b-full ${on ? "bg-ww-blue-bright" : ""}`}
                   />
                   <span className="relative">
-                    <item.icon className="size-[18px]" strokeWidth={1.75} aria-hidden />
+                    <item.icon
+                      className={`size-[19px] ${on ? "text-ww-blue-bright" : ""}`}
+                      strokeWidth={1.75}
+                      aria-hidden
+                    />
                     {badge ? (
-                      <span className="telemetry absolute -right-2.5 -top-1.5 min-w-[15px] rounded-[2px] bg-sea-red px-[3px] text-center text-[9px] leading-[14px] text-sea-surface">
+                      <span className="telemetry absolute -right-2.5 -top-1.5 min-w-[15px] rounded-[4px] bg-sea-red px-[3px] text-center text-[9px] leading-[14px] text-white">
                         {badge}
                       </span>
                     ) : null}
@@ -549,17 +617,17 @@ function BottomBar() {
               onClick={() => setMore((v) => !v)}
               aria-expanded={more}
               className={`focus-ring relative flex h-full w-full flex-col items-center justify-center gap-1 text-[11px] ${
-                moreActive || more ? "font-medium text-sea-ink" : "text-sea-ink-3"
+                moreActive || more ? "font-medium text-white" : "text-ww-navy-ink-2"
               }`}
             >
               <span
                 aria-hidden
-                className={`absolute inset-x-5 top-0 h-[2px] ${moreActive ? "bg-sea-ink" : ""}`}
+                className={`absolute inset-x-6 top-0 h-[3px] rounded-b-full ${moreActive ? "bg-ww-blue-bright" : ""}`}
               />
               {more ? (
-                <X className="size-[18px]" strokeWidth={1.75} aria-hidden />
+                <X className="size-[19px]" strokeWidth={1.75} aria-hidden />
               ) : (
-                <MoreHorizontal className="size-[18px]" strokeWidth={1.75} aria-hidden />
+                <MoreHorizontal className="size-[19px]" strokeWidth={1.75} aria-hidden />
               )}
               More
             </button>
@@ -584,47 +652,35 @@ export function useDismiss<T extends HTMLElement = HTMLDivElement>(onClose: () =
   return ref;
 }
 
-/** Both the sidebar and the phone bar mount a trigger; only the visible
- * one may own the shortcut, or ⌘K would open two palettes. */
-function GlobalSearch({ variant }: { variant: "sidebar" | "bar" }) {
+/** The search field in the top bar: a field on wide screens, an icon on
+ * phones. ⌘K opens the same palette from anywhere. */
+function GlobalSearch() {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (!((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k")) return;
-      const desktop = window.matchMedia("(min-width: 1024px)").matches;
-      if ((variant === "sidebar") !== desktop) return;
       e.preventDefault();
       setOpen(true);
     }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [variant]);
+  }, []);
 
   return (
     <>
-      {variant === "sidebar" ? (
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          aria-label="Search shipments and pages"
-          title="Search  ⌘K"
-          className="focus-ring flex h-8 w-full items-center justify-center gap-2 rounded-[2px] text-[12.5px] text-sea-ink-3 transition-colors hover:text-sea-ink side-open:justify-start side-open:border side-open:border-sea-rule side-open:bg-sea-surface side-open:px-2.5 side-open:hover:border-sea-ink-4"
-        >
-          <Search className="size-4 shrink-0 side-open:size-3.5" strokeWidth={1.75} aria-hidden />
-          <span className="hidden flex-1 truncate text-left side-open:block">Search</span>
-          <kbd className="telemetry hidden text-[10px] text-sea-ink-4 side-open:block">⌘K</kbd>
-        </button>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          aria-label="Search shipments and pages"
-          className="focus-ring grid size-9 place-items-center text-sea-ink-2 hover:text-sea-ink"
-        >
-          <Search className="size-[18px]" strokeWidth={1.75} aria-hidden />
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label="Search shipments and pages"
+        className="focus-ring grid size-9 place-items-center rounded-md text-sea-ink-2 transition-colors hover:bg-sea-paper hover:text-sea-ink sm:flex sm:h-8 sm:w-56 sm:items-center sm:gap-2 sm:border sm:border-sea-rule sm:bg-sea-paper/60 sm:px-2.5 sm:text-left sm:text-[12.5px] sm:text-sea-ink-3 sm:hover:border-ww-blue-line sm:hover:bg-sea-surface xl:w-72"
+      >
+        <Search className="size-[18px] shrink-0 sm:size-3.5" strokeWidth={1.75} aria-hidden />
+        <span className="hidden flex-1 truncate sm:block">Search shipments, vessels, ports</span>
+        <kbd className="telemetry hidden rounded-[4px] border border-sea-rule bg-sea-surface px-1 text-[10px] leading-[16px] text-sea-ink-3 sm:block">
+          ⌘K
+        </kbd>
+      </button>
       {open ? <CommandPalette onClose={() => setOpen(false)} /> : null}
     </>
   );
@@ -757,9 +813,7 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
                     i === index ? "bg-sea-shallows" : ""
                   }`}
                 >
-                  <span className="telemetry text-[11px] text-sea-ink-3">
-                    {shortId(r.shipment.id)}
-                  </span>
+                  <span className="ref-tag justify-self-start">{shortId(r.shipment.id)}</span>
                   <span className="truncate font-medium">{r.shipment.client_name}</span>
                   <span className="truncate text-[12px] text-sea-ink-3">
                     {r.shipment.origin} → {r.shipment.destination}
@@ -774,39 +828,54 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
   );
 }
 
-function WorkspaceMenu() {
+function WorkspaceMenu({ variant }: { variant: "sidebar" | "bar" }) {
   const [open, setOpen] = useState(false);
   const ref = useDismiss(() => setOpen(false));
+  const onNavy = variant === "sidebar";
 
   return (
-    <div ref={ref} className="relative lg:side-open:min-w-0 lg:side-open:flex-1">
+    <div ref={ref} className={`relative ${onNavy ? "side-open:min-w-0 side-open:flex-1" : ""}`}>
       <button
-        className="focus-ring flex h-8 items-center gap-2.5 rounded-[2px] text-left transition-colors hover:bg-sea-shallows lg:side-open:w-full lg:side-open:px-1"
+        className={`focus-ring flex h-9 items-center gap-2.5 rounded-md text-left transition-colors ${
+          onNavy ? "hover:bg-ww-navy-2 side-open:w-full side-open:px-1.5" : "hover:bg-sea-paper"
+        }`}
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-label="Workspace menu, StimTech Solutions"
       >
-        <span className="grid size-7 shrink-0 place-items-center rounded-[2px] border border-sea-rule bg-sea-surface text-[10px] font-semibold tracking-[0.04em] text-sea-ink">
+        <span
+          className={`grid size-7 shrink-0 place-items-center rounded-md text-[10px] font-semibold tracking-[0.04em] ${
+            onNavy
+              ? "bg-ww-navy-3 text-white ring-1 ring-ww-navy-line"
+              : "bg-ww-blue-soft text-ww-blue ring-1 ring-ww-blue-line"
+          }`}
+        >
           ST
         </span>
-        <span className="hidden min-w-0 lg:side-open:block">
-          <span className="block truncate text-[12.5px] font-medium leading-[16px] text-sea-ink">
-            StimTech Solutions
+        {onNavy ? (
+          <span className="hidden min-w-0 side-open:block">
+            <span className="block truncate text-[12.5px] font-medium leading-[16px] text-white">
+              StimTech Solutions
+            </span>
+            <span className="block truncate text-[11px] leading-[14px] text-ww-navy-ink-2">
+              Operations workspace
+            </span>
           </span>
-          <span className="block truncate text-[11px] leading-[14px] text-sea-ink-3">
-            Operations workspace
-          </span>
-        </span>
+        ) : null}
       </button>
       {open ? (
-        <div className="panel-lifted animate-in absolute right-0 top-10 z-40 w-[232px] overflow-hidden text-sea-ink lg:bottom-10 lg:left-0 lg:right-auto lg:top-auto">
+        <div
+          className={`panel-lifted animate-in absolute z-40 w-[232px] overflow-hidden text-sea-ink ${
+            onNavy ? "bottom-11 left-0" : "right-0 top-11"
+          }`}
+        >
           <div className="border-b border-sea-rule px-3.5 py-3">
             <p className="text-[13px] font-medium">StimTech Solutions</p>
             <p className="text-[12px] text-sea-ink-3">Operations workspace</p>
           </div>
           <Link
             to="/settings"
-            className="flex items-center gap-2 px-3.5 py-2.5 text-[13px] transition-colors hover:bg-sea-paper-2"
+            className="flex items-center gap-2 px-3.5 py-2.5 text-[13px] transition-colors hover:bg-sea-shallows"
             onClick={() => setOpen(false)}
           >
             <Settings className="size-3.5 text-sea-ink-3" aria-hidden /> Settings
@@ -864,7 +933,7 @@ export function HeaderTabs({
             aria-current={on ? "page" : undefined}
             className={`focus-ring flex shrink-0 items-center gap-2 border-b-2 pb-2.5 text-[13px] transition-colors ${
               on
-                ? "border-sea-ink font-medium text-sea-ink"
+                ? "border-ww-blue font-medium text-sea-ink"
                 : "border-transparent text-sea-ink-3 hover:text-sea-ink"
             }`}
           >
@@ -880,16 +949,16 @@ export function HeaderTabs({
 }
 
 export const btnPrimary =
-  "focus-ring inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-[2px] border border-primary bg-primary px-3 text-[13px] font-medium text-primary-foreground transition-colors duration-150 hover:bg-primary-hover active:translate-y-px disabled:opacity-45";
+  "focus-ring inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-md border border-primary bg-primary px-3 text-[13px] font-medium text-primary-foreground transition-colors duration-150 hover:bg-primary-hover active:translate-y-px disabled:opacity-45";
 
 export const btnGhost =
-  "focus-ring inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-[2px] border border-sea-rule bg-sea-surface px-3 text-[13px] font-medium text-sea-ink transition-colors duration-150 hover:border-sea-ink-4 hover:bg-sea-paper-2 active:translate-y-px disabled:opacity-45";
+  "focus-ring inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-md border border-sea-rule bg-sea-surface px-3 text-[13px] font-medium text-sea-ink transition-colors duration-150 hover:border-ww-blue-line hover:bg-ww-blue-soft hover:text-ww-blue active:translate-y-px disabled:opacity-45";
 
 export const btnDanger =
-  "focus-ring inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-[2px] border border-sea-red/35 bg-sea-surface px-3 text-[13px] font-medium text-sea-red transition-colors duration-150 hover:bg-sea-red-soft active:translate-y-px";
+  "focus-ring inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-md border border-sea-red/35 bg-sea-surface px-3 text-[13px] font-medium text-sea-red transition-colors duration-150 hover:bg-sea-red-soft active:translate-y-px";
 
 const fieldBase =
-  "focus-ring h-8 rounded-[2px] border border-sea-rule bg-sea-surface px-2.5 text-[13px] text-sea-ink transition-colors placeholder:text-sea-ink-3 hover:border-sea-ink-4";
+  "focus-ring h-8 rounded-md border border-sea-rule bg-sea-surface px-2.5 text-[13px] text-sea-ink transition-colors placeholder:text-sea-ink-3 hover:border-ww-blue-line focus:border-ww-blue";
 
 export const fieldClass = `${fieldBase} w-full`;
 

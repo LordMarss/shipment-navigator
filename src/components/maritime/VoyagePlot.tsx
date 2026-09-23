@@ -153,7 +153,7 @@ export function VoyagePlot({
             <span
               aria-hidden
               className={`absolute left-0 top-1/2 h-[3px] -translate-y-1/2 transition-[width] duration-700 ${
-                moving ? "bg-sea-move" : "bg-sea-ink-2"
+                moving ? "bg-sea-move" : "bg-ww-steel"
               }`}
               style={{ width: `${pos * 100}%` }}
             />
@@ -184,7 +184,7 @@ export function VoyagePlot({
                 ? "border-sea-red bg-sea-red"
                 : pos == null && !voyage.arrived
                   ? "border-sea-ink bg-sea-ink"
-                  : "border-sea-ink-2 bg-sea-surface"
+                  : "border-ww-steel bg-sea-surface"
             }`}
           />
           <span
@@ -211,7 +211,7 @@ export function VoyagePlot({
                 style={{ left: `${pos * 100}%` }}
               >
                 {target.state === "none" ? (
-                  <span className="block size-[9px] rotate-45 bg-sea-ink-2" />
+                  <span className="block size-[9px] rotate-45 bg-ww-steel" />
                 ) : (
                   <AisTarget state={target.state} stopped={target.stopped} size={16} />
                 )}

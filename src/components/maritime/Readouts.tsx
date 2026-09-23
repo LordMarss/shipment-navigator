@@ -16,32 +16,31 @@ const TONE: Record<NonNullable<ReadoutItem["tone"]>, string> = {
 };
 
 /**
- * A row of instrument readouts, as on the dashboard's bridge console:
- * condensed label, telemetry value, ruled cells. Built on the shared
- * tokens, so inside a page header (the console band) it takes the console
- * colours and on chart paper it takes the paper ones.
+ * The page's readings as one instrument strip: a single panel divided into
+ * cells, each a label and a condensed figure. Colour only when the reading
+ * means something.
  */
 export function Readouts({ items, loading = false }: { items: ReadoutItem[]; loading?: boolean }) {
   return (
-    <dl className="grid grid-cols-2 border-t border-border sm:grid-cols-[repeat(auto-fit,minmax(140px,1fr))]">
+    <dl className="panel grid grid-cols-2 overflow-hidden sm:grid-cols-[repeat(auto-fit,minmax(150px,1fr))]">
       {items.map((item, i) => (
         <div
           key={item.label}
-          className={`border-border px-3 py-3 first:pl-0 ${i > 0 ? "sm:border-l" : ""} ${
-            i % 2 === 1 ? "max-sm:border-l" : "max-sm:pl-0"
+          className={`border-sea-rule-2 px-4 py-3.5 sm:px-5 ${i > 0 ? "sm:border-l" : ""} ${
+            i % 2 === 1 ? "max-sm:border-l" : ""
           } ${i > 1 ? "max-sm:border-t" : ""}`}
         >
-          <dt className="label-xs flex items-center gap-1.5">
+          <dt className="flex items-center gap-1.5 text-[12px] font-medium text-sea-ink-3">
             {item.mark}
             {item.label}
           </dt>
           <dd
             className={`figure mt-1 text-[30px] leading-[32px] ${
-              item.tone ? TONE[item.tone] : "text-foreground"
+              item.tone ? TONE[item.tone] : "text-sea-ink"
             }`}
           >
             {loading ? (
-              <span className="inline-block h-7 w-10 animate-pulse bg-sea-paper-2" />
+              <span className="inline-block h-7 w-10 animate-pulse rounded-sm bg-sea-paper-2" />
             ) : (
               item.value
             )}

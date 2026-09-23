@@ -135,9 +135,7 @@ function DocumentsPage() {
                     >
                       {s.client_name}
                     </Link>
-                    <span className="telemetry mt-0.5 block text-[11px] text-sea-ink-3">
-                      {shortId(s.id)}
-                    </span>
+                    <span className="ref-tag mt-1">{shortId(s.id)}</span>
                   </td>
                   {standard.map((d, i) => {
                     const name = STANDARD_DOCUMENTS[i]!;

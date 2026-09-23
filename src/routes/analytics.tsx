@@ -100,7 +100,7 @@ function AnalyticsPage() {
           </p>
         </div>
       ) : (
-        <div className="grid gap-x-12 gap-y-12 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
+        <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
           <ChartPanel id="phases" title="Fleet by phase" meta="shipments at each station">
             {/* Stations along the passage, each stacking one cell per shipment */}
             <div className="relative mt-6 px-2">

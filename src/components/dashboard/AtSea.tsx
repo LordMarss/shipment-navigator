@@ -11,18 +11,18 @@ import {
   type Target,
   type Voyage,
 } from "@/components/maritime/format";
-import { AisTarget, Bearing, Skeleton, TCount } from "@/components/maritime/marks";
+import { Bearing, PassageLine, Skeleton, TCount } from "@/components/maritime/marks";
 
 /** Voyages listed before the rest are handed to the board. */
-const LIMIT = 5;
+const LIMIT = 4;
 
 type Passage = { s: Shipment; voyage: Voyage; target: Target; moving: boolean };
 
 /**
- * What is moving: every voyage that has sailed and not yet arrived, read
- * as a vessel on its passage. The vessel leads (it is what AIS reports),
- * then the passage drawn to scale by schedule, then the two readings a
- * watch officer checks: time to ETA and the age of the last fix.
+ * The network: where every voyage stands (alongside, at sea, arrived) as
+ * one proportional bar, then each vessel at sea on its passage line with
+ * the two readings a watch officer checks, time to ETA and the age of the
+ * last AIS fix. Sits beside the attention queue as its context.
  */
 export function AtSea({
   shipments,
@@ -41,15 +41,19 @@ export function AtSea({
   onFocus: (id: string | null) => void;
   onShowAll: () => void;
 }) {
-  const { passages, waiting, nextEtd } = useMemo(() => {
+  const { passages, alongside, arrived, nextEtd, nextEta } = useMemo(() => {
     const passages: Passage[] = [];
-    let waiting = 0;
+    let alongside = 0;
+    let arrived = 0;
     let nextEtd: Shipment | null = null;
     for (const s of shipments) {
       const voyage = voyageOf(s, now);
-      if (voyage.arrived) continue;
+      if (voyage.arrived) {
+        arrived += 1;
+        continue;
+      }
       if (!s.actual_departure) {
-        waiting += 1;
+        alongside += 1;
         if (s.planned_etd && (!nextEtd || new Date(s.planned_etd) < new Date(nextEtd.planned_etd!)))
           nextEtd = s;
         continue;
@@ -61,77 +65,169 @@ export function AtSea({
     }
     const eta = (p: Passage) => (p.s.eta ? new Date(p.s.eta).getTime() : Infinity);
     passages.sort((a, b) => Number(b.moving) - Number(a.moving) || eta(a) - eta(b));
-    return { passages, waiting, nextEtd };
+    const nextEta =
+      passages
+        .filter((p) => p.s.eta && now != null && new Date(p.s.eta).getTime() >= now)
+        .sort((a, b) => new Date(a.s.eta!).getTime() - new Date(b.s.eta!).getTime())[0]?.s ?? null;
+    return { passages, alongside, arrived, nextEtd, nextEta };
   }, [shipments, positions, now]);
 
   const underway = passages.filter((p) => p.moving).length;
+  const total = shipments.length;
+  const stages = [
+    { key: "alongside", label: "Alongside", n: alongside, bar: "bg-ww-steel/55" },
+    { key: "sea", label: "At sea", n: passages.length, bar: "bg-sea-move" },
+    { key: "arrived", label: "Arrived", n: arrived, bar: "bg-sea-green" },
+  ];
 
   return (
-    <section aria-labelledby="atsea-title" className="min-w-0">
-      <header className="flex items-end justify-between gap-4 pb-3">
-        <div className="flex items-baseline gap-3">
-          <h2 id="atsea-title" className="display text-[19px] leading-[24px] text-sea-ink">
-            At sea
-          </h2>
-          {!isLoading ? (
-            <span
-              className={`figure text-[26px] leading-[24px] ${passages.length ? "text-sea-ink" : "text-sea-ink-4"}`}
-            >
-              {passages.length}
-            </span>
-          ) : null}
-        </div>
+    <section
+      aria-labelledby="network-title"
+      className="@container panel flex h-full min-w-0 flex-col overflow-hidden"
+    >
+      <header className="flex min-h-[56px] items-center justify-between gap-4 border-b border-sea-rule px-4 pb-2.5 pt-3.5 sm:px-5">
+        <h2 id="network-title" className="panel-title !text-[15px]">
+          Network
+        </h2>
         {!isLoading && passages.length > 0 ? (
-          <p className="text-[12px] text-sea-ink-2">
+          <p className="flex items-center gap-1.5 text-[12px] text-sea-ink-2">
+            <Bearing deg={45} size={9} className={underway ? "text-sea-move" : "text-sea-ink-4"} />
             <span className={`telemetry text-[11px] ${underway ? "text-sea-move" : ""}`}>
               {underway}
-            </span>{" "}
+            </span>
             under way on AIS
           </p>
         ) : null}
       </header>
 
-      <div className="border-t border-sea-ink">
-        {isLoading ? (
-          Array.from({ length: 2 }).map((_, i) => (
-            <div key={i} className="border-b border-sea-rule-2 py-4">
-              <Skeleton className="h-4 w-1/2" />
-              <Skeleton className="mt-3 h-[2px] w-full" />
+      <div className="flex-1 @2xl:grid @2xl:grid-cols-[minmax(240px,300px)_minmax(0,1fr)]">
+        {/* Where every voyage stands, to scale */}
+        <div className="border-b border-sea-rule-2 px-4 py-4 sm:px-5 @2xl:border-b-0 @2xl:border-r">
+          {isLoading ? (
+            <Skeleton className="h-[34px] w-full rounded-sm" />
+          ) : (
+            <>
+              <div
+                className="flex h-[6px] gap-[3px]"
+                role="img"
+                aria-label={stages.map((st) => `${st.n} ${st.label.toLowerCase()}`).join(", ")}
+              >
+                {total === 0 ? (
+                  <span className="flex-1 rounded-full bg-sea-paper-2" />
+                ) : (
+                  stages
+                    .filter((st) => st.n > 0)
+                    .map((st) => (
+                      <span
+                        key={st.key}
+                        className={`rounded-full ${st.bar} transition-[flex-grow] duration-700`}
+                        style={{ flexGrow: st.n, flexBasis: 0 }}
+                      />
+                    ))
+                )}
+              </div>
+              <dl className="mt-2.5 grid grid-cols-3 gap-2">
+                {stages.map((st) => (
+                  <div key={st.key} className="min-w-0">
+                    <dt className="flex items-center gap-1.5 text-[11.5px] text-sea-ink-3">
+                      <span
+                        aria-hidden
+                        className={`inline-block h-[6px] w-2.5 rounded-full ${st.bar}`}
+                      />
+                      {st.label}
+                    </dt>
+                    <dd className="figure mt-0.5 text-[22px] leading-[24px] text-sea-ink">
+                      {st.n}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </>
+          )}
+        </div>
+
+        <div className="flex-1">
+          {isLoading ? (
+            Array.from({ length: 2 }).map((_, i) => (
+              <div key={i} className="border-b border-sea-rule-2 px-5 py-4">
+                <Skeleton className="h-4 w-1/2" />
+                <Skeleton className="mt-3 h-[2px] w-full" />
+              </div>
+            ))
+          ) : passages.length === 0 ? (
+            <div className="px-4 py-6 sm:px-5">
+              <p className="text-[13.5px] font-medium text-sea-ink">No vessel at sea</p>
+              <p className="mt-0.5 text-[12.5px] text-sea-ink-2">
+                {alongside === 0
+                  ? "Voyages appear here from their recorded departure."
+                  : nextEtd?.planned_etd
+                    ? `Next sails ${shortDate(nextEtd.planned_etd, now)} from ${nextEtd.origin}.`
+                    : `${alongside} awaiting departure.`}
+              </p>
             </div>
-          ))
-        ) : passages.length === 0 ? (
-          <div className="border-b border-sea-rule-2 py-6">
-            <p className="text-[14px] font-medium text-sea-ink">No vessel at sea</p>
-            <p className="mt-0.5 text-[13px] text-sea-ink-2">
-              {waiting === 0
-                ? "Voyages appear here from their recorded departure."
-                : nextEtd?.planned_etd
-                  ? `${waiting} awaiting departure. Next sails ${shortDate(nextEtd.planned_etd, now)} from ${nextEtd.origin}.`
-                  : `${waiting} awaiting departure.`}
-            </p>
-          </div>
-        ) : (
-          <ol>
-            {passages.slice(0, LIMIT).map((p) => (
-              <PassageRow
-                key={p.s.id}
-                passage={p}
-                now={now}
-                lit={focusId === p.s.id}
-                onFocus={onFocus}
-              />
-            ))}
-          </ol>
-        )}
+          ) : (
+            <ol>
+              {passages.slice(0, LIMIT).map((p) => (
+                <PassageRow
+                  key={p.s.id}
+                  passage={p}
+                  now={now}
+                  lit={focusId === p.s.id}
+                  onFocus={onFocus}
+                />
+              ))}
+            </ol>
+          )}
+        </div>
       </div>
+
+      {/* The next two movements on the network */}
+      {!isLoading && shipments.length > 0 ? (
+        <dl className="mt-auto grid grid-cols-2 border-t border-sea-rule bg-sea-paper/45 text-[12px]">
+          {(
+            [
+              ["Next departure", nextEtd, nextEtd?.planned_etd, nextEtd?.origin],
+              ["Next arrival", nextEta, nextEta?.eta, nextEta?.destination],
+            ] as const
+          ).map(([label, ship, at, port], i) => {
+            const late = at != null && now != null && new Date(at).getTime() < now;
+            return (
+              <div
+                key={label}
+                className={`min-w-0 px-4 py-2.5 sm:px-5 ${i ? "border-l border-sea-rule-2" : ""}`}
+              >
+                <dt className="text-[11.5px] text-sea-ink-3">{label}</dt>
+                <dd className="mt-0.5 truncate">
+                  {ship && at ? (
+                    <Link
+                      to="/shipments/$id"
+                      params={{ id: ship.id }}
+                      className="focus-ring rounded-sm hover:text-ww-blue"
+                    >
+                      <span
+                        className={`telemetry text-[11px] uppercase ${late ? "font-medium text-sea-red" : "text-sea-ink"}`}
+                      >
+                        {shortDate(at, now)}
+                      </span>{" "}
+                      <span className="text-sea-ink-2">{port}</span>
+                    </Link>
+                  ) : (
+                    <span className="text-sea-ink-4">None scheduled</span>
+                  )}
+                </dd>
+              </div>
+            );
+          })}
+        </dl>
+      ) : null}
 
       {passages.length > LIMIT ? (
         <button
           type="button"
           onClick={onShowAll}
-          className="focus-ring mt-2.5 inline-flex items-center gap-1.5 text-[12.5px] font-medium text-sea-ink hover:underline"
+          className="focus-ring flex h-10 items-center justify-center gap-1.5 border-t border-sea-rule bg-sea-paper/45 text-[12.5px] font-medium text-ww-blue hover:text-ww-blue-hover"
         >
-          All {passages.length} on the board <ArrowRight className="size-3.5" aria-hidden />
+          All {passages.length} at sea on the board <ArrowRight className="size-3.5" aria-hidden />
         </button>
       ) : null}
     </section>
@@ -150,11 +246,10 @@ function PassageRow({
   onFocus: (id: string | null) => void;
 }) {
   const { s, voyage, target, moving } = passage;
-  const pos = voyage.pos ?? 0;
   const lost = target.state === "lost";
   const late = s.eta != null && now != null && new Date(s.eta).getTime() < now;
   return (
-    <li className="border-b border-sea-rule-2">
+    <li className="border-b border-sea-rule-2 last:border-b-0">
       <Link
         to="/shipments/$id"
         params={{ id: s.id }}
@@ -162,13 +257,15 @@ function PassageRow({
         onMouseLeave={() => onFocus(null)}
         onFocus={() => onFocus(s.id)}
         onBlur={() => onFocus(null)}
-        className={`focus-ring -mx-2 block px-2 py-3 transition-colors duration-150 hover:bg-sea-shallows/60 ${lit ? "bg-sea-shallows/60" : ""}`}
+        className={`focus-ring block px-4 py-3 transition-colors duration-150 hover:bg-sea-shallows sm:px-5 ${lit ? "bg-sea-shallows" : ""}`}
       >
         {/* Vessel and its reading */}
         <span className="flex items-baseline justify-between gap-3">
-          <span className="min-w-0 truncate text-[14px] font-medium text-sea-ink">
-            {s.vessel_name ?? "Vessel not named"}
-            <span className="ml-2 text-[12px] font-normal text-sea-ink-3">{s.client_name}</span>
+          <span className="min-w-0 truncate">
+            <span className="vessel text-[13.5px] !font-semibold text-sea-ink">
+              {s.vessel_name ?? "Vessel not named"}
+            </span>
+            <span className="ml-2 text-[12px] text-sea-ink-3">{s.client_name}</span>
           </span>
           <span
             className={`telemetry flex shrink-0 items-center gap-1.5 text-[11px] uppercase ${
@@ -189,32 +286,18 @@ function PassageRow({
           </span>
         </span>
 
-        {/* The passage to scale by schedule */}
-        <span className="mt-2 grid grid-cols-[minmax(0,1fr)_minmax(90px,2fr)_minmax(0,1fr)] items-center gap-2.5 text-[12px] text-sea-ink-2">
-          <span className="truncate">{s.origin}</span>
-          <span aria-hidden className="relative mx-[4px] block h-[12px]">
-            <span className="absolute inset-x-0 top-1/2 border-t border-dotted border-sea-ink-4" />
-            <span
-              className={`absolute left-0 top-1/2 h-[2px] -translate-y-1/2 ${moving ? "bg-sea-move" : "bg-sea-ink-2"}`}
-              style={{ width: `${pos * 100}%` }}
-            />
-            <span className="absolute left-0 top-1/2 size-[6px] -translate-x-1/2 -translate-y-1/2 rounded-full border-[1.5px] border-sea-ink-2 bg-sea-surface" />
-            <span
-              className={`absolute left-full top-1/2 size-[6px] -translate-x-1/2 -translate-y-1/2 rounded-full border-[1.5px] bg-sea-surface ${late ? "border-sea-red" : "border-sea-ink"}`}
-            />
-            <span
-              className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2"
-              style={{ left: `${pos * 100}%` }}
-            >
-              {target.state === "none" ? (
-                <span className="block size-[6px] rotate-45 bg-sea-ink-2" />
-              ) : (
-                <AisTarget state={target.state} stopped={target.stopped} size={12} />
-              )}
-            </span>
-          </span>
+        {/* The passage */}
+        <span className="mt-2 grid grid-cols-[minmax(0,1fr)_minmax(80px,1.8fr)_minmax(0,1fr)] items-center gap-2.5 text-[12px]">
+          <span className="truncate text-sea-ink-2">{s.origin}</span>
+          <PassageLine
+            pos={voyage.pos}
+            moving={moving}
+            target={target.state}
+            stopped={target.stopped}
+            arrivalOverdue={late}
+          />
           <span
-            className={`truncate text-right ${late ? "font-medium text-sea-red" : "text-sea-ink"}`}
+            className={`truncate text-right ${late ? "font-medium text-sea-red" : "font-medium text-sea-ink"}`}
           >
             {s.destination}
           </span>
@@ -225,9 +308,8 @@ function PassageRow({
           <span className="flex items-baseline gap-2 text-sea-ink-2">
             {s.eta ? (
               <>
-                <span>
-                  ETA <span className="font-medium text-sea-ink">{shortDate(s.eta, now)}</span>
-                </span>
+                <span className="telemetry text-[11px] uppercase text-sea-ink-3">ETA</span>
+                <span className="font-medium text-sea-ink">{shortDate(s.eta, now)}</span>
                 <TCount iso={s.eta} now={now} />
               </>
             ) : (

@@ -41,9 +41,12 @@ export function StatusHistory({ events }: { events: ShipmentEvent[] }) {
   const shown = only === "all" ? events : events.filter((e) => sourceOf(e) === only);
 
   return (
-    <section aria-labelledby="log-title">
-      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2 border-b border-sea-ink pb-2">
-        <h2 id="log-title" className="chart-label text-sea-ink">
+    <section
+      aria-labelledby="log-title"
+      className="panel min-w-0 px-4 pb-3 sm:px-5 [&_li:last-child]:border-b-0"
+    >
+      <div className="-mx-4 flex min-h-[52px] flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b border-sea-rule px-4 py-2.5 sm:-mx-5 sm:px-5">
+        <h2 id="log-title" className="panel-title">
           Voyage log
           <span className="telemetry ml-2 font-normal normal-case tracking-normal text-sea-ink-3">
             {events.length} entries, UTC
@@ -59,7 +62,7 @@ export function StatusHistory({ events }: { events: ShipmentEvent[] }) {
                 onClick={() => setOnly(k)}
                 className={`focus-ring inline-flex items-center gap-1.5 border-b-2 pb-0.5 transition-colors ${
                   only === k
-                    ? "border-sea-ink text-sea-ink"
+                    ? "border-ww-blue text-sea-ink"
                     : "border-transparent text-sea-ink-3 hover:text-sea-ink"
                 }`}
               >

@@ -133,7 +133,9 @@ function VesselsPage() {
                       <span className="w-4 shrink-0">
                         <AisTarget state={target.state} stopped={target.stopped} size={12} />
                       </span>
-                      <span className="text-[14px] font-medium text-sea-ink">{v.name}</span>
+                      <span className="vessel text-[13.5px] !font-semibold text-sea-ink">
+                        {v.name}
+                      </span>
                     </span>
                     <span className="telemetry mt-1 block pl-[26px] text-[11px] text-sea-ink-3">
                       {v.mmsi ? `MMSI ${v.mmsi}` : "No MMSI recorded"}
@@ -180,9 +182,7 @@ function VesselsPage() {
                             params={{ id: s.id }}
                             className="focus-ring group grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-4 rounded-[1px] text-[12.5px] hover:bg-sea-shallows/60 md:grid-cols-[84px_minmax(0,1fr)_auto_auto]"
                           >
-                            <span className="telemetry text-[11px] text-sea-ink-2 underline-offset-2 group-hover:underline max-md:hidden">
-                              {shortId(s.id)}
-                            </span>
+                            <span className="ref-tag max-md:hidden">{shortId(s.id)}</span>
                             <span className="truncate text-sea-ink">
                               {s.client_name}
                               <span className="ml-2 text-sea-ink-3">

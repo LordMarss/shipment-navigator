@@ -78,15 +78,24 @@ export function AttentionQueue({
   const shown = items.slice(0, LIMIT);
 
   return (
-    <section aria-labelledby="attention-title" className="min-w-0">
-      <header className="flex items-end justify-between gap-4 pb-3">
-        <div className="flex items-baseline gap-3">
-          <h2 id="attention-title" className="display text-[19px] leading-[24px] text-sea-ink">
+    <section
+      aria-labelledby="attention-title"
+      className={`panel flex h-full min-w-0 flex-col overflow-hidden ${alarm > 0 ? "shadow-[inset_0_3px_0_var(--sea-red)]" : items.length > 0 ? "shadow-[inset_0_3px_0_var(--sea-amber)]" : ""}`}
+    >
+      <header className="flex min-h-[56px] flex-wrap items-center justify-between gap-x-4 gap-y-1 border-b border-sea-rule px-4 pb-2.5 pt-3.5 sm:px-5">
+        <div className="flex items-center gap-2.5">
+          <h2 id="attention-title" className="panel-title !text-[15px]">
             Needs attention
           </h2>
           {!isLoading ? (
             <span
-              className={`figure text-[26px] leading-[24px] ${items.length ? "text-sea-ink" : "text-sea-ink-4"}`}
+              className={`telemetry rounded-[4px] px-1.5 text-[11px] font-medium leading-[18px] ${
+                alarm > 0
+                  ? "bg-sea-red-soft text-sea-red"
+                  : items.length
+                    ? "bg-sea-amber-soft text-sea-amber-ink"
+                    : "bg-sea-green-soft text-sea-green"
+              }`}
             >
               {items.length}
             </span>
@@ -106,7 +115,7 @@ export function AttentionQueue({
         ) : null}
       </header>
 
-      <div className="border-t border-sea-ink bg-sea-surface shadow-[0_1px_0_var(--sea-rule)]">
+      <div className="flex-1">
         {isLoading ? (
           Array.from({ length: 3 }).map((_, i) => (
             <div key={i} className="border-b border-sea-rule-2 px-4 py-4 last:border-b-0">
@@ -141,7 +150,7 @@ export function AttentionQueue({
         <button
           type="button"
           onClick={onShowAll}
-          className="focus-ring mt-2.5 inline-flex items-center gap-1.5 text-[12.5px] font-medium text-sea-ink hover:underline"
+          className="focus-ring flex h-10 items-center justify-center gap-1.5 border-t border-sea-rule bg-sea-paper/45 text-[12.5px] font-medium text-ww-blue hover:text-ww-blue-hover"
         >
           All {items.length} on the board <ArrowRight className="size-3.5" aria-hidden />
         </button>
@@ -163,7 +172,7 @@ function QueueRow({ item, onFocus }: { item: Item; onFocus: (id: string | null) 
         onMouseLeave={() => onFocus(null)}
         onFocus={() => onFocus(s.id)}
         onBlur={() => onFocus(null)}
-        className="focus-ring group relative grid grid-cols-[12px_minmax(0,1fr)_auto] gap-x-3 gap-y-1.5 px-4 py-3.5 transition-colors duration-150 hover:bg-sea-shallows/60 md:grid-cols-[12px_minmax(0,0.8fr)_minmax(0,1.5fr)_84px_96px] md:items-start md:gap-x-5"
+        className="focus-ring group relative grid grid-cols-[12px_minmax(0,1fr)_auto] gap-x-3 gap-y-1.5 px-4 py-3.5 transition-colors duration-150 hover:bg-sea-shallows sm:px-5 md:grid-cols-[12px_minmax(0,1fr)_minmax(0,1.35fr)_76px_92px] md:items-start md:gap-x-5"
       >
         <span
           aria-hidden
@@ -175,14 +184,14 @@ function QueueRow({ item, onFocus }: { item: Item; onFocus: (id: string | null) 
 
         {/* Who and where */}
         <span className="min-w-0">
-          <span className="block truncate text-[14.5px] font-medium leading-[20px] text-sea-ink">
-            {s.client_name}
-          </span>
-          <span className="mt-0.5 flex min-w-0 items-baseline gap-2 text-[12px] leading-[16px] text-sea-ink-3">
-            <span className="telemetry shrink-0 text-[10.5px]">{shortId(s.id)}</span>
-            <span className="truncate">
-              {s.origin} <span className="text-sea-ink-4">→</span> {s.destination}
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="truncate text-[14.5px] font-medium leading-[20px] text-sea-ink">
+              {s.client_name}
             </span>
+            <span className="ref-tag shrink-0">{shortId(s.id)}</span>
+          </span>
+          <span className="mt-1 block truncate text-[12px] leading-[16px] text-sea-ink-3">
+            {s.origin} <span className="text-sea-ink-4">→</span> {s.destination}
           </span>
         </span>
 
@@ -219,7 +228,7 @@ function QueueRow({ item, onFocus }: { item: Item; onFocus: (id: string | null) 
           </span>
         </span>
 
-        <span className="col-span-2 col-start-2 flex items-center gap-1.5 text-[12.5px] font-medium text-sea-ink md:col-span-1 md:col-start-5 md:row-start-1 md:justify-end md:pt-0.5">
+        <span className="col-span-2 col-start-2 flex items-center gap-1.5 text-[12.5px] font-medium text-ww-blue md:col-span-1 md:col-start-5 md:row-start-1 md:justify-end md:pt-0.5">
           {alarm ? "Investigate" : "Review"}
           <ArrowRight
             className="size-3.5 transition-transform duration-150 group-hover:translate-x-0.5"

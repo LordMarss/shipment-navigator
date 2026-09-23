@@ -131,8 +131,8 @@ function FleetMap() {
         />
       }
     >
-      <div className="grid grid-cols-1 gap-x-10 gap-y-8 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="min-w-0 self-start overflow-hidden border border-border bg-surface lg:sticky lg:top-[calc(var(--rail-h)+16px)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="panel min-w-0 self-start overflow-hidden lg:sticky lg:top-[calc(var(--rail-h)+16px)]">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-sea-rule px-4 py-2">
             <span className="chart-label inline-flex min-w-0 items-center gap-2 text-sea-ink">
               {tracked ? (
@@ -152,7 +152,7 @@ function FleetMap() {
             <div
               role="group"
               aria-label="Map source"
-              className="flex h-7 items-stretch rounded-[2px] border border-sea-rule text-[12px]"
+              className="flex h-7 items-stretch rounded-md border border-sea-rule text-[12px]"
             >
               {(
                 [
@@ -167,7 +167,7 @@ function FleetMap() {
                   onClick={() => setView(key)}
                   className={`focus-ring whitespace-nowrap px-2.5 transition-colors ${
                     view === key
-                      ? "bg-sea-ink text-sea-surface"
+                      ? "bg-ww-blue text-sea-surface"
                       : "text-sea-ink-2 hover:bg-sea-paper-2 hover:text-sea-ink"
                   }`}
                 >
@@ -239,9 +239,7 @@ function FleetMap() {
                           className="focus-ring block truncate rounded-[1px] text-[13.5px] font-medium text-sea-ink underline-offset-2 hover:underline"
                         >
                           {s.client_name}
-                          <span className="telemetry ml-2 text-[11px] font-normal text-sea-ink-3">
-                            {shortId(s.id)}
-                          </span>
+                          <span className="ref-tag ml-2 align-[1px]">{shortId(s.id)}</span>
                         </Link>
                         <p className="truncate text-xs text-muted-foreground">
                           {s.origin} → {s.destination}
@@ -261,7 +259,7 @@ function FleetMap() {
                               size={11}
                             />
                           </span>
-                          <span className="truncate text-sea-ink-2">
+                          <span className="vessel truncate text-[11.5px] text-sea-ink-2">
                             {s.vessel_name || "Vessel"}
                           </span>
                           <span className="telemetry shrink-0 text-[11px] text-sea-ink-3">
@@ -271,7 +269,7 @@ function FleetMap() {
                         <button
                           type="button"
                           aria-pressed={isTracked}
-                          className={`focus-ring h-7 shrink-0 whitespace-nowrap rounded-[2px] px-2.5 text-[12px] font-medium ${
+                          className={`focus-ring h-7 shrink-0 whitespace-nowrap rounded-md px-2.5 text-[12px] font-medium ${
                             isTracked
                               ? "bg-sea-move text-sea-paper"
                               : "border border-sea-rule text-sea-ink hover:bg-sea-shallows"

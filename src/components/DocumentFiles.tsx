@@ -16,7 +16,7 @@ import {
 } from "@/lib/api";
 
 const actionBtn =
-  "focus-ring h-7 rounded-[2px] px-2 text-[12px] text-sea-ink-2 transition-colors hover:bg-sea-paper-2 hover:text-sea-ink disabled:opacity-45";
+  "focus-ring h-7 rounded-md px-2 text-[12px] text-sea-ink-2 transition-colors hover:bg-sea-paper-2 hover:text-sea-ink disabled:opacity-45";
 
 /**
  * The documentation manifest: the required trade documents as numbered
@@ -56,9 +56,12 @@ export function DocumentFiles({
   });
 
   return (
-    <section aria-labelledby="manifest-title">
-      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2 border-b border-sea-ink pb-2">
-        <h2 id="manifest-title" className="chart-label text-sea-ink">
+    <section
+      aria-labelledby="manifest-title"
+      className="panel min-w-0 px-4 pb-3 sm:px-5 [&_li:last-child]:border-b-0"
+    >
+      <div className="-mx-4 flex min-h-[52px] flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b border-sea-rule px-4 py-2.5 sm:-mx-5 sm:px-5">
+        <h2 id="manifest-title" className="panel-title">
           Documentation manifest
         </h2>
         <span className="flex items-center gap-3 text-[12px]">
@@ -135,7 +138,7 @@ export function DocumentFiles({
                 </span>
                 <button
                   type="button"
-                  className="focus-ring inline-flex h-8 items-center rounded-[2px] border border-sea-rule bg-sea-surface px-3 text-[13px] font-medium text-sea-ink hover:bg-sea-paper-2 disabled:opacity-45"
+                  className="focus-ring inline-flex h-8 items-center rounded-md border border-sea-rule bg-sea-surface px-3 text-[13px] font-medium text-sea-ink hover:bg-sea-paper-2 disabled:opacity-45"
                   disabled={addingOther}
                   onClick={() => otherInput.current?.click()}
                 >
@@ -288,7 +291,7 @@ function DocumentRow({
               </button>
               <button
                 type="button"
-                className="focus-ring h-7 rounded-[2px] px-2 text-[12px] text-sea-red transition-colors hover:bg-sea-red-soft disabled:opacity-45"
+                className="focus-ring h-7 rounded-md px-2 text-[12px] text-sea-red transition-colors hover:bg-sea-red-soft disabled:opacity-45"
                 disabled={busy}
                 onClick={() =>
                   void run(
@@ -303,7 +306,7 @@ function DocumentRow({
           ) : (
             <button
               type="button"
-              className="focus-ring inline-flex h-7 items-center rounded-[2px] bg-sea-ink px-2.5 text-[12px] font-medium text-sea-surface transition-colors hover:bg-sea-ink-2 disabled:opacity-45"
+              className="focus-ring inline-flex h-7 items-center rounded-md bg-sea-ink px-2.5 text-[12px] font-medium text-sea-surface transition-colors hover:bg-sea-ink-2 disabled:opacity-45"
               disabled={busy}
               onClick={() => input.current?.click()}
             >

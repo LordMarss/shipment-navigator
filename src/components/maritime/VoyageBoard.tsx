@@ -31,6 +31,7 @@ import {
   Bearing,
   ConditionMark,
   ManifestMeter,
+  PassageLine,
   PhaseLadder,
   Skeleton,
   TCount,
@@ -124,7 +125,7 @@ type Section = {
 };
 
 const field =
-  "focus-ring h-8 w-full rounded-[2px] border border-sea-rule bg-sea-surface px-2.5 text-[13px] text-sea-ink transition-colors placeholder:text-sea-ink-3 hover:border-sea-ink-4";
+  "focus-ring h-8 w-full rounded-md border border-sea-rule bg-sea-surface px-2.5 text-[13px] text-sea-ink transition-colors placeholder:text-sea-ink-3 hover:border-ww-blue-line focus:border-ww-blue";
 
 const time = (iso: string | null | undefined, fallback: number) =>
   iso ? new Date(iso).getTime() : fallback;
@@ -211,7 +212,7 @@ export function VoyageBoard({
   const md = useMinWidth(768);
   const [boardRef, boardWidth] = useElementWidth<HTMLElement>();
   const cols = {
-    phase: boardWidth >= 860,
+    phase: boardWidth >= 960,
     docs: boardWidth >= 1040,
     cost: showLandedCost && boardWidth >= 1180,
   };
@@ -427,66 +428,79 @@ export function VoyageBoard({
   // mark, shipment, passage, eta, exception, expand + the optional columns
   const colCount = 6 + Number(cols.phase) + Number(cols.docs) + Number(cols.cost);
 
+  const lensList = LENSES.filter((l) => l.key !== "changed" || changedIds);
+  const noData = !isLoading && shipments.length === 0;
+
   return (
     <section
       ref={boardRef}
       id="board"
       aria-labelledby="board-title"
-      className="min-w-0 scroll-mt-[calc(var(--rail-h)+12px)]"
+      className="panel min-w-0 scroll-mt-[calc(var(--rail-h)+12px)]"
     >
-      {/* Title, lenses and tools */}
-      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 pb-3">
-        <div className="flex min-w-0 flex-wrap items-baseline gap-x-5 gap-y-2">
-          <h2 id="board-title" className="chart-label !text-[11.5px] text-sea-ink">
+      {/* Title and lenses, the lenses set on the header rule as tabs */}
+      <div className="flex flex-wrap items-end justify-between gap-x-6 border-b border-sea-rule px-4 pt-3 sm:px-5">
+        <div className="flex min-w-0 items-baseline gap-2.5 pb-3">
+          <h2 id="board-title" className="panel-title">
             {title}
           </h2>
-          {showLenses ? (
-            <div role="group" aria-label="Show" className="flex max-w-full gap-4 overflow-x-auto">
-              {LENSES.filter((l) => l.key !== "changed" || changedIds).map((l) => {
-                const on = lens === l.key;
-                return (
-                  <button
-                    key={l.key}
-                    type="button"
-                    aria-pressed={on}
-                    onClick={() => setLens(l.key)}
-                    className={`focus-ring shrink-0 whitespace-nowrap border-b-2 pb-0.5 text-[12.5px] transition-colors ${
-                      on
-                        ? "border-sea-ink text-sea-ink"
-                        : "border-transparent text-sea-ink-3 hover:text-sea-ink"
+          <span className="text-[12px] text-sea-ink-3">
+            {isLoading ? "" : `${shipments.length} voyage${shipments.length === 1 ? "" : "s"}`}
+          </span>
+        </div>
+        {showLenses ? (
+          <div
+            role="group"
+            aria-label="Show"
+            className="-mb-px flex max-w-full gap-5 overflow-x-auto [scrollbar-width:none]"
+          >
+            {lensList.map((l) => {
+              const on = lens === l.key;
+              return (
+                <button
+                  key={l.key}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => setLens(l.key)}
+                  className={`focus-ring flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 pb-2.5 text-[13px] transition-colors duration-150 ${
+                    on
+                      ? "border-ww-blue font-medium text-sea-ink"
+                      : "border-transparent text-sea-ink-3 hover:text-sea-ink"
+                  }`}
+                >
+                  {l.label}
+                  <span
+                    className={`telemetry rounded-[4px] px-1 text-[10px] leading-[16px] ${
+                      on ? "bg-ww-blue-soft text-ww-blue" : "bg-sea-paper text-sea-ink-3"
                     }`}
                   >
-                    {l.label}
-                    <span className="telemetry ml-1.5 text-[10.5px] text-sea-ink-3">
-                      {isLoading ? "" : counts[l.key]}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          ) : lens !== "all" ? (
-            <span className="animate-in inline-flex items-center gap-2 border-b-2 border-sea-ink pb-0.5 text-[12.5px] text-sea-ink">
-              {LENS_LABEL[lens]}
-              <span className="telemetry text-[10.5px] text-sea-ink-3">{visible.length}</span>
-              <button
-                type="button"
-                onClick={() => setLens("all")}
-                className="focus-ring inline-flex items-center text-sea-ink-3 hover:text-sea-ink"
-                aria-label="Show all voyages"
-              >
-                <X className="size-3.5" aria-hidden />
-              </button>
-            </span>
-          ) : (
-            <span className="telemetry text-[10.5px] text-sea-ink-3">
-              {isLoading ? "" : `${shipments.length} voyages`}
-            </span>
-          )}
-        </div>
+                    {isLoading ? "" : counts[l.key]}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        ) : lens !== "all" ? (
+          <span className="animate-in mb-2.5 inline-flex items-center gap-2 rounded-md bg-ww-blue-soft px-2 py-1 text-[12.5px] text-ww-blue">
+            {LENS_LABEL[lens]}
+            <span className="telemetry text-[10.5px]">{visible.length}</span>
+            <button
+              type="button"
+              onClick={() => setLens("all")}
+              className="focus-ring inline-flex items-center rounded-sm hover:text-ww-blue-hover"
+              aria-label="Show all voyages"
+            >
+              <X className="size-3.5" aria-hidden />
+            </button>
+          </span>
+        ) : null}
+      </div>
 
-        <div
-          className={`grid w-full grid-cols-2 gap-1.5 sm:flex sm:w-auto sm:items-center ${!isLoading && shipments.length === 0 ? "hidden" : ""}`}
-        >
+      {/* Tools */}
+      <div
+        className={`flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-sea-rule bg-sea-paper/55 px-4 py-2.5 sm:px-5 ${noData ? "hidden" : ""}`}
+      >
+        <div className="grid w-full grid-cols-2 gap-1.5 sm:flex sm:w-auto sm:items-center">
           <label className="relative col-span-2 block sm:w-56">
             <span className="sr-only">Search shipments</span>
             <Search
@@ -539,7 +553,7 @@ export function VoyageBoard({
           <div
             role="group"
             aria-label="Group rows by"
-            className="col-span-2 flex h-8 items-stretch rounded-[2px] border border-sea-rule bg-sea-surface text-[12.5px] sm:col-span-1"
+            className="col-span-2 flex h-8 items-stretch rounded-md border border-sea-rule bg-sea-surface text-[12.5px] sm:col-span-1"
           >
             {(
               [
@@ -554,7 +568,7 @@ export function VoyageBoard({
                 onClick={() => setGroupBy(key)}
                 className={`focus-ring flex-1 whitespace-nowrap px-2.5 transition-colors sm:flex-none ${
                   groupBy === key
-                    ? "bg-sea-ink text-sea-surface"
+                    ? "bg-ww-blue text-sea-surface"
                     : "text-sea-ink-2 hover:bg-sea-paper-2 hover:text-sea-ink"
                 }`}
               >
@@ -563,24 +577,33 @@ export function VoyageBoard({
             ))}
           </div>
         </div>
+        {filtered ? (
+          <button
+            type="button"
+            onClick={clearAll}
+            className="focus-ring hidden rounded-sm text-[12.5px] font-medium text-ww-blue hover:text-ww-blue-hover sm:block"
+          >
+            Clear filters
+          </button>
+        ) : null}
       </div>
 
       {/* Wide: the board */}
-      <div className="hidden border-t border-sea-ink md:block">
+      <div className="hidden md:block">
         <table ref={tableRef} className="w-full table-fixed border-collapse text-left">
           <colgroup>
-            <col className="w-[26px]" />
-            <col className="w-[19%] xl:w-[15%]" />
+            <col className="w-[38px]" />
+            <col className="w-[19%] xl:w-[16%]" />
             <col />
             {cols.phase ? <col className="w-[128px]" /> : null}
             <col className="w-[92px] xl:w-[100px]" />
             <col className="w-[24%] xl:w-[20%]" />
             {cols.docs ? <col className="w-[64px]" /> : null}
             {cols.cost ? <col className="w-[88px]" /> : null}
-            <col className="w-[30px]" />
+            <col className="w-[40px]" />
           </colgroup>
           <thead
-            className={`sticky top-[var(--rail-h)] z-[5] bg-sea-paper ${!isLoading && shipments.length === 0 ? "hidden" : ""}`}
+            className={`sticky top-[var(--rail-h)] z-[5] bg-sea-surface/95 backdrop-blur-sm ${noData ? "hidden" : ""}`}
           >
             <tr className="shadow-[inset_0_-1px_0_var(--sea-rule)]">
               <th scope="col" className="py-2">
@@ -672,7 +695,7 @@ export function VoyageBoard({
       </div>
 
       {/* Narrow: each voyage as a compact strip, still grouped */}
-      <div className="border-t border-sea-ink md:hidden">
+      <div className="px-4 md:hidden">
         {isLoading
           ? Array.from({ length: 4 }).map((_, i) => (
               <div
@@ -716,7 +739,7 @@ export function VoyageBoard({
       </div>
 
       {!isLoading && visible.length === 0 ? (
-        <div className="border-b border-sea-rule-2 bg-sea-surface px-4 py-10 md:px-[26px]">
+        <div className="px-4 py-12 md:px-[38px]">
           {shipments.length === 0 ? (
             <>
               <p className="text-[14px] font-medium text-sea-ink">{emptyTitle}</p>
@@ -788,7 +811,7 @@ function PassageScale() {
 
 function Legend({ keys }: { keys: boolean }) {
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-[11.5px] text-sea-ink-3">
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-b-lg border-t border-sea-rule bg-sea-paper/45 px-4 py-2.5 text-[11.5px] text-sea-ink-3 sm:px-5">
       <span className="inline-flex items-center gap-1.5">
         <span aria-hidden className="h-[2px] w-4 bg-sea-move" /> Under way on AIS
       </span>
@@ -832,12 +855,18 @@ function GroupHead({
           className={`size-3.5 translate-y-[2px] text-sea-ink-3 transition-transform duration-150 ${collapsed ? "" : "rotate-90"}`}
         />
       ) : null}
-      <span className={`chart-label ${section.tone === "alarm" ? "text-sea-red" : "text-sea-ink"}`}>
+      <span
+        className={`text-[12.5px] font-semibold ${section.tone === "alarm" ? "text-sea-red" : "text-sea-ink"}`}
+      >
         {section.label}
       </span>
-      <span className="telemetry text-[10.5px] text-sea-ink-2">{section.rows.length}</span>
+      <span
+        className={`telemetry rounded-[4px] px-1 text-[10px] leading-[16px] ${section.tone === "alarm" ? "bg-sea-red-soft text-sea-red" : "bg-sea-surface text-sea-ink-2 ring-1 ring-sea-rule-2"}`}
+      >
+        {section.rows.length}
+      </span>
       {section.summary ? (
-        <span className="text-[11.5px] text-sea-ink-2">{section.summary}</span>
+        <span className="text-[12px] text-sea-ink-2">{section.summary}</span>
       ) : null}
       {section.order ? (
         <span className="text-[11.5px] text-sea-ink-4">
@@ -847,23 +876,23 @@ function GroupHead({
     </span>
   );
   return (
-    <tr className="border-b border-sea-rule">
+    <tr className="border-y border-sea-rule-2">
       <th
         scope="colgroup"
         colSpan={colSpan}
-        className="bg-sea-paper px-0 pb-2 pt-6 text-left font-normal [tr:first-child>&]:pt-3"
+        className="bg-sea-paper/60 px-0 py-2 text-left font-normal"
       >
         {section.collapsible ? (
           <button
             type="button"
             onClick={onToggle}
             aria-expanded={!collapsed}
-            className="focus-ring -ml-0.5 pl-0.5"
+            className="focus-ring rounded-sm pl-[14px]"
           >
             {inner}
           </button>
         ) : (
-          <span className="block pl-[26px]">{inner}</span>
+          <span className="block pl-[38px]">{inner}</span>
         )}
       </th>
     </tr>
@@ -882,7 +911,7 @@ function CompactGroupHead({
   const inner = (
     <>
       <span
-        className={`chart-label truncate ${section.tone === "alarm" ? "text-sea-red" : "text-sea-ink"}`}
+        className={`truncate text-[12.5px] font-semibold ${section.tone === "alarm" ? "text-sea-red" : "text-sea-ink"}`}
       >
         {section.label}
       </span>
@@ -987,9 +1016,13 @@ function BoardRow({
           >
             {s.client_name}
           </Link>
-          <span className="telemetry mt-0.5 block truncate text-[10.5px] leading-[16px] text-sea-ink-3">
-            {shortId(s.id)}
-            {s.reference ? <span className="ml-2 text-sea-ink-4">{s.reference}</span> : null}
+          <span className="mt-1 flex min-w-0 items-center gap-2 text-[11px] leading-[18px] text-sea-ink-3">
+            <span className="ref-tag">{shortId(s.id)}</span>
+            {s.reference ? (
+              <span className="min-w-0 truncate text-sea-ink-4" title={s.reference}>
+                {s.reference}
+              </span>
+            ) : null}
           </span>
         </td>
 
@@ -1089,7 +1122,7 @@ function BoardRow({
               e.stopPropagation();
               onToggle();
             }}
-            className={`focus-ring inline-grid size-6 place-items-center rounded-[2px] text-sea-ink-3 transition-[opacity,color] hover:bg-sea-paper-2 hover:text-sea-ink ${
+            className={`focus-ring inline-grid size-6 place-items-center rounded-md text-sea-ink-3 transition-[opacity,color] hover:bg-sea-paper-2 hover:text-sea-ink ${
               expanded || lit
                 ? "opacity-100"
                 : "opacity-0 focus:opacity-100 group-hover:opacity-100"
@@ -1314,7 +1347,9 @@ function Passage({
       </div>
       <div className="mt-0.5 flex items-baseline justify-between gap-3 leading-[16px]">
         <span className="flex min-w-0 items-center gap-1.5 text-[11.5px]" title={fix}>
-          <span className={`truncate ${s.vessel_name ? "text-sea-ink-2" : "text-sea-ink-4"}`}>
+          <span
+            className={`truncate ${s.vessel_name ? "vessel text-[11px] text-sea-ink-2" : "text-sea-ink-4"}`}
+          >
             {s.vessel_name ?? "Vessel not assigned"}
           </span>
           {s.vessel_name && !voyage.arrived ? (
@@ -1375,7 +1410,7 @@ function FreshReading({ value, className }: { value: string; className: string }
   );
 }
 
-function Track({ row, cursor }: { row: Row; cursor: boolean }) {
+function Track({ row }: { row: Row; cursor: boolean }) {
   const { s, voyage, target } = row;
   const overdue = row.departureOverdue;
   const pos = voyage.pos;
@@ -1387,71 +1422,25 @@ function Track({ row, cursor }: { row: Row; cursor: boolean }) {
       : `From ${s.origin} to ${s.destination}, about ${Math.round(pos * 100)}% by schedule${moving ? ", under way" : ""}${row.arrivalOverdue ? ", ETA passed" : ""}`;
 
   return (
-    <div role="img" aria-label={label} title={label} className="relative mx-[5px] h-[14px]">
+    <div role="img" aria-label={label} title={label} className="relative">
       {/* chart-scale divisions, aligned with the column head */}
       {[0.25, 0.5, 0.75].map((t) => (
         <span
           key={t}
           aria-hidden
           className="absolute top-[9px] h-[3px] w-px bg-sea-rule"
-          style={{ left: `${t * 100}%` }}
+          style={{ left: `calc(4px + ${t} * (100% - 8px))` }}
         />
       ))}
-      {/* planned track */}
-      <span
-        aria-hidden
-        className={`absolute inset-x-0 top-1/2 -translate-y-1/2 border-t ${
-          voyage.arrived ? "border-solid border-sea-ink-4" : "border-dotted border-sea-ink-4"
-        }`}
+      <PassageLine
+        pos={pos}
+        arrived={voyage.arrived}
+        moving={moving}
+        target={target.state}
+        stopped={target.stopped}
+        departOverdue={overdue}
+        arrivalOverdue={row.arrivalOverdue}
       />
-      {/* track made good */}
-      {pos != null && pos > 0 && !voyage.arrived ? (
-        <span
-          aria-hidden
-          className={`absolute left-0 top-1/2 h-[2px] -translate-y-1/2 transition-[width,background-color] duration-500 ${
-            moving ? "bg-sea-move" : cursor ? "bg-sea-ink" : "bg-sea-ink-2"
-          }`}
-          style={{ width: `${pos * 100}%` }}
-        />
-      ) : null}
-      {/* ports: origin filled while still alongside; destination ringed red
-       * once its ETA has passed without an arrival */}
-      <span
-        aria-hidden
-        className={`absolute left-0 top-1/2 size-[7px] -translate-x-1/2 -translate-y-1/2 rounded-full border-[1.5px] ${
-          overdue
-            ? "border-sea-red bg-sea-red"
-            : pos == null && !voyage.arrived
-              ? "border-sea-ink bg-sea-ink"
-              : "border-sea-ink-2 bg-sea-surface"
-        }`}
-      />
-      <span
-        aria-hidden
-        className={`absolute left-full top-1/2 size-[7px] -translate-x-1/2 -translate-y-1/2 rounded-full border-[1.5px] ${
-          voyage.arrived
-            ? "border-sea-green bg-sea-green"
-            : row.arrivalOverdue
-              ? "border-sea-red bg-sea-surface outline outline-1 outline-offset-2 outline-sea-red/40"
-              : "border-sea-ink bg-sea-surface"
-        }`}
-      />
-      {/* vessel */}
-      {!voyage.arrived && pos != null ? (
-        <span
-          aria-hidden
-          className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 transition-[left] duration-500"
-          style={{ left: `${pos * 100}%` }}
-        >
-          {target.state === "none" ? (
-            <span
-              className={`block size-[6px] rotate-45 ${cursor ? "bg-sea-ink" : "bg-sea-ink-2"}`}
-            />
-          ) : (
-            <AisTarget state={target.state} stopped={target.stopped} />
-          )}
-        </span>
-      ) : null}
     </div>
   );
 }
@@ -1489,7 +1478,9 @@ function CompactRow({ row, now }: { row: Row; now: number | null }) {
         <span className="mt-1 flex items-center justify-between gap-4">
           <span className="flex min-w-0 items-center gap-1.5 text-[12px]">
             <PhaseLadder status={s.status} className="mr-1" />
-            <span className="truncate text-sea-ink-2">
+            <span
+              className={`truncate ${s.vessel_name ? "vessel text-[11px] text-sea-ink-2" : "text-sea-ink-4"}`}
+            >
               {s.vessel_name ?? "Vessel not assigned"}
             </span>
             {s.vessel_name && !voyage.arrived ? (

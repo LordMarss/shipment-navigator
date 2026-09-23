@@ -66,6 +66,85 @@ export function AisTarget({
   );
 }
 
+/* -------------------------------------------------------------- passage --- */
+
+/**
+ * The WhiteWind passage line, the same everywhere a voyage is drawn:
+ * origin ring, track made good (sea blue while AIS confirms the vessel is
+ * under way, steel otherwise), the vessel as its AIS target, planned track
+ * dotted, destination ring. A ring turns red when its date has passed
+ * without the movement being recorded; the destination fills green on
+ * arrival.
+ */
+export function PassageLine({
+  pos,
+  arrived = false,
+  moving = false,
+  target = "none",
+  stopped = false,
+  departOverdue = false,
+  arrivalOverdue = false,
+  className = "",
+}: {
+  /** 0..1 along the passage, or null while alongside at origin. */
+  pos: number | null;
+  arrived?: boolean;
+  moving?: boolean;
+  target?: TargetState;
+  stopped?: boolean;
+  departOverdue?: boolean;
+  arrivalOverdue?: boolean;
+  className?: string;
+}) {
+  return (
+    <span aria-hidden className={`relative mx-[4px] block h-[14px] ${className}`}>
+      <span
+        className={`absolute inset-x-0 top-1/2 -translate-y-1/2 border-t ${
+          arrived ? "border-solid border-ww-steel/60" : "border-dotted border-sea-ink-4"
+        }`}
+      />
+      {pos != null && pos > 0 && !arrived ? (
+        <span
+          className={`absolute left-0 top-1/2 h-[2px] -translate-y-1/2 rounded-full transition-[width] duration-700 ${
+            moving ? "bg-sea-move" : "bg-ww-steel"
+          }`}
+          style={{ width: `${pos * 100}%` }}
+        />
+      ) : null}
+      <span
+        className={`absolute left-0 top-1/2 size-[7px] -translate-x-1/2 -translate-y-1/2 rounded-full border-[1.5px] ${
+          departOverdue
+            ? "border-sea-red bg-sea-red"
+            : pos == null && !arrived
+              ? "border-sea-ink bg-sea-ink"
+              : "border-ww-steel bg-sea-surface"
+        }`}
+      />
+      <span
+        className={`absolute left-full top-1/2 size-[7px] -translate-x-1/2 -translate-y-1/2 rounded-full border-[1.5px] ${
+          arrived
+            ? "border-sea-green bg-sea-green"
+            : arrivalOverdue
+              ? "border-sea-red bg-sea-surface"
+              : "border-sea-ink bg-sea-surface"
+        }`}
+      />
+      {!arrived && pos != null ? (
+        <span
+          className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 transition-[left] duration-700"
+          style={{ left: `${pos * 100}%` }}
+        >
+          {target === "none" ? (
+            <span className="block size-[6px] rotate-45 bg-ww-steel" />
+          ) : (
+            <AisTarget state={target} stopped={stopped} />
+          )}
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
 /* ---------------------------------------------------------------- phase --- */
 
 /**
@@ -103,7 +182,7 @@ export function PhaseLadder({
           <span
             key={p}
             aria-hidden
-            className={`${arrived ? "bg-sea-green" : current || passed ? "bg-sea-ink" : "bg-sea-rule"} ${passed && !arrived ? "opacity-45" : ""}`}
+            className={`rounded-[1px] ${arrived ? "bg-sea-green" : current ? "bg-ww-blue" : passed ? "bg-ww-steel/60" : "bg-sea-rule"}`}
             style={{
               width: h.w,
               height: current || arrived ? h.cur : h.base,
@@ -245,6 +324,7 @@ export function ChartPanel({
   tools,
   children,
   className = "",
+  flush = false,
 }: {
   id: string;
   title: string;
@@ -252,25 +332,31 @@ export function ChartPanel({
   tools?: ReactNode;
   children: ReactNode;
   className?: string;
+  /** The body runs to the panel edges (a table that draws its own gutters). */
+  flush?: boolean;
 }) {
   return (
     <section
       id={id}
       aria-labelledby={`${id}-title`}
-      className={`min-w-0 scroll-mt-[calc(var(--rail-h)+16px)] ${className}`}
+      className={`panel min-w-0 overflow-hidden scroll-mt-[calc(var(--rail-h)+16px)] ${className}`}
     >
-      <header className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2 border-b border-sea-ink pb-2">
-        <div className="flex min-w-0 items-baseline gap-3">
-          <h2 id={`${id}-title`} className="chart-label !text-[11.5px] text-sea-ink">
+      <header className="flex min-h-[52px] flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-sea-rule px-4 py-2.5 sm:px-5">
+        <div className="flex min-w-0 items-baseline gap-2.5">
+          <h2 id={`${id}-title`} className="panel-title">
             {title}
           </h2>
-          {meta ? (
-            <span className="telemetry truncate text-[11px] text-sea-ink-3">{meta}</span>
-          ) : null}
+          {meta ? <span className="truncate text-[12px] text-sea-ink-3">{meta}</span> : null}
         </div>
         {tools ? <div className="min-w-0 max-w-full">{tools}</div> : null}
       </header>
-      {children}
+      <div
+        className={
+          flush ? "" : "px-4 pb-1 sm:px-5 [&_li:last-child]:border-b-0 [&_tr:last-child]:border-b-0"
+        }
+      >
+        {children}
+      </div>
     </section>
   );
 }

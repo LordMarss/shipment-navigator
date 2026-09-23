@@ -90,7 +90,9 @@ export function NewShipmentForm({ onClose }: { onClose: () => void }) {
           value={form.origin}
           portId={form.origin_port_id}
           placeholder="Shanghai, CN"
-          onChange={({ text, portId }) => setForm({ ...form, origin: text, origin_port_id: portId })}
+          onChange={({ text, portId }) =>
+            setForm({ ...form, origin: text, origin_port_id: portId })
+          }
         />
         <PortAutocomplete
           label="Destination"
@@ -98,7 +100,9 @@ export function NewShipmentForm({ onClose }: { onClose: () => void }) {
           value={form.destination}
           portId={form.destination_port_id}
           placeholder="Vancouver, CA"
-          onChange={({ text, portId }) => setForm({ ...form, destination: text, destination_port_id: portId })}
+          onChange={({ text, portId }) =>
+            setForm({ ...form, destination: text, destination_port_id: portId })
+          }
         />
       </Section>
 
