@@ -4,16 +4,14 @@ import { useMemo, useState } from "react";
 
 import { AppShell } from "@/components/AppShell";
 import { NewShipmentForm } from "@/components/NewShipmentForm";
-import { ActivityLog } from "@/components/dashboard/ActivityLog";
-import { Band } from "@/components/dashboard/glyphs";
-import { Horizon } from "@/components/dashboard/Horizon";
-import { Manifest, type Lens } from "@/components/dashboard/Manifest";
-import { Masthead, type MastheadFacts } from "@/components/dashboard/Masthead";
+import { Almanac } from "@/components/dashboard/Almanac";
+import { BridgeStrip, type BridgeFacts } from "@/components/dashboard/BridgeStrip";
+import { Conditions, type ConditionItem } from "@/components/dashboard/Conditions";
+import { DeckLog } from "@/components/dashboard/DeckLog";
 import { useNow } from "@/components/dashboard/useNow";
-import { WatchList, type WatchItem } from "@/components/dashboard/WatchList";
+import { VoyageBoard, type Lens } from "@/components/dashboard/VoyageBoard";
 import { useMonitoringConfig } from "@/hooks/useMonitoringConfig";
 import {
-  isLegacyStatus,
   listAllDocuments,
   listAllEvents,
   listAlerts,
@@ -100,9 +98,9 @@ function Dashboard() {
 
   const shipmentById = useMemo(() => new Map(shipments.map((s) => [s.id, s])), [shipments]);
 
-  // Same verdict as `kpis` (and the sidebar), itemised: the masthead's
-  // headline number always equals the at-risk/delayed rows here.
-  const watch = useMemo<WatchItem[]>(() => {
+  // Same verdict as `kpis` (and the sidebar), itemised: the bridge strip's
+  // alarm count always equals the at-risk/delayed entries here.
+  const watch = useMemo<ConditionItem[]>(() => {
     const alertCounts = new Map<string, number>();
     for (const a of alerts) {
       if (a.shipment_id) alertCounts.set(a.shipment_id, (alertCounts.get(a.shipment_id) ?? 0) + 1);
@@ -120,9 +118,9 @@ function Dashboard() {
       );
   }, [shipments, documents, alerts, config]);
 
-  const facts = useMemo<MastheadFacts>(() => {
+  const facts = useMemo<BridgeFacts>(() => {
     const { atRisk, delayed } = kpis(shipments, documents, config);
-    const exceptions = atRisk + delayed;
+    const alarm = atRisk + delayed;
     // "Under way" is read from real AIS telemetry, not the status field.
     const underway = positions
       ? shipments.filter(
@@ -147,105 +145,93 @@ function Dashboard() {
         .map((a) => a.shipment_id),
     );
     return {
-      exceptions,
-      toReview: watch.length - exceptions,
+      alarm,
+      caution: watch.length - alarm,
+      underway,
+      inPassage: open.filter((s) => Boolean(s.actual_departure) && !s.actual_arrival).length,
+      arriving72h: upcoming.filter((s) => new Date(s.eta!).getTime() <= t + 3 * DAY).length,
+      etaRevised24h: etaRevised.size,
+      docsOpen: open.filter((s) => {
+        const d = docsFor(documents, s.id);
+        return d.attached < d.total;
+      }).length,
       overdueDepartures: open.filter(
         (s) => !s.actual_departure && s.planned_etd && new Date(s.planned_etd).getTime() < t,
       ).length,
       nextArrival: upcoming[0] ?? null,
-      underway,
-      active: shipments.filter((s) => !isLegacyStatus(s.status) && s.status !== "Arrived").length,
-      arriving72h: upcoming.filter((s) => new Date(s.eta!).getTime() <= t + 3 * DAY).length,
-      etaRevised24h: etaRevised.size,
-      missingDocs: open.filter((s) => {
-        const d = docsFor(documents, s.id);
-        return d.attached < d.total;
-      }).length,
     };
   }, [shipments, documents, alerts, positions, config, now, watch.length]);
 
-  const urgent = watch.filter((w) => w.health.level !== "Attention").length;
+  const showConditionsOnBoard = () => {
+    setLens("attention");
+    document.getElementById("board")?.scrollIntoView({ block: "start" });
+  };
 
   return (
-    <AppShell title="Operations" bare>
-      {/* The operations sheet: neutral paper, graphite ink, one signal blue. */}
-      <div className="min-h-[calc(100dvh-3.5rem)] bg-paper text-ink-1">
-        <div className="mx-auto w-full max-w-[1520px] px-5 pb-6 [--ww-margin:188px] sm:px-8 lg:px-10 2xl:px-14 2xl:[--ww-margin:220px]">
-          <Masthead
-            facts={facts}
-            now={now}
-            lastSync={lastSync}
-            isLoading={isLoading}
-            formOpen={open}
-            onToggleForm={() => setOpen((v) => !v)}
-          />
+    <AppShell title="Operations" bare chrome="bridge">
+      <BridgeStrip
+        facts={facts}
+        now={now}
+        lastSync={lastSync}
+        isLoading={isLoading}
+        formOpen={open}
+        onToggleForm={() => setOpen((v) => !v)}
+      />
 
+      {/* The chart table: paper with a sparse graticule. */}
+      <div className="chart-paper min-h-[calc(100dvh-3.5rem)] text-sea-ink">
+        <div className="mx-auto w-full max-w-[1560px] px-5 pb-12 pt-7 sm:px-8 lg:px-10">
           {open ? (
-            <div id="new-shipment" className="pb-10 pt-2 xl:pl-[var(--ww-margin)]">
+            <div id="new-shipment" className="mb-9">
               <NewShipmentForm onClose={() => setOpen(false)} />
             </div>
           ) : null}
 
-          <Band
-            id="attention"
-            title="Needs attention"
-            meta={
-              isLoading
-                ? null
-                : watch.length === 0
-                  ? "All clear"
-                  : [
-                      urgent > 0 ? `${urgent} at risk or delayed` : null,
-                      watch.length > urgent ? `${watch.length - urgent} to review` : null,
-                    ]
-                      .filter(Boolean)
-                      .join(", ")
-            }
-          >
-            <WatchList
-              items={watch}
-              isLoading={isLoading}
-              focusId={focusId}
-              onFocus={setFocusId}
-              onShowAll={() => {
-                setLens("attention");
-                document.getElementById("fleet")?.scrollIntoView({ block: "start" });
-              }}
-            />
-          </Band>
+          {/* Conditions lead on narrow screens; on wide screens the board is
+           * the canvas and the watch column runs beside it. */}
+          <div className="grid gap-x-10 gap-y-10 xl:grid-cols-[minmax(0,1fr)_minmax(320px,368px)]">
+            <div className="xl:col-start-2 xl:row-start-1">
+              <Conditions
+                items={watch}
+                isLoading={isLoading}
+                focusId={focusId}
+                onFocus={setFocusId}
+                onShowAll={showConditionsOnBoard}
+              />
+            </div>
 
-          <Band id="schedule" title="Schedule" meta="Planned departures and arrivals">
-            <Horizon
-              shipments={shipments}
-              now={now}
-              focusId={focusId}
-              onFocus={setFocusId}
-              isLoading={isLoading}
-            />
-          </Band>
+            <div className="min-w-0 xl:col-start-1 xl:row-span-2 xl:row-start-1">
+              <VoyageBoard
+                shipments={shipments}
+                documents={documents}
+                alerts={alerts}
+                positions={positions}
+                isLoading={isLoading}
+                now={now}
+                focusId={focusId}
+                onFocus={setFocusId}
+                lens={lens}
+                onLensChange={setLens}
+              />
+            </div>
 
-          <Manifest
-            shipments={shipments}
-            documents={documents}
-            alerts={alerts}
-            positions={positions}
-            isLoading={isLoading}
-            now={now}
-            focusId={focusId}
-            onFocus={setFocusId}
-            lens={lens}
-            onLensChange={setLens}
-          />
-
-          <Band id="log" title="Log" meta="Latest events and alerts">
-            <ActivityLog
-              events={events}
-              alerts={alerts}
-              shipmentById={shipmentById}
-              isLoading={alertsLoading || eventsLoading}
-              now={now}
-            />
-          </Band>
+            <div className="grid content-start gap-x-10 gap-y-10 md:grid-cols-2 xl:col-start-2 xl:row-start-2 xl:grid-cols-1">
+              <Almanac
+                shipments={shipments}
+                now={now}
+                isLoading={isLoading}
+                focusId={focusId}
+                onFocus={setFocusId}
+              />
+              <DeckLog
+                events={events}
+                alerts={alerts}
+                shipmentById={shipmentById}
+                isLoading={alertsLoading || eventsLoading}
+                now={now}
+              />
+            </div>
+          </div>
         </div>
       </div>
     </AppShell>

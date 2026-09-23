@@ -62,6 +62,7 @@ export function AppShell({
   children,
   wide = false,
   bare = false,
+  chrome = "default",
 }: {
   /** Usually plain text; a page needing a richer header (e.g. an inline back
    *  button) may pass a small ReactNode instead. */
@@ -79,6 +80,9 @@ export function AppShell({
   /** The page draws its own header and layout on an open canvas (the
    * dashboard): no atmosphere band, no width cap, no main padding. */
   bare?: boolean;
+  /** "bridge" renders the sidebar and top bar as the navy bridge console
+   * (dashboard only for now; every other route keeps the default). */
+  chrome?: "default" | "bridge";
 }) {
   const [mobileNav, setMobileNav] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -89,7 +93,7 @@ export function AppShell({
   }, [pathname]);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background" data-chrome={chrome}>
       <Sidebar open={mobileNav} onClose={() => setMobileNav(false)} />
 
       <div className="lg:pl-[248px]">
@@ -141,7 +145,7 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const exceptions = atRisk + delayed;
 
   const body = (
-    <div className="atmosphere flex h-full flex-col">
+    <div className="atmosphere flex h-full flex-col" data-chrome-surface>
       <div className="flex h-16 shrink-0 items-center gap-2.5 border-b border-border px-5">
         <span className="grid size-6 shrink-0 place-items-center rounded-md bg-primary-deep text-primary-foreground">
           <Ship className="size-3.5" />
@@ -245,7 +249,7 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
 
 function TopBar({ onMenu }: { onMenu: () => void }) {
   return (
-    <header className="atmosphere atmosphere-grid sticky top-0 z-20 border-b border-border">
+    <header className="atmosphere atmosphere-grid sticky top-0 z-20 border-b border-border" data-chrome-surface>
       <div className="flex h-14 items-center gap-3 px-5 sm:px-6 lg:px-8">
         <button
           className="focus-ring rounded-md p-2 text-muted-foreground transition-colors hover:bg-surface lg:hidden"
@@ -367,6 +371,7 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-start justify-center bg-foreground/20 px-4 pt-[14vh] backdrop-blur-[2px]"
+      data-chrome-reset
       onClick={onClose}
     >
       <div
