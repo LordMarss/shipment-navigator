@@ -1,78 +1,117 @@
-import { SourceTag } from "@/components/StatusPill";
-import { buildTimeline, formatDayTime } from "@/lib/lifecycle";
+import { SourceMark } from "@/components/maritime/marks";
+import { slipLabel, utcDayTime } from "@/components/maritime/format";
+import { buildTimeline, drift } from "@/lib/lifecycle";
 import type { Shipment, ShipmentEvent } from "@/lib/api";
 
-const KIND_LABEL: Record<string, string> = {
-  planned: "Planned",
-  actual: "Actual",
-  current: "Current",
-  pending: "Pending",
-};
-
 /**
- * Planned vs current vs actual, side by side. Anything not yet recorded stays
- * pending rather than being estimated.
+ * The voyage's milestones as a schedule table: what was planned, what is
+ * now expected or has actually happened, the variance between them, and
+ * which source recorded it. Anything not yet recorded stays blank rather
+ * than being estimated.
  */
 export function ShipmentTimeline({
-  shipment,
+  shipment: s,
   events,
 }: {
   shipment: Shipment;
   events: ShipmentEvent[];
 }) {
-  const timeline = buildTimeline(shipment, events);
+  const timeline = buildTimeline(s, events);
+  const src = (key: string) => timeline.find((t) => t.key === key);
+  const dep = drift(s.planned_etd, s.actual_departure);
+  const eta = drift(s.planned_eta, s.eta);
+  const arr = drift(s.planned_eta, s.actual_arrival);
+
+  const rows: {
+    label: string;
+    planned: string | null;
+    actual: { text: string; kind: "actual" | "expected" } | null;
+    variance: number | null;
+    source: { source?: string | undefined; automated?: boolean | undefined } | undefined;
+  }[] = [
+    {
+      label: "Departure",
+      planned: s.planned_etd,
+      actual: s.actual_departure ? { text: s.actual_departure, kind: "actual" } : null,
+      variance: s.actual_departure ? (dep?.hours ?? null) : null,
+      source: src("actual_departure"),
+    },
+    {
+      label: "Arrival",
+      planned: s.planned_eta,
+      actual: s.actual_arrival
+        ? { text: s.actual_arrival, kind: "actual" }
+        : s.eta
+          ? { text: s.eta, kind: "expected" }
+          : null,
+      variance: s.actual_arrival ? (arr?.hours ?? null) : (eta?.hours ?? null),
+      source: s.actual_arrival ? src("actual_arrival") : src("current_eta"),
+    },
+  ];
 
   return (
-    <section className="panel overflow-hidden">
-      <header className="border-b border-border px-4 py-3">
-        <h2 className="label-xs">Lifecycle timeline</h2>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Planned, current and actual milestones as recorded on this shipment
-        </p>
-      </header>
-
-      <ol className="px-4 py-3">
-        {timeline.map((entry, i) => {
-          const recorded = Boolean(entry.value);
-          const dot = !recorded
-            ? "bg-transparent border border-border"
-            : entry.delayed
-              ? "bg-risk"
-              : entry.kind === "planned"
-                ? "bg-muted-foreground/40"
-                : "bg-positive";
-
-          return (
-            <li key={entry.key} className="relative flex gap-3 pb-3 last:pb-1">
-              {i < timeline.length - 1 ? (
-                <span aria-hidden className="absolute left-[5px] top-4 h-full w-px bg-border" />
-              ) : null}
-              <span aria-hidden className={`mt-1.5 size-[11px] shrink-0 rounded-full ${dot}`} />
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm font-medium text-foreground">{entry.label}</span>
-                  <span className="text-xs uppercase tracking-[0.05em] text-muted-foreground">
-                    {KIND_LABEL[recorded ? entry.kind : "pending"]}
+    <section aria-labelledby="milestones-title">
+      <h2 id="milestones-title" className="chart-label border-b border-sea-ink pb-2 text-sea-ink">
+        Milestones{" "}
+        <span className="ml-2 font-normal normal-case tracking-normal text-sea-ink-3">UTC</span>
+      </h2>
+      <table className="w-full table-fixed text-left">
+        <thead>
+          <tr className="border-b border-sea-rule">
+            <th className="chart-label w-[22%] py-2 font-normal text-sea-ink-3">Milestone</th>
+            <th className="chart-label py-2 font-normal text-sea-ink-3">Planned</th>
+            <th className="chart-label py-2 font-normal text-sea-ink-3">Actual / expected</th>
+            <th className="chart-label w-[64px] py-2 text-right font-normal text-sea-ink-3">Var</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.label} className="border-b border-sea-rule-2 align-top">
+              <td className="py-2.5 pr-3 text-[13px] font-medium text-sea-ink">{r.label}</td>
+              <td className="telemetry py-2.5 pr-3 text-[11px] uppercase text-sea-ink-2">
+                {r.planned ? (
+                  utcDayTime(r.planned)
+                ) : (
+                  <span className="text-sea-amber-ink">Not set</span>
+                )}
+              </td>
+              <td className="py-2.5 pr-3">
+                {r.actual ? (
+                  <span className="telemetry flex items-center gap-1.5 text-[11px] uppercase text-sea-ink">
+                    {r.source?.source ? (
+                      <SourceMark
+                        source={r.source.source}
+                        automated={Boolean(r.source.automated)}
+                      />
+                    ) : null}
+                    {r.actual.kind === "expected" ? "ETA " : ""}
+                    {utcDayTime(r.actual.text)}
                   </span>
-                  <span className={`ml-auto text-xs ${recorded ? "text-foreground" : "text-muted-foreground"}`}>
-                    {recorded ? formatDayTime(entry.value) : "Not recorded"}
-                  </span>
-                </div>
-                {entry.note ? (
-                  <p className={`mt-0.5 text-xs ${entry.delayed ? "text-risk" : "text-muted-foreground"}`}>
-                    {entry.note}
-                  </p>
-                ) : null}
-                {entry.source ? (
-                  <div className="mt-0.5">
-                    <SourceTag source={entry.source} automated={Boolean(entry.automated)} />
-                  </div>
-                ) : null}
-              </div>
-            </li>
-          );
-        })}
-      </ol>
+                ) : (
+                  <span className="text-[12px] text-sea-ink-3">Not yet recorded</span>
+                )}
+              </td>
+              <td
+                className={`telemetry py-2.5 text-right text-[11px] ${
+                  r.variance == null || r.variance === 0
+                    ? "text-sea-ink-4"
+                    : r.variance > 0
+                      ? "text-sea-amber-ink"
+                      : "text-sea-ink-2"
+                }`}
+              >
+                {r.variance == null ? "" : r.variance === 0 ? "0H" : slipLabel(r.variance)}
+              </td>
+            </tr>
+          ))}
+          <tr className="border-b border-sea-rule-2">
+            <td className="py-2.5 pr-3 text-[13px] text-sea-ink-2">Record opened</td>
+            <td className="telemetry py-2.5 text-[11px] uppercase text-sea-ink-3" colSpan={3}>
+              {utcDayTime(s.created_at)}
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </section>
   );
 }

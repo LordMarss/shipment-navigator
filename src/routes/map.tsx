@@ -55,7 +55,11 @@ function FleetMap() {
     const kind = position ? deriveVesselCondition(s, position).kind : null;
     return targetOf(position, kind, Boolean(s.vessel_mmsi), now);
   };
-  const underway = active.filter((s) => targetFor(s).state === "active").length;
+  // Same definition as the operations page: a sailed voyage whose vessel is
+  // under way on AIS (a booked voyage's vessel may be moving on another passage).
+  const underway = active.filter(
+    (s) => s.actual_departure && !s.actual_arrival && targetFor(s).state === "active",
+  ).length;
   const trackedByAis = active.filter((s) => s.vessel_mmsi).length;
   const inTransitCount = active.filter((s) => s.status === "In Transit").length;
 

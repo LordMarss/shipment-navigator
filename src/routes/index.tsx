@@ -1,12 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
+import { Plus } from "lucide-react";
 
-import { AppShell } from "@/components/AppShell";
+import { AppShell, btnPrimary } from "@/components/AppShell";
 import { NewShipmentForm } from "@/components/NewShipmentForm";
 import { Almanac } from "@/components/dashboard/Almanac";
 import { DeckLog } from "@/components/dashboard/DeckLog";
-import { SituationBar, type SituationFacts } from "@/components/dashboard/SituationBar";
+import {
+  SituationBar,
+  type FleetTick,
+  type SituationFacts,
+} from "@/components/dashboard/SituationBar";
 import { useNow } from "@/components/maritime/useNow";
 import { VoyageBoard, type Lens } from "@/components/maritime/VoyageBoard";
 import { useMonitoringConfig } from "@/hooks/useMonitoringConfig";
@@ -123,11 +128,15 @@ function Dashboard() {
       const level = shipmentHealth(s, docsFor(documents, s.id), config).level;
       return level === "At Risk" || level === "Delayed" || level === "Attention";
     }).length;
-    // "Under way" is read from real AIS telemetry, not the status field.
+    // "Under way" is read from real AIS telemetry, not the status field, and
+    // only for voyages that have sailed: a booked voyage's vessel may be
+    // moving on another passage.
     const underway = positions
       ? shipments.filter(
           (s) =>
             s.vessel_mmsi &&
+            s.actual_departure &&
+            !s.actual_arrival &&
             deriveVesselCondition(s, positions.get(s.vessel_mmsi) ?? null).kind === "underway",
         ).length
       : 0;
@@ -166,6 +175,41 @@ function Dashboard() {
     };
   }, [shipments, documents, positions, config, now, changedIds, events, alerts, shipmentById]);
 
+  const fleet = useMemo<FleetTick[]>(() => {
+    const t = now ?? 0;
+    return shipments.map((s) => {
+      const level = shipmentHealth(s, docsFor(documents, s.id), config).level;
+      const arrived = Boolean(s.actual_arrival) || FINISHED.has(s.status);
+      const sailed = Boolean(s.actual_departure) && !arrived;
+      const dep = s.actual_departure ? new Date(s.actual_departure).getTime() : null;
+      const eta = s.eta ? new Date(s.eta).getTime() : null;
+      return {
+        id: s.id,
+        client: s.client_name,
+        stretch: arrived ? 2 : sailed ? 1 : 0,
+        level:
+          level === "At Risk" || level === "Delayed"
+            ? "alarm"
+            : level === "Attention"
+              ? "caution"
+              : null,
+        moving: Boolean(
+          sailed &&
+          s.vessel_mmsi &&
+          positions &&
+          deriveVesselCondition(s, positions.get(s.vessel_mmsi) ?? null).kind === "underway",
+        ),
+        order: arrived
+          ? -(eta ?? 0)
+          : sailed && dep && eta && eta > dep
+            ? -((t - dep) / (eta - dep))
+            : s.planned_etd
+              ? new Date(s.planned_etd).getTime()
+              : Number.MAX_SAFE_INTEGER,
+      };
+    });
+  }, [shipments, documents, config, positions, now]);
+
   const chooseLens = (next: Lens) => {
     setLens(next);
     if (next !== "all")
@@ -183,6 +227,9 @@ function Dashboard() {
         onLens={chooseLens}
         formOpen={open}
         onToggleForm={() => setOpen((v) => !v)}
+        fleet={fleet}
+        focusId={focusId}
+        onFocus={setFocusId}
       />
 
       <div className="mx-auto w-full max-w-[1600px] px-4 pb-12 pt-6 sm:px-6 lg:px-8">
@@ -207,6 +254,13 @@ function Dashboard() {
               onLensChange={setLens}
               showLenses={false}
               changedIds={changedIds}
+              emptyTitle="No voyages on the board"
+              emptyDescription="Create a shipment with its ports, vessel MMSI and planned dates. Its passage is plotted here and followed on AIS from departure."
+              emptyAction={
+                <button className={btnPrimary} onClick={() => setOpen(true)}>
+                  <Plus className="size-3.5" aria-hidden /> New shipment
+                </button>
+              }
             />
           </div>
 

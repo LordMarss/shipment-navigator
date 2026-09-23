@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { Plus, X } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -6,6 +7,18 @@ import { relativeTime } from "@/lib/lifecycle";
 import { clock, monthName, shortDate, utcClock, weekday } from "@/components/maritime/format";
 import { ConditionMark } from "@/components/maritime/marks";
 import type { Lens } from "@/components/maritime/VoyageBoard";
+
+/** One voyage as a tick on the fleet strip. */
+export type FleetTick = {
+  id: string;
+  client: string;
+  /** 0 alongside at origin, 1 at sea, 2 arrived. */
+  stretch: 0 | 1 | 2;
+  level: "alarm" | "caution" | null;
+  moving: boolean;
+  /** Sort key within the stretch: passage progress or time to departure. */
+  order: number;
+};
 
 export type SituationFacts = {
   alarm: number;
@@ -38,7 +51,13 @@ export function SituationBar({
   onLens,
   formOpen,
   onToggleForm,
+  fleet,
+  focusId,
+  onFocus,
 }: {
+  fleet: FleetTick[];
+  focusId: string | null;
+  onFocus: (id: string | null) => void;
   facts: SituationFacts;
   now: number | null;
   lastSync: string | undefined;
@@ -126,7 +145,9 @@ export function SituationBar({
                   </span>
                 </span>
                 <span className="mt-2 block max-w-[48ch] text-[13px] leading-[1.45] text-sea-ink-2">
-                  {lead(facts)}
+                  {fleet.length === 0
+                    ? "No voyages on the board yet. Create a shipment to start the watch."
+                    : lead(facts)}
                 </span>
                 <LensHint on={lens === "attention"} />
               </>
@@ -171,8 +192,87 @@ export function SituationBar({
             isLoading={isLoading}
           />
         </div>
+        {!isLoading && fleet.length > 0 ? (
+          <FleetStrip fleet={fleet} focusId={focusId} onFocus={onFocus} />
+        ) : null}
       </div>
     </section>
+  );
+}
+
+const STRETCHES = ["Alongside, origin", "At sea", "Arrived"] as const;
+
+/**
+ * The whole operation in one line: every voyage a tick, laid out as the
+ * passage is (alongside at origin, at sea, arrived), each stretch as wide
+ * as the voyages in it. A tick takes colour only for state: red alarm,
+ * amber caution, blue under way. Pointing at a tick marks the voyage on
+ * the board; selecting it opens the record.
+ */
+function FleetStrip({
+  fleet,
+  focusId,
+  onFocus,
+}: {
+  fleet: FleetTick[];
+  focusId: string | null;
+  onFocus: (id: string | null) => void;
+}) {
+  const groups = STRETCHES.map((label, i) => ({
+    label,
+    ticks: fleet.filter((t) => t.stretch === i).sort((a, b) => a.order - b.order),
+  }));
+  return (
+    <div className="border-t border-sea-rule-2 pb-4 pt-3">
+      <div className="flex items-end gap-3" aria-label="Fleet by stretch of passage">
+        {groups.map((g) =>
+          g.ticks.length === 0 ? null : (
+            <div
+              key={g.label}
+              className="min-w-0"
+              style={{ flexGrow: g.ticks.length, flexBasis: 0 }}
+            >
+              <span className="chart-label flex items-baseline gap-1.5 truncate !text-[9.5px] text-sea-ink-3">
+                {g.label}
+                <span className="telemetry !tracking-normal text-sea-ink-2">{g.ticks.length}</span>
+              </span>
+              <ul className="mt-1.5 flex h-[18px] items-end gap-[3px] border-b border-sea-ink-4">
+                {g.ticks.map((t) => {
+                  const on = focusId === t.id;
+                  const tone =
+                    t.level === "alarm"
+                      ? "bg-sea-red"
+                      : t.level === "caution"
+                        ? "bg-sea-amber"
+                        : t.moving
+                          ? "bg-sea-move"
+                          : t.stretch === 2
+                            ? "bg-sea-green/70"
+                            : "bg-sea-ink-4";
+                  return (
+                    <li key={t.id} className="flex h-full min-w-[3px] max-w-[7px] flex-1 items-end">
+                      <Link
+                        to="/shipments/$id"
+                        params={{ id: t.id }}
+                        title={`${t.client}${t.level ? `, ${t.level}` : t.moving ? ", under way" : ""}`}
+                        aria-label={t.client}
+                        onMouseEnter={() => onFocus(t.id)}
+                        onMouseLeave={() => onFocus(null)}
+                        onFocus={() => onFocus(t.id)}
+                        onBlur={() => onFocus(null)}
+                        className={`focus-ring block w-full transition-[height,opacity] duration-150 ${tone} ${
+                          on ? "h-full opacity-100" : t.level ? "h-[14px]" : "h-[9px] hover:h-full"
+                        } ${focusId && !on ? "opacity-50" : ""}`}
+                      />
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ),
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -239,19 +339,19 @@ function Reading({
   );
 }
 
-/** Shows whether this reading is the board's current lens. */
+/** Whether this reading is the board's current lens. Quiet until pointed
+ * at; a solid rule once it is filtering the board. */
 function LensHint({ on }: { on: boolean }) {
   return (
     <span
-      className={`mt-2 hidden items-center gap-1.5 text-[11.5px] transition-colors sm:flex ${
-        on ? "text-sea-ink" : "text-sea-ink-4 group-hover:text-sea-ink-3"
+      className={`mt-2 hidden items-center gap-1.5 text-[11.5px] transition-opacity duration-150 sm:flex ${
+        on
+          ? "text-sea-ink opacity-100"
+          : "text-sea-ink-3 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"
       }`}
     >
-      <span
-        aria-hidden
-        className={`h-[2px] w-4 transition-colors ${on ? "bg-sea-ink" : "bg-sea-rule group-hover:bg-sea-ink-4"}`}
-      />
-      {on ? "Showing on board" : "Show on board"}
+      <span aria-hidden className={`h-[2px] w-4 ${on ? "bg-sea-ink" : "bg-sea-ink-4"}`} />
+      {on ? "Filtering the board" : "Filter the board"}
     </span>
   );
 }

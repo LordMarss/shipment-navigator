@@ -2,7 +2,13 @@ import type { VesselCondition } from "@/lib/aisAutomation";
 import type { ShipmentStatus } from "@/lib/api";
 import type { HealthLevel, MonitoringState, Severity } from "@/lib/lifecycle";
 import { conditionOf } from "@/components/maritime/format";
-import { AisTarget, ConditionMark, ManifestMeter } from "@/components/maritime/marks";
+import {
+  AisTarget,
+  ConditionMark,
+  ManifestMeter,
+  PhaseLadder,
+  SourceMark,
+} from "@/components/maritime/marks";
 
 /*
  * Status vocabulary, shared by every page. Drawn from the same maritime
@@ -56,9 +62,9 @@ function PhaseSquare({ status, size = 6 }: { status: ShipmentStatus; size?: numb
   );
 }
 
-/** `size="lg"` is a ruled chip for a page's primary status display; `sm`
- * (default) is the phase square and the label, so a table of these reads
- * as data rather than a row of badges. */
+/** Phase as the six-tick ladder beside its name, so a column of these reads
+ * as a measurement rather than a row of badges. `lg` is the page-level
+ * reading on a shipment record. */
 export function StatusPill({
   status,
   size = "sm",
@@ -66,17 +72,11 @@ export function StatusPill({
   status: ShipmentStatus;
   size?: "sm" | "lg";
 }) {
-  if (size === "lg") {
-    return (
-      <span className="inline-flex items-center gap-2 whitespace-nowrap rounded-[2px] border border-border px-2.5 py-1.5 text-sm font-medium text-foreground">
-        <PhaseSquare status={status} size={7} />
-        {status}
-      </span>
-    );
-  }
   return (
-    <span className="inline-flex items-center gap-2 whitespace-nowrap text-sm text-foreground">
-      <PhaseSquare status={status} />
+    <span
+      className={`inline-flex items-center gap-2 whitespace-nowrap text-foreground ${size === "lg" ? "text-[15px] font-medium" : "text-[13px]"}`}
+    >
+      <PhaseLadder status={status} size={size === "lg" ? "md" : "sm"} />
       {status}
     </span>
   );
@@ -149,10 +149,7 @@ export function SourceTag({ source, automated }: { source: string; automated: bo
   const code = source === "ais" ? "AIS" : source === "system" ? "SYS" : automated ? "SYS" : "OPR";
   return (
     <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs text-muted-foreground">
-      <span
-        aria-hidden
-        className={`inline-block size-[6px] shrink-0 ${automated ? "bg-sea-ink-2" : "border-[1.5px] border-sea-ink-2"}`}
-      />
+      <SourceMark source={source} automated={automated} />
       <span className="telemetry text-[10.5px]">{code}</span>
       <span>{automated ? "automatic" : "operator entry"}</span>
     </span>

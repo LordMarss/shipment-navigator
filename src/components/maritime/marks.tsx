@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { ACTIVE_STATUSES, type ShipmentStatus } from "@/lib/api";
 import { tCount, type ConditionLevel, type TargetState } from "@/components/maritime/format";
 
 /*
@@ -62,6 +63,100 @@ export function AisTarget({
         <line x1="0" y1="11.5" x2="11.5" y2="0.5" stroke={stroke} strokeWidth="1.2" />
       ) : null}
     </svg>
+  );
+}
+
+/* ---------------------------------------------------------------- phase --- */
+
+/**
+ * The lifecycle as six ticks in three groups: port (scheduled, booked),
+ * sea (departed, in transit, approaching), port (arrived). Passed phases
+ * are solid, the current phase stands taller, phases ahead are hairlines.
+ * Phase is geometry, not a coloured badge; only arrival takes colour.
+ * A legacy status (at port, cleared, delivered) has passed every phase.
+ */
+export function PhaseLadder({
+  status,
+  size = "sm",
+  className = "",
+}: {
+  status: ShipmentStatus;
+  size?: "sm" | "md";
+  className?: string;
+}) {
+  const index = ACTIVE_STATUSES.indexOf(status as (typeof ACTIVE_STATUSES)[number]);
+  const legacy = index === -1;
+  const at = legacy ? ACTIVE_STATUSES.length - 1 : index;
+  const h = size === "md" ? { base: 8, cur: 14, w: 4 } : { base: 6, cur: 11, w: 3 };
+  return (
+    <span
+      role="img"
+      aria-label={`Phase ${at + 1} of ${ACTIVE_STATUSES.length}: ${status}`}
+      className={`inline-flex shrink-0 items-end ${className}`}
+      style={{ height: h.cur }}
+    >
+      {ACTIVE_STATUSES.map((p, i) => {
+        const passed = i < at || legacy;
+        const current = i === at && !legacy;
+        const arrived = p === "Arrived" && (current || legacy);
+        return (
+          <span
+            key={p}
+            aria-hidden
+            className={`${arrived ? "bg-sea-green" : current || passed ? "bg-sea-ink" : "bg-sea-rule"} ${passed && !arrived ? "opacity-45" : ""}`}
+            style={{
+              width: h.w,
+              height: current || arrived ? h.cur : h.base,
+              marginLeft: i === 0 ? 0 : i === 2 || i === 5 ? h.w + 2 : 2,
+            }}
+          />
+        );
+      })}
+    </span>
+  );
+}
+
+/* -------------------------------------------------------------- bearing --- */
+
+/** Course over ground as a small arrow, north up, rotated to the bearing. */
+export function Bearing({
+  deg,
+  className = "",
+  size = 10,
+}: {
+  deg: number | null;
+  className?: string;
+  size?: number;
+}) {
+  if (deg == null) return null;
+  return (
+    <svg
+      aria-hidden
+      width={size}
+      height={size}
+      viewBox="0 0 10 10"
+      className={`inline-block shrink-0 ${className}`}
+      style={{ transform: `rotate(${deg}deg)` }}
+    >
+      <path d="M5 0.8 L8.2 8.6 L5 6.8 L1.8 8.6 Z" fill="currentColor" />
+    </svg>
+  );
+}
+
+/** Source of a logged entry, by shape: AIS a filled triangle (a target),
+ * system a filled square, operator a hollow square. */
+export function SourceMark({ source, automated }: { source: string; automated: boolean }) {
+  if (source === "ais")
+    return (
+      <svg aria-hidden width="8" height="8" viewBox="0 0 8 8" className="block shrink-0">
+        <polygon points="0.8,0.8 7.4,4 0.8,7.2" fill="var(--sea-ink-2)" />
+      </svg>
+    );
+  return (
+    <span
+      aria-hidden
+      className={`inline-block size-[7px] shrink-0 ${automated ? "bg-sea-ink-2" : "border-[1.5px] border-sea-ink-2"}`}
+    />
   );
 }
 
@@ -129,7 +224,7 @@ export function TCount({
   const { label, past } = tCount(iso, now);
   return (
     <span
-      className={`telemetry text-[10.5px] ${past ? "font-medium text-sea-red" : "text-sea-ink-3"} ${className}`}
+      className={`telemetry text-[10.5px] uppercase ${past ? "font-medium text-sea-red" : "text-sea-ink-3"} ${className}`}
       title={past ? "Time since this date" : "Time until this date"}
     >
       {label}

@@ -3,7 +3,7 @@ import { Fragment, type ReactNode } from "react";
 
 import type { Alert, Shipment, ShipmentEvent } from "@/lib/api";
 import { alertSeverity, type Severity } from "@/lib/lifecycle";
-import { clock, monthName, weekday } from "@/components/maritime/format";
+import { clock, humanField, logValue, monthName, weekday } from "@/components/maritime/format";
 import { ChartPanel, ConditionMark, Skeleton } from "@/components/maritime/marks";
 
 type Entry = {
@@ -53,7 +53,7 @@ export function DeckLog({
       prefixClient: true,
       text:
         event.field && (event.from_value || event.to_value)
-          ? `${event.field} → ${event.to_value ?? "cleared"}`
+          ? `${humanField(event.field, event.event_type) || "Phase"} → ${event.to_value ? logValue(event.to_value, now) : "cleared"}`
           : (event.reason ?? event.event_type),
       code: sourceCode(event.source, event.automated),
       automatic: event.automated,

@@ -177,3 +177,52 @@ export function conditionOf(level: HealthLevel): ConditionLevel | null {
   if (level === "Attention") return "caution";
   return null;
 }
+
+/* ------------------------------------------------------------ UTC stamps --- */
+
+/** "23 Sep 06:00" in UTC, the voyage record's time convention. */
+export function utcDayTime(iso: string, now: number | null = null) {
+  const d = new Date(iso);
+  const sameYear = now == null || new Date(now).getUTCFullYear() === d.getUTCFullYear();
+  const day = `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}${sameYear ? "" : ` ${d.getUTCFullYear()}`}`;
+  return `${day} ${utcClock(d.getTime())}`;
+}
+
+/** "23 Sep" in UTC. */
+export function utcDay(iso: string) {
+  const d = new Date(iso);
+  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
+}
+
+/** Signed hours as a compact slip: "+70H", "−6H", "+3D" beyond two days. */
+export function slipLabel(hours: number) {
+  const sign = hours > 0 ? "+" : "−";
+  const abs = Math.abs(hours);
+  return abs >= 48 ? `${sign}${Math.round(abs / 24)}D` : `${sign}${abs}H`;
+}
+
+/* ------------------------------------------------------------- log text --- */
+
+/** The changed field, unless the category label already names it. */
+const FIELD_LABEL: Record<string, string> = {
+  status: "",
+  eta: "ETA",
+  planned_eta: "Planned ETA",
+  planned_etd: "Planned ETD",
+  actual_departure: "Departure",
+  actual_arrival: "Arrival",
+  vessel_mmsi: "MMSI",
+};
+export const humanField = (f: string | null, type: string) => {
+  const key = (f ?? type).toLowerCase();
+  if (key in FIELD_LABEL) return FIELD_LABEL[key]!;
+  return key.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
+};
+
+/** A logged value for display: ISO timestamps inside it (an ETA, a hold's
+ * expiry) read as UTC day and time rather than raw ISO. */
+export const logValue = (v: string, now: number | null = null) =>
+  v.replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?/g, (m) => {
+    const t = Date.parse(/Z|[+-]\d{2}:?\d{2}$/.test(m) ? m : `${m}Z`);
+    return Number.isNaN(t) ? m : `${utcDayTime(new Date(t).toISOString(), now)} UTC`;
+  });

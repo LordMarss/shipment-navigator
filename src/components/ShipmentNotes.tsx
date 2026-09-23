@@ -3,13 +3,14 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { btnGhost, btnPrimary, fieldClass } from "@/components/AppShell";
+import { utcDayTime } from "@/components/maritime/format";
 import { createNote, deleteNote, listNotes, updateNote, type ShipmentNote } from "@/lib/api";
-import { formatDayTime } from "@/lib/lifecycle";
 
 /**
- * Manual annotations on a shipment, separate from the automated audit trail
- * in `shipment_events`. Backed by the existing `shipment_notes` table/API —
- * this wires up UI for functionality the backend already supports.
+ * The operations log: operator notes on this voyage, newest first, each
+ * stamped in UTC with its author, set as log lines rather than cards.
+ * Separate from the automated voyage log in `shipment_events`. Backed by
+ * the existing `shipment_notes` table/API.
  */
 export function ShipmentNotes({ shipmentId }: { shipmentId: string }) {
   const queryClient = useQueryClient();
@@ -30,53 +31,70 @@ export function ShipmentNotes({ shipmentId }: { shipmentId: string }) {
   });
 
   return (
-    <div className="panel p-4">
-      <h2 className="label-xs mb-3">Notes</h2>
+    <section aria-labelledby="ops-log-title">
+      <div className="flex items-end justify-between border-b border-sea-ink pb-2">
+        <h2 id="ops-log-title" className="chart-label text-sea-ink">
+          Operations log
+          <span className="telemetry ml-2 font-normal normal-case tracking-normal text-sea-ink-3">
+            {isLoading ? "" : `${notes.length} ${notes.length === 1 ? "entry" : "entries"}, UTC`}
+          </span>
+        </h2>
+      </div>
 
       <form
-        className="mb-4 flex flex-col gap-2 border-b border-border pb-4"
+        className="flex flex-col gap-2 border-b border-sea-rule py-3 sm:flex-row sm:items-start"
         onSubmit={(e) => {
           e.preventDefault();
           if (draft.trim()) add.mutate();
         }}
       >
-        <textarea
-          className={`${fieldClass} min-h-[72px] resize-y`}
-          placeholder="Add a note about this shipment..."
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-        />
+        <label className="min-w-0 flex-1">
+          <span className="sr-only">New log entry</span>
+          <textarea
+            className={`${fieldClass} min-h-[36px] resize-y py-1.5`}
+            rows={1}
+            placeholder="Log an entry: calls made, client updates, instructions for the next watch"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && draft.trim()) {
+                e.preventDefault();
+                add.mutate();
+              }
+            }}
+          />
+        </label>
         <button
           type="submit"
-          className={`${btnPrimary} self-end`}
+          className={`${btnPrimary} self-end sm:self-start`}
           disabled={add.isPending || !draft.trim()}
         >
-          {add.isPending ? "Adding…" : "Add note"}
+          {add.isPending ? "Logging…" : "Log entry"}
         </button>
       </form>
 
       {isLoading ? (
-        <p className="text-xs text-muted-foreground">Loading notes…</p>
+        <p className="py-4 text-[12.5px] text-sea-ink-3">Loading the log…</p>
       ) : notes.length === 0 ? (
-        <p className="text-xs text-muted-foreground">No notes yet.</p>
+        <div className="py-5">
+          <p className="text-[13px] font-medium text-sea-ink">No entries yet</p>
+          <p className="mt-1 max-w-[60ch] text-[12.5px] text-sea-ink-2">
+            Anything the next person on watch should know about this voyage belongs here. Entries
+            are timestamped and kept with the record.
+          </p>
+        </div>
       ) : (
-        <ul className="space-y-3">
+        <ol>
           {notes.map((n) => (
             <NoteRow key={n.id} note={n} onChanged={invalidate} />
           ))}
-        </ul>
+        </ol>
       )}
-    </div>
+    </section>
   );
 }
 
-function NoteRow({
-  note,
-  onChanged,
-}: {
-  note: ShipmentNote;
-  onChanged: () => void;
-}) {
+function NoteRow({ note, onChanged }: { note: ShipmentNote; onChanged: () => void }) {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(note.body);
 
@@ -96,18 +114,20 @@ function NoteRow({
   });
 
   return (
-    <li className="rounded-md border border-border bg-subtle/50 p-3">
-      <div className="mb-1.5 flex items-center justify-between text-xs text-muted-foreground">
-        <span>{note.author ?? "Operator"}</span>
-        <span>
-          {formatDayTime(note.created_at)}
-          {note.updated_at !== note.created_at ? " · edited" : ""}
+    <li className="group animate-in grid grid-cols-1 gap-x-4 gap-y-1 border-b border-sea-rule-2 py-3 sm:grid-cols-[120px_minmax(0,1fr)]">
+      <div className="telemetry flex gap-3 text-[10.5px] uppercase text-sea-ink-3 sm:block">
+        <time dateTime={note.created_at} className="block text-sea-ink-2">
+          {utcDayTime(note.created_at)}
+        </time>
+        <span className="block">
+          {note.author ?? "Operator"}
+          {note.updated_at !== note.created_at ? ", edited" : ""}
         </span>
       </div>
       {editing ? (
         <div className="flex flex-col gap-2">
           <textarea
-            className={`${fieldClass} min-h-[64px] resize-y`}
+            className={`${fieldClass} min-h-[64px] resize-y py-1.5`}
             value={text}
             onChange={(e) => setText(e.target.value)}
           />
@@ -133,28 +153,30 @@ function NoteRow({
           </div>
         </div>
       ) : (
-        <>
-          <p className="whitespace-pre-wrap text-sm text-foreground">{note.body}</p>
-          <div className="mt-1.5 flex justify-end gap-1.5">
+        <div className="flex min-w-0 items-start justify-between gap-4">
+          <p className="whitespace-pre-wrap text-[13.5px] leading-[1.5] text-sea-ink">
+            {note.body}
+          </p>
+          <span className="flex shrink-0 gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100">
             <button
               type="button"
-              className="text-xs text-muted-foreground hover:text-foreground"
+              className="focus-ring h-7 rounded-[2px] px-2 text-[12px] text-sea-ink-3 hover:bg-sea-paper-2 hover:text-sea-ink"
               onClick={() => setEditing(true)}
             >
               Edit
             </button>
             <button
               type="button"
-              className="text-xs text-muted-foreground hover:text-destructive"
+              className="focus-ring h-7 rounded-[2px] px-2 text-[12px] text-sea-ink-3 hover:bg-sea-red-soft hover:text-sea-red"
               disabled={remove.isPending}
               onClick={() => {
-                if (confirm("Delete this note?")) remove.mutate();
+                if (confirm("Delete this log entry?")) remove.mutate();
               }}
             >
               Delete
             </button>
-          </div>
-        </>
+          </span>
+        </div>
       )}
     </li>
   );

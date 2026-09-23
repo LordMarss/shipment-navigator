@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ArrowLeft, ArrowRight, ChevronRight, MoreHorizontal, RotateCcw, Ship } from "lucide-react";
+import { ArrowLeft, ArrowRight, ChevronRight, MoreHorizontal, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 
 import { AppShell, btnGhost, btnPrimary, fieldClass } from "@/components/AppShell";
@@ -10,16 +10,21 @@ import { PortAutocomplete } from "@/components/PortAutocomplete";
 import { ShipmentNotes } from "@/components/ShipmentNotes";
 import { ShipmentTimeline } from "@/components/ShipmentTimeline";
 import { StatusHistory } from "@/components/StatusHistory";
-import {
-  SeverityBadge,
-  StatusPill,
-  VesselConditionBadge,
-  statusAccent,
-  type StatusAccent,
-} from "@/components/StatusPill";
+import { SeverityBadge, StatusPill } from "@/components/StatusPill";
 import { useMonitoringConfig } from "@/hooks/useMonitoringConfig";
-import { conditionOf } from "@/components/maritime/format";
-import { ConditionMark } from "@/components/maritime/marks";
+import {
+  conditionOf,
+  formatCoordinates,
+  humanField,
+  logValue,
+  slipLabel,
+  targetOf,
+  tCount,
+  utcClock,
+  utcDayTime,
+  voyageOf,
+} from "@/components/maritime/format";
+import { Bearing, ConditionMark, PhaseLadder, SourceMark } from "@/components/maritime/marks";
 import { useNow } from "@/components/maritime/useNow";
 import { VoyagePlot } from "@/components/maritime/VoyagePlot";
 import {
@@ -49,7 +54,7 @@ import {
   alertSeverity,
   docsFor,
   drift,
-  formatDayTime,
+  formatUtcMinute,
   monitoringInfo,
   navStatusLabel,
   relativeTime,
@@ -60,13 +65,13 @@ import {
 export const Route = createFileRoute("/shipments/$id")({
   head: () => ({
     meta: [
-      { title: "Shipment Detail — StimTech Solutions" },
+      { title: "Voyage record - StimTech Solutions" },
       {
         name: "description",
         content:
           "Edit shipment schedule and details, follow the automated status pipeline and tick off required trade documents.",
       },
-      { property: "og:title", content: "Shipment Detail — StimTech Solutions" },
+      { property: "og:title", content: "Voyage record - StimTech Solutions" },
       {
         property: "og:description",
         content:
@@ -119,33 +124,6 @@ function dateDraftFrom(s: Shipment): DateDraft {
  * in the Change History regardless of which existing code path wrote it. */
 function isStatusEvent(e: ShipmentEvent) {
   return (e.field ?? "").toLowerCase() === "status";
-}
-
-function eventSourceLabel(e: ShipmentEvent) {
-  if (!e.automated) return "Manual";
-  return e.source === "ais" ? "Automated (AIS)" : "Automated (System)";
-}
-
-const ACCENT_DOT: Record<StatusAccent, string> = {
-  neutral: "bg-muted-foreground/60",
-  primary: "bg-primary",
-  positive: "bg-positive",
-  warning: "bg-warning",
-};
-
-const ACCENT_RING: Record<StatusAccent, { bg: string; text: string }> = {
-  neutral: { bg: "bg-muted-foreground", text: "text-muted-foreground" },
-  primary: { bg: "bg-primary", text: "text-primary-deep" },
-  positive: { bg: "bg-positive", text: "text-positive" },
-  warning: { bg: "bg-warning", text: "text-warning" },
-};
-
-/** `shipment_events.to_value` is a plain string column — safely resolve it
- * back to a known status for colour purposes, defaulting to neutral for
- * anything unrecognized rather than guessing. */
-function accentForValue(value: string | null): StatusAccent {
-  const known = ACTIVE_STATUSES.find((s) => s === value);
-  return known ? statusAccent(known) : "neutral";
 }
 
 type TabKey = "overview" | "timeline" | "documents" | "notes" | "alerts";
@@ -327,8 +305,13 @@ function ShipmentDetail() {
 
   if (isLoading) {
     return (
-      <AppShell title="Shipment">
-        <p className="panel px-4 py-8 text-center text-sm text-muted-foreground">Loading…</p>
+      <AppShell title="Shipment" bare>
+        <div className="mx-auto w-full max-w-[1320px] px-4 pt-6 sm:px-6 lg:px-8">
+          <div className="h-3 w-40 animate-pulse bg-sea-paper-2" />
+          <div className="mt-3 h-8 w-72 max-w-full animate-pulse bg-sea-paper-2" />
+          <div className="mt-6 h-16 w-full animate-pulse bg-sea-paper-2" />
+          <div className="mt-6 h-[104px] w-full animate-pulse bg-sea-paper-2" />
+        </div>
       </AppShell>
     );
   }
@@ -336,10 +319,16 @@ function ShipmentDetail() {
   if (!shipment || !draft || !dates) {
     return (
       <AppShell title="Shipment not found">
-        <div className="panel px-4 py-8 text-center text-sm text-muted-foreground">
-          This shipment no longer exists.{" "}
-          <Link to="/" className="text-primary hover:underline">
-            Back to dashboard
+        <div className="max-w-[60ch] py-6">
+          <p className="text-[14px] font-medium text-sea-ink">No voyage record at this address</p>
+          <p className="mt-1 text-[13px] text-sea-ink-2">
+            The shipment may have been deleted, or the link is incomplete.
+          </p>
+          <Link
+            to="/shipments"
+            className="focus-ring mt-4 inline-flex text-[13px] font-medium text-sea-ink underline decoration-sea-ink-4 underline-offset-2"
+          >
+            Back to the shipment board
           </Link>
         </div>
       </AppShell>
@@ -365,541 +354,891 @@ function ShipmentDetail() {
   const conditionLabel = vesselConditionLabel(vesselCondition);
   const shipmentAlerts = alerts.filter((a) => a.shipment_id === shipment.id);
   const statusEvents = events.filter(isStatusEvent);
-  const lastStatusChange = statusEvents[0]?.occurred_at ?? shipment.updated_at;
-  const statusDot = ACCENT_DOT[statusAccent(shipment.status)];
-  const showHealth = health.level !== "On Track" && health.level !== "Delivered";
+  const level = conditionOf(health.level);
+  const voyage = voyageOf(shipment, now);
+  const target = targetOf(
+    position ?? null,
+    position ? vesselCondition.kind : null,
+    Boolean(shipment.vessel_mmsi),
+    now,
+  );
+  const etaCount = shipment.eta && now != null ? tCount(shipment.eta, now) : null;
+  // The automation reason repeats the monitoring reason as its preamble;
+  // show only what it adds.
+  const automationDetail = decision.reason.startsWith(monitoring.reason)
+    ? decision.reason.slice(monitoring.reason.length).replace(/^[\s\u2014\-.;,]+/, "")
+    : decision.reason;
+  const reachedAt = (phase: string) =>
+    statusEvents.find((e) => e.to_value === phase)?.occurred_at ?? null;
 
   const openOverride = () => {
     setOverrideStatus((next ?? shipment.status) as ActiveShipmentStatus);
     setOverrideOpen((v) => !v);
   };
 
+  const signal: { tone: string; label: string; sub: string } = !shipment.vessel_mmsi
+    ? { tone: "text-sea-ink-3", label: "Not tracked", sub: "No MMSI recorded" }
+    : !position
+      ? { tone: "text-sea-ink-3", label: "Awaiting fix", sub: `MMSI ${shipment.vessel_mmsi}` }
+      : hasFreshAis
+        ? {
+            tone: "text-sea-ink",
+            label: relativeTime(position.position_timestamp ?? position.updated_at),
+            sub: "Receiving",
+          }
+        : {
+            tone: "text-sea-amber-ink",
+            label: relativeTime(position.position_timestamp ?? position.updated_at),
+            sub: "Stale, over 24h",
+          };
+
   return (
-    <AppShell
-      title={
-        <span className="inline-flex items-center gap-2">
-          <Link
-            to="/"
-            aria-label="Back to shipments"
-            className="focus-ring -ml-1 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-surface hover:text-foreground"
-          >
-            <ArrowLeft className="size-4" />
-          </Link>
-          Shipment #{shipment.reference ?? shortId(shipment.id)}
-        </span>
-      }
-      actions={
-        <HeaderMenu
-          next={next}
-          advancing={advance.isPending}
-          onAdvance={() => advance.mutate()}
-          onDelete={() => {
-            if (confirm("Delete this shipment and its documents?")) remove.mutate();
-          }}
-        />
-      }
-      headerExtra={
-        <div className="flex flex-col gap-6">
-          <div className="flex flex-wrap items-start gap-x-10 gap-y-5">
-            <HeaderStat
-              label="Status"
-              value={
-                <span className="inline-flex items-center gap-2">
-                  <span aria-hidden className={`size-2 shrink-0 ${statusDot}`} />
-                  {shipment.status}
-                </span>
-              }
-            />
-            {showHealth ? (
-              <HeaderStat
-                label="Health"
-                value={
-                  <span
-                    className={`inline-flex items-center gap-2 ${health.level === "Attention" ? "text-warning" : "text-risk"}`}
-                  >
-                    {conditionOf(health.level) ? (
-                      <ConditionMark level={conditionOf(health.level)!} size={10} />
-                    ) : null}
-                    {health.level}
+    <AppShell title={shipment.client_name} bare>
+      <div className="mx-auto w-full max-w-[1320px] px-4 pb-14 sm:px-6 lg:px-8">
+        {/* ----------------------------------------------------- record header */}
+        <header className="pt-5">
+          <div className="flex items-center justify-between gap-4">
+            <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2 text-[12px]">
+              <Link
+                to="/shipments"
+                className="focus-ring inline-flex shrink-0 items-center gap-1 text-sea-ink-3 hover:text-sea-ink"
+              >
+                <ArrowLeft className="size-3.5" aria-hidden />
+                Shipments
+              </Link>
+              <span aria-hidden className="text-sea-ink-4">
+                /
+              </span>
+              <span className="telemetry truncate text-[11px] text-sea-ink-2">
+                {shortId(shipment.id)}
+                {shipment.reference ? (
+                  <span className="ml-2 text-sea-ink-3">{shipment.reference}</span>
+                ) : null}
+                {shipment.container_number ? (
+                  <span className="ml-2 hidden text-sea-ink-3 sm:inline">
+                    {shipment.container_number}
                   </span>
-                }
-              />
-            ) : null}
-            <HeaderStat
-              label="ETA"
-              value={
-                <span className="inline-flex items-center gap-2">
-                  {formatEta(shipment.eta)}
-                  {etaDrift && etaDrift.hours !== 0 ? (
-                    <span
-                      className={`instrument rounded px-1.5 py-0.5 text-xs font-semibold ${
-                        etaDrift.tone === "late"
-                          ? "bg-warning-soft text-warning"
-                          : "bg-positive-soft text-positive"
-                      }`}
-                    >
-                      {etaDrift.tone === "late" ? "+" : "−"}
-                      {Math.abs(etaDrift.hours) >= 48
-                        ? `${Math.round(Math.abs(etaDrift.hours) / 24)}d`
-                        : `${Math.abs(etaDrift.hours)}h`}
-                    </span>
-                  ) : null}
-                </span>
-              }
-            />
-            <HeaderStat label="Documents" value={`${docs.attached}/${docs.total}`} />
-            <HeaderStat label="Updated" value={relativeTime(lastStatusChange)} />
-          </div>
-
-          {showHealth ? <p className="text-xs text-muted-foreground">{health.reason}</p> : null}
-
-          {shipmentAlerts.length > 0 ? (
-            <button
-              type="button"
-              onClick={() => setTab("alerts")}
-              className="flex items-center gap-2 border-t border-border pt-5 text-left text-sm"
-            >
-              <span aria-hidden className="size-1.5 shrink-0 bg-risk" />
-              <span className="font-medium text-foreground">
-                {shipmentAlerts.length} alert{shipmentAlerts.length === 1 ? "" : "s"} on this
-                shipment
+                ) : null}
               </span>
-              <span className="text-xs font-medium text-primary">Review →</span>
-            </button>
-          ) : null}
-        </div>
-      }
-    >
-      <div className="mb-7">
-        <VoyagePlot
-          shipment={shipment}
-          position={position ?? null}
-          condition={position ? vesselCondition.kind : null}
-          measured={routeProgress}
-          now={now}
-        />
-      </div>
-
-      <div className="mb-6 flex gap-1 overflow-x-auto border-b border-border">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            onClick={() => setTab(t.key)}
-            className={`-mb-px border-b-2 px-3.5 py-2.5 text-sm font-medium transition-colors duration-150 ${
-              tab === t.key
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {t.label}
-            {t.key === "alerts" && shipmentAlerts.length > 0 ? ` (${shipmentAlerts.length})` : ""}
-          </button>
-        ))}
-      </div>
-
-      {tab === "overview" ? (
-        <div className="flex flex-col gap-9">
-          <section>
-            <h2 className="label-xs mb-4">Lifecycle</h2>
-            <LifecycleJourney
-              status={shipment.status}
-              legacyTerminal={legacyTerminal}
-              currentIndex={currentIndex}
-            />
-            <div className="mt-5 flex flex-col gap-1 border-t border-border pt-4 text-xs text-muted-foreground sm:flex-row sm:gap-6">
-              <p>Monitoring: {monitoring.reason}</p>
-              <p>
-                Automation:{" "}
-                {decision.status === shipment.status
-                  ? "no pending change"
-                  : `will move to ${decision.status}`}
-                {" · "}
-                {decision.reason}
-              </p>
-              {automationHold ? (
-                <button
-                  type="button"
-                  className={`${btnGhost} shrink-0 self-start`}
-                  disabled={resume.isPending}
-                  onClick={() => resume.mutate()}
-                >
-                  {resume.isPending ? "Resuming…" : "Resume Automation"}
-                </button>
-              ) : null}
-            </div>
-          </section>
-
-          {/* The dominant instrument on this page — full width, because
-           * position and telemetry are what someone monitoring a shipment
-           * needs almost no effort to read. Notes, history and editing are
-           * all secondary to this, and are composed that way below. */}
-          <section className="panel p-5">
-            <div className="flex items-center justify-between">
-              <h2 className="label-xs">Vessel &amp; Live Position</h2>
-              {shipment.vessel_mmsi ? (
-                <Link
-                  to="/map"
-                  className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-primary hover:underline"
-                >
-                  View on map <ArrowRight className="size-3.5" />
-                </Link>
-              ) : null}
-            </div>
-
-            {shipment.vessel_name || shipment.vessel_mmsi ? (
-              <div className="mt-3 flex items-center gap-3">
-                <span className="flex size-11 shrink-0 items-center justify-center rounded-md border border-border bg-subtle text-muted-foreground">
-                  <Ship className="size-5" />
-                </span>
-                <div className="min-w-0">
-                  <p className="truncate text-base font-semibold text-foreground">
-                    {shipment.vessel_name ?? "Unnamed vessel"}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {shipment.carrier ? `${shipment.carrier} · ` : ""}
-                    MMSI <span className="instrument">{shipment.vessel_mmsi ?? "Not set"}</span>
-                    {conditionLabel ? " · " : ""}
-                    {conditionLabel ? (
-                      <VesselConditionBadge condition={vesselCondition} label={conditionLabel} />
-                    ) : null}
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <p className="mt-3 text-xs text-muted-foreground">
-                No vessel assigned to this shipment yet.
-              </p>
-            )}
-
-            {shipment.vessel_mmsi ? (
-              position ? (
-                <div className="console mt-4 p-5">
-                  <div className="flex items-center justify-between">
-                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.07em] text-nav-foreground">
-                      <span
-                        className={`relative inline-block size-1.5 rounded-full ${hasFreshAis ? "ping-live bg-nav-accent text-nav-accent" : "bg-nav-muted-foreground"}`}
-                        aria-hidden
-                      />
-                      {hasFreshAis ? "Live Position" : "Last Known Position"}
-                    </span>
-                    <span className="instrument text-xs text-nav-muted-foreground">
-                      {relativeTime(position.position_timestamp ?? position.updated_at)}
-                    </span>
-                  </div>
-                  <div className="mt-5 flex items-center gap-5">
-                    <CompassRose cog={position.cog} />
-                    <div className="grid flex-1 grid-cols-2 gap-4 sm:grid-cols-3">
-                      <ConsoleSpeed sog={position.sog} />
-                      <ConsoleField
-                        label="COG"
-                        value={position.cog != null ? `${position.cog}°` : "No COG"}
-                      />
-                      <ConsoleField
-                        label="Nav Status"
-                        value={navStatusLabel(position.nav_status)}
-                      />
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <p className="mt-4 rounded-lg border border-border bg-subtle/60 p-3.5 text-xs text-muted-foreground">
-                  No AIS position received yet for MMSI{" "}
-                  <span className="instrument">{shipment.vessel_mmsi}</span>.
-                </p>
-              )
-            ) : null}
-
-            <button
-              type="button"
-              disabled={legacyTerminal}
-              onClick={openOverride}
-              className="mt-4 flex w-full items-center justify-between gap-2 rounded-md border border-border bg-surface px-3.5 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/30 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <span className="inline-flex items-center gap-2">
-                <RotateCcw className="size-3.5" />
-                Override Status
-              </span>
-              <ChevronRight className="size-3.5" />
-            </button>
-
-            {legacyTerminal ? (
-              <p className="mt-2 text-xs text-muted-foreground">
-                This shipment holds a legacy status and has moved past the active lifecycle.
-              </p>
-            ) : overrideOpen ? (
-              <div className="mt-3 space-y-3 rounded-lg border border-border bg-subtle/50 p-3.5">
-                <p className="text-xs text-muted-foreground">
-                  Use this if you need to correct a status change, like an accidental update or
-                  incorrect AIS data. This will create a manual timeline event. Automation remains
-                  primary.
-                </p>
-                <label className="block">
-                  <span className="label-xs mb-1 block">New status</span>
-                  <select
-                    className={fieldClass}
-                    value={overrideStatus}
-                    onChange={(e) => setOverrideStatus(e.target.value as ActiveShipmentStatus)}
-                  >
-                    {ACTIVE_STATUSES.map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="block">
-                  <span className="label-xs mb-1 block">Reason (optional)</span>
-                  <textarea
-                    className={`${fieldClass} min-h-[60px] resize-y`}
-                    placeholder="Why is this being changed manually?"
-                    value={overrideReason}
-                    onChange={(e) => setOverrideReason(e.target.value)}
-                  />
-                </label>
-                <div className="flex justify-end gap-1.5">
+            </nav>
+            <div className="flex shrink-0 items-center gap-1.5">
+              {next && !legacyTerminal ? (
+                <span className="hidden sm:block">
                   <button
                     type="button"
                     className={btnGhost}
-                    onClick={() => {
-                      setOverrideOpen(false);
-                      setOverrideReason("");
-                    }}
+                    disabled={advance.isPending}
+                    onClick={() => advance.mutate()}
                   >
-                    Cancel
+                    {advance.isPending ? "Advancing…" : `Advance to ${next}`}
                   </button>
+                </span>
+              ) : null}
+              <HeaderMenu
+                next={next}
+                advancing={advance.isPending}
+                onAdvance={() => advance.mutate()}
+                onDelete={() => {
+                  if (confirm("Delete this shipment and its documents?")) remove.mutate();
+                }}
+              />
+            </div>
+          </div>
+
+          <h1 className="display mt-2 text-[30px] leading-[34px] text-sea-ink">
+            {shipment.client_name}
+          </h1>
+
+          <dl className="mt-5 grid grid-cols-2 border-y border-sea-rule sm:grid-cols-3 lg:grid-cols-[1.1fr_1.1fr_1.2fr_1.1fr_0.9fr]">
+            <HeaderStat label="Phase">
+              <span className="flex items-center gap-2.5">
+                <PhaseLadder status={shipment.status} size="md" />
+                <span className="truncate">{shipment.status}</span>
+              </span>
+              <HeaderSub>
+                {automationHold ? (
+                  <span className="text-sea-amber-ink">
+                    Automation held to {utcClock(automationHold.getTime())}Z
+                  </span>
+                ) : voyage.day ? (
+                  `Day ${voyage.day.elapsed} of ${voyage.day.total}`
+                ) : legacyTerminal ? (
+                  "Legacy status"
+                ) : (
+                  `Phase ${currentIndex + 1} of ${ACTIVE_STATUSES.length}`
+                )}
+              </HeaderSub>
+            </HeaderStat>
+            <HeaderStat label="Vessel">
+              <span className={`truncate ${shipment.vessel_name ? "" : "text-sea-ink-3"}`}>
+                {shipment.vessel_name ?? "Not assigned"}
+              </span>
+              <HeaderSub mono>
+                {shipment.vessel_mmsi ? `MMSI ${shipment.vessel_mmsi}` : "No MMSI"}
+                {shipment.carrier ? `  ${shipment.carrier}` : ""}
+              </HeaderSub>
+            </HeaderStat>
+            <HeaderStat label="Position">
+              {position && target.state !== "none" ? (
+                <span className="telemetry truncate text-[13px]">
+                  {formatCoordinates(position.latitude, position.longitude)}
+                </span>
+              ) : (
+                <span className="text-sea-ink-3">No fix</span>
+              )}
+              <HeaderSub mono>
+                {position && target.sog != null ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <span
+                      className={
+                        target.state === "active" && voyage.pos != null && !voyage.arrived
+                          ? "text-sea-move"
+                          : ""
+                      }
+                    >
+                      SOG {target.sog.toFixed(1)} KN
+                    </span>
+                    {target.cog != null ? (
+                      <>
+                        <Bearing deg={target.cog} className="text-sea-ink-2" size={9} />
+                        COG {String(Math.round(target.cog)).padStart(3, "0")}°
+                      </>
+                    ) : null}
+                  </span>
+                ) : (
+                  (conditionLabel ?? "No reading")
+                )}
+              </HeaderSub>
+            </HeaderStat>
+            <HeaderStat label="ETA (UTC)">
+              {shipment.actual_arrival ? (
+                <span className="text-sea-green">
+                  Arrived {utcDayTime(shipment.actual_arrival, now)}
+                </span>
+              ) : shipment.eta ? (
+                <span className={`tabular-nums ${etaCount?.past ? "text-sea-red" : ""}`}>
+                  {utcDayTime(shipment.eta, now)}
+                </span>
+              ) : (
+                <span className="text-sea-amber-ink">Not set</span>
+              )}
+              <HeaderSub mono>
+                {etaCount && !shipment.actual_arrival ? (
+                  <span className={etaCount.past ? "text-sea-red" : ""}>{etaCount.label}</span>
+                ) : null}
+                {etaDrift && etaDrift.hours !== 0 && !shipment.actual_arrival ? (
+                  <span
+                    className={`ml-2 ${etaDrift.tone === "late" ? "text-sea-amber-ink" : ""}`}
+                    title={etaDrift.label}
+                  >
+                    {slipLabel(etaDrift.hours)} vs plan
+                  </span>
+                ) : null}
+              </HeaderSub>
+            </HeaderStat>
+            <HeaderStat label="AIS signal">
+              <span className={`inline-flex items-center gap-2 ${signal.tone}`}>
+                <span
+                  aria-hidden
+                  className={`relative inline-block size-[7px] shrink-0 rounded-full ${
+                    hasFreshAis
+                      ? "ping-live bg-sea-move text-sea-move"
+                      : position
+                        ? "bg-sea-amber"
+                        : "border border-sea-ink-4"
+                  }`}
+                />
+                {signal.label}
+              </span>
+              <HeaderSub>{signal.sub}</HeaderSub>
+            </HeaderStat>
+          </dl>
+
+          {/* The exception, if there is one: what, why, what to do */}
+          {level || automationHold ? (
+            <div
+              role="status"
+              className={`animate-in mt-4 flex flex-col gap-3 border-l-[3px] bg-sea-surface py-3 pl-4 pr-4 sm:flex-row sm:items-center sm:justify-between ${
+                level === "alarm" ? "border-sea-red" : "border-sea-amber"
+              }`}
+            >
+              <div className="min-w-0">
+                {level ? (
+                  <p className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+                    <span className="inline-flex items-center gap-1.5">
+                      <ConditionMark level={level} size={9} />
+                      <span
+                        className={`chart-label ${level === "alarm" ? "text-sea-red" : "text-sea-amber-ink"}`}
+                      >
+                        {health.level}
+                      </span>
+                    </span>
+                    <span className="text-[13.5px] font-medium text-sea-ink">
+                      {health.action ?? "Review the voyage"}
+                    </span>
+                  </p>
+                ) : null}
+                {level ? (
+                  <p className="mt-0.5 text-[12.5px] text-sea-ink-2">{health.reason}</p>
+                ) : null}
+                {automationHold ? (
+                  <p className={`text-[12.5px] text-sea-ink-2 ${level ? "mt-1.5" : ""}`}>
+                    <span className="chart-label mr-2 text-sea-amber-ink">Automation held</span>
+                    An operator corrected this voyage; AIS automation stands down until{" "}
+                    <span className="telemetry text-[11px]">{formatUtcMinute(automationHold)}</span>
+                    .
+                  </p>
+                ) : null}
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                {automationHold ? (
                   <button
                     type="button"
-                    className={btnPrimary}
-                    disabled={override.isPending || overrideStatus === shipment.status}
-                    onClick={() => override.mutate()}
+                    className={btnGhost}
+                    disabled={resume.isPending}
+                    onClick={() => resume.mutate()}
                   >
-                    {override.isPending ? "Confirming…" : "Confirm change"}
+                    {resume.isPending ? "Resuming…" : "Resume automation"}
                   </button>
-                </div>
+                ) : null}
+                {shipmentAlerts.length > 0 ? (
+                  <button type="button" className={btnGhost} onClick={() => setTab("alerts")}>
+                    {shipmentAlerts.length} alert{shipmentAlerts.length === 1 ? "" : "s"}
+                  </button>
+                ) : null}
               </div>
-            ) : null}
-          </section>
+            </div>
+          ) : null}
+        </header>
 
-          {/* Secondary rail — quieter by design (Change History carries no
-           * panel border at all) so the contrast between "instrument" and
-           * "record" is visible, not just implied. */}
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <ShipmentNotes shipmentId={id} />
+        {/* ------------------------------------------------------- the passage */}
+        <div className="mt-7">
+          <VoyagePlot
+            shipment={shipment}
+            position={position ?? null}
+            condition={position ? vesselCondition.kind : null}
+            measured={routeProgress}
+            now={now}
+          />
+        </div>
 
-            <section>
-              <h2 className="label-xs mb-3">Change History</h2>
-              {statusEvents.length === 0 ? (
-                <p className="text-xs text-muted-foreground">No status changes recorded yet.</p>
+        {/* -------------------------------------------------------------- tabs */}
+        <div
+          role="tablist"
+          aria-label="Voyage record"
+          className="mt-8 flex gap-6 overflow-x-auto border-b border-sea-rule"
+          onKeyDown={(e) => {
+            if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+            const i = TABS.findIndex((t) => t.key === tab);
+            const nextTab =
+              TABS[(i + (e.key === "ArrowRight" ? 1 : TABS.length - 1)) % TABS.length]!;
+            setTab(nextTab.key);
+            document.getElementById(`tab-${nextTab.key}`)?.focus();
+          }}
+        >
+          {TABS.map((t) => {
+            const count =
+              t.key === "alerts"
+                ? shipmentAlerts.length
+                : t.key === "timeline"
+                  ? events.length
+                  : t.key === "documents"
+                    ? `${docs.attached}/${docs.total}`
+                    : null;
+            return (
+              <button
+                key={t.key}
+                id={`tab-${t.key}`}
+                role="tab"
+                type="button"
+                aria-selected={tab === t.key}
+                tabIndex={tab === t.key ? 0 : -1}
+                onClick={() => setTab(t.key)}
+                className={`focus-ring -mb-px flex shrink-0 items-center gap-2 border-b-2 pb-2.5 text-[13.5px] transition-colors duration-150 ${
+                  tab === t.key
+                    ? "border-sea-ink font-medium text-sea-ink"
+                    : "border-transparent text-sea-ink-3 hover:text-sea-ink"
+                }`}
+              >
+                {t.label}
+                {count != null && count !== 0 ? (
+                  <span
+                    className={`telemetry text-[10.5px] ${
+                      t.key === "alerts" ? "text-sea-red" : "text-sea-ink-3"
+                    }`}
+                  >
+                    {count}
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+
+        <div role="tabpanel" aria-labelledby={`tab-${tab}`} key={tab} className="animate-in pt-7">
+          {tab === "overview" ? (
+            <div className="grid grid-cols-1 gap-x-12 gap-y-10 lg:grid-cols-[minmax(0,1fr)_minmax(320px,380px)]">
+              <div className="flex min-w-0 flex-col gap-10">
+                <section aria-labelledby="lifecycle-title">
+                  <h2
+                    id="lifecycle-title"
+                    className="chart-label border-b border-sea-ink pb-2 text-sea-ink"
+                  >
+                    Lifecycle
+                  </h2>
+                  <LifecycleJourney
+                    status={shipment.status}
+                    legacyTerminal={legacyTerminal}
+                    currentIndex={currentIndex}
+                    reachedAt={reachedAt}
+                  />
+                </section>
+
+                <section aria-labelledby="watch-title">
+                  <h2
+                    id="watch-title"
+                    className="chart-label border-b border-sea-ink pb-2 text-sea-ink"
+                  >
+                    Monitoring
+                  </h2>
+                  <dl className="divide-y divide-sea-rule-2">
+                    <div className="grid grid-cols-[112px_minmax(0,1fr)] gap-4 py-2.5">
+                      <dt className="chart-label pt-0.5 text-sea-ink-3">Watch</dt>
+                      <dd className="text-[13px] text-sea-ink">
+                        <span className="font-medium">{monitoring.state}</span>
+                        <span className="text-sea-ink-2">. {monitoring.reason}</span>
+                      </dd>
+                    </div>
+                    <div className="grid grid-cols-[112px_minmax(0,1fr)] gap-4 py-2.5">
+                      <dt className="chart-label pt-0.5 text-sea-ink-3">Automation</dt>
+                      <dd className="text-[13px] text-sea-ink">
+                        {automationHold ? (
+                          <span className="font-medium text-sea-amber-ink">
+                            Held until {formatUtcMinute(automationHold)}
+                          </span>
+                        ) : decision.status === shipment.status ? (
+                          <span className="font-medium">No pending change</span>
+                        ) : (
+                          <span className="font-medium">Will move to {decision.status}</span>
+                        )}
+                        {automationDetail ? (
+                          <span className="text-sea-ink-2">. {automationDetail}</span>
+                        ) : null}
+                      </dd>
+                    </div>
+                  </dl>
+                </section>
+
+                <section aria-labelledby="latest-title">
+                  <div className="flex items-end justify-between border-b border-sea-ink pb-2">
+                    <h2 id="latest-title" className="chart-label text-sea-ink">
+                      Latest entries
+                    </h2>
+                    {events.length > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => setTab("timeline")}
+                        className="focus-ring inline-flex items-center gap-1 text-[12px] text-sea-ink-2 hover:text-sea-ink"
+                      >
+                        Full voyage log <ArrowRight className="size-3" aria-hidden />
+                      </button>
+                    ) : null}
+                  </div>
+                  {events.length === 0 ? (
+                    <p className="py-3 text-[12.5px] text-sea-ink-3">
+                      Nothing logged yet. Phase changes, schedule revisions and corrections appear
+                      here with their source.
+                    </p>
+                  ) : (
+                    <ol>
+                      {events.slice(0, 4).map((e) => (
+                        <li
+                          key={e.id}
+                          className="grid grid-cols-[96px_44px_minmax(0,1fr)] items-baseline gap-x-3 border-b border-sea-rule-2 py-2"
+                        >
+                          <time className="telemetry text-[10.5px] uppercase text-sea-ink-2">
+                            {utcDayTime(e.occurred_at, now)}
+                          </time>
+                          <span className="flex items-center gap-1.5">
+                            <SourceMark source={e.source} automated={e.automated} />
+                            <span className="telemetry text-[10px] text-sea-ink-3">
+                              {e.source === "ais" ? "AIS" : e.automated ? "SYS" : "OPR"}
+                            </span>
+                          </span>
+                          <span className="truncate text-[12.5px] text-sea-ink">
+                            {e.to_value ? (
+                              <>
+                                <span className="text-sea-ink-2">
+                                  {humanField(e.field, e.event_type) || "Phase"}
+                                </span>{" "}
+                                {e.from_value ? (
+                                  <span className="text-sea-ink-3 line-through decoration-sea-ink-4">
+                                    {logValue(e.from_value, now)}
+                                  </span>
+                                ) : null}{" "}
+                                <span className="text-sea-ink-4">→</span>{" "}
+                                <span className="font-medium">{logValue(e.to_value, now)}</span>
+                              </>
+                            ) : e.reason ? (
+                              logValue(e.reason, now)
+                            ) : (
+                              e.event_type.replace(/_/g, " ")
+                            )}
+                          </span>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                </section>
+
+                <section>
+                  <button
+                    type="button"
+                    onClick={() => setEditOpen((v) => !v)}
+                    aria-expanded={editOpen}
+                    className="focus-ring flex w-full items-center justify-between border-b border-sea-ink pb-2 text-left"
+                  >
+                    <span className="chart-label text-sea-ink">Shipment information</span>
+                    <span className="inline-flex items-center gap-1 text-[12px] text-sea-ink-2">
+                      {editOpen ? "Close" : "Edit details"}
+                      <ChevronRight
+                        className={`size-3.5 transition-transform duration-200 ${editOpen ? "rotate-90" : ""}`}
+                        aria-hidden
+                      />
+                    </span>
+                  </button>
+
+                  {editOpen ? (
+                    <form
+                      className="animate-in pt-4"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        save.mutate();
+                      }}
+                    >
+                      <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
+                        <Field label="Client">
+                          <input
+                            className={fieldClass}
+                            value={draft.client_name}
+                            onChange={(e) => setDraft({ ...draft, client_name: e.target.value })}
+                          />
+                        </Field>
+                        <Field label="Landed cost (USD)">
+                          <input
+                            className={fieldClass}
+                            type="number"
+                            step="0.01"
+                            value={draft.landed_cost ?? ""}
+                            onChange={(e) =>
+                              setDraft({
+                                ...draft,
+                                landed_cost: e.target.value === "" ? null : Number(e.target.value),
+                              })
+                            }
+                          />
+                        </Field>
+                        <PortAutocomplete
+                          label="Origin"
+                          value={draft.origin}
+                          portId={draft.origin_port_id}
+                          onChange={({ text, portId }) =>
+                            setDraft({ ...draft, origin: text, origin_port_id: portId })
+                          }
+                        />
+                        <PortAutocomplete
+                          label="Destination"
+                          value={draft.destination}
+                          portId={draft.destination_port_id}
+                          onChange={({ text, portId }) =>
+                            setDraft({ ...draft, destination: text, destination_port_id: portId })
+                          }
+                        />
+                        <Field label="Vessel">
+                          <input
+                            className={fieldClass}
+                            value={draft.vessel_name ?? ""}
+                            onChange={(e) => setDraft({ ...draft, vessel_name: e.target.value })}
+                          />
+                        </Field>
+                        <Field label="MMSI">
+                          <input
+                            className={`${fieldClass} telemetry`}
+                            inputMode="numeric"
+                            value={draft.vessel_mmsi ?? ""}
+                            onChange={(e) => setDraft({ ...draft, vessel_mmsi: e.target.value })}
+                          />
+                        </Field>
+                        <Field label="Planned ETD">
+                          <input
+                            className={fieldClass}
+                            type="datetime-local"
+                            value={dates.planned_etd}
+                            onChange={(e) => setDates({ ...dates, planned_etd: e.target.value })}
+                          />
+                        </Field>
+                        <Field label="Planned ETA">
+                          <input
+                            className={fieldClass}
+                            type="datetime-local"
+                            value={dates.planned_eta}
+                            onChange={(e) => setDates({ ...dates, planned_eta: e.target.value })}
+                          />
+                        </Field>
+                        <Field label="Current ETA">
+                          <input
+                            className={fieldClass}
+                            type="datetime-local"
+                            value={dates.eta}
+                            onChange={(e) => setDates({ ...dates, eta: e.target.value })}
+                          />
+                        </Field>
+                        <Field label="Actual departure">
+                          <input
+                            className={fieldClass}
+                            type="datetime-local"
+                            value={dates.actual_departure}
+                            onChange={(e) =>
+                              setDates({ ...dates, actual_departure: e.target.value })
+                            }
+                          />
+                        </Field>
+                        <Field label="Actual arrival">
+                          <input
+                            className={fieldClass}
+                            type="datetime-local"
+                            value={dates.actual_arrival}
+                            onChange={(e) => setDates({ ...dates, actual_arrival: e.target.value })}
+                          />
+                        </Field>
+                        <InfoField
+                          label="Last AIS update"
+                          value={
+                            position
+                              ? relativeTime(position.position_timestamp ?? position.updated_at)
+                              : "No AIS data yet"
+                          }
+                        />
+                      </div>
+                      <p className="mt-3 text-[12px] text-sea-ink-3">
+                        Dates are entered in your local time and shown on the record in UTC.
+                      </p>
+                      <div className="mt-3 flex items-center justify-end gap-2 border-t border-sea-rule pt-3">
+                        <button
+                          type="button"
+                          className={btnGhost}
+                          onClick={() => setEditOpen(false)}
+                        >
+                          Cancel
+                        </button>
+                        <button className={btnPrimary} type="submit" disabled={save.isPending}>
+                          {save.isPending ? "Saving…" : "Save changes"}
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <dl className="grid grid-cols-2 gap-x-6 sm:grid-cols-3">
+                      {(
+                        [
+                          ["Client", shipment.client_name],
+                          ["Reference", shipment.customer_reference ?? shipment.reference],
+                          ["Carrier", shipment.carrier],
+                          ["Container", shipment.container_number],
+                          [
+                            "Landed cost",
+                            shipment.landed_cost == null
+                              ? null
+                              : `USD ${shipment.landed_cost.toLocaleString(undefined, { maximumFractionDigits: 2 })}`,
+                          ],
+                          ["IMO", shipment.vessel_imo],
+                          [
+                            "Planned ETD",
+                            shipment.planned_etd
+                              ? `${utcDayTime(shipment.planned_etd, now)} UTC`
+                              : null,
+                          ],
+                          [
+                            "Planned ETA",
+                            shipment.planned_eta
+                              ? `${utcDayTime(shipment.planned_eta, now)} UTC`
+                              : null,
+                          ],
+                          [
+                            "Ports linked",
+                            shipment.origin_port_id && shipment.destination_port_id
+                              ? "Both, measured by position"
+                              : shipment.origin_port_id || shipment.destination_port_id
+                                ? "One of two"
+                                : "Neither, schedule only",
+                          ],
+                        ] as [string, string | null][]
+                      ).map(([label, value]) => (
+                        <div key={label} className="min-w-0 border-b border-sea-rule-2 py-2.5">
+                          <dt className="chart-label !text-[9.5px] text-sea-ink-3">{label}</dt>
+                          <dd
+                            className={`mt-0.5 truncate text-[13px] ${value ? "text-sea-ink" : "text-sea-ink-4"}`}
+                          >
+                            {value ?? "Not recorded"}
+                          </dd>
+                        </div>
+                      ))}
+                    </dl>
+                  )}
+                </section>
+              </div>
+
+              {/* Right: the live instrument and the correction control */}
+              <aside className="flex min-w-0 flex-col gap-6 max-lg:order-first" aria-label="Vessel">
+                <section aria-labelledby="console-title">
+                  <h2
+                    id="console-title"
+                    className="chart-label border-b border-sea-ink pb-2 text-sea-ink"
+                  >
+                    Vessel and live position
+                  </h2>
+                  {!shipment.vessel_mmsi ? (
+                    <div className="border-b border-sea-rule-2 py-4">
+                      <p className="text-[13px] font-medium text-sea-ink">Not tracked on AIS</p>
+                      <p className="mt-1 text-[12.5px] leading-[1.5] text-sea-ink-2">
+                        Without an MMSI this voyage is followed by schedule only: no position, no
+                        automatic phase changes.
+                      </p>
+                      <button
+                        type="button"
+                        className={`${btnGhost} mt-3`}
+                        onClick={() => setEditOpen(true)}
+                      >
+                        Add vessel MMSI
+                      </button>
+                    </div>
+                  ) : !position ? (
+                    <div className="border-b border-sea-rule-2 py-4">
+                      <p className="text-[13px] font-medium text-sea-ink">Awaiting first AIS fix</p>
+                      <p className="mt-1 text-[12.5px] leading-[1.5] text-sea-ink-2">
+                        Listening for MMSI{" "}
+                        <span className="telemetry text-[11px]">{shipment.vessel_mmsi}</span>. A
+                        position is recorded when the vessel next transmits in range of a receiver.
+                        If none arrives, check the MMSI against the booking.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="console mt-3 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.07em] text-nav-foreground">
+                          <span
+                            className={`relative inline-block size-1.5 rounded-full ${hasFreshAis ? "ping-live bg-nav-accent text-nav-accent" : "bg-sea-amber"}`}
+                            aria-hidden
+                          />
+                          {hasFreshAis ? "Live" : "Last known"}
+                        </span>
+                        <span className="telemetry text-[10.5px] uppercase text-nav-muted-foreground">
+                          {utcDayTime(position.position_timestamp ?? position.updated_at, now)} UTC
+                        </span>
+                      </div>
+                      <p className="telemetry mt-3 text-[13px] text-nav-foreground">
+                        {formatCoordinates(position.latitude, position.longitude)}
+                      </p>
+                      <div className="mt-4 flex items-center gap-5">
+                        <CompassRose cog={position.cog} />
+                        <div className="grid flex-1 grid-cols-2 gap-4">
+                          <ConsoleSpeed sog={position.sog} />
+                          <ConsoleField
+                            label="COG"
+                            value={
+                              position.cog != null
+                                ? `${String(Math.round(position.cog)).padStart(3, "0")}°`
+                                : "None"
+                            }
+                          />
+                          <div className="col-span-2">
+                            <ConsoleField
+                              label="Nav status"
+                              value={navStatusLabel(position.nav_status)}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      {!hasFreshAis ? (
+                        <p className="mt-4 border-t border-nav-border pt-3 text-[12px] leading-[1.45] text-sea-amber">
+                          Position is over 24 hours old. The vessel may be out of receiver range;
+                          phase automation will not act on it.
+                        </p>
+                      ) : conditionLabel ? (
+                        <p className="mt-4 border-t border-nav-border pt-3 text-[12px] text-nav-muted-foreground">
+                          {conditionLabel}
+                        </p>
+                      ) : null}
+                    </div>
+                  )}
+                  {shipment.vessel_mmsi ? (
+                    <Link
+                      to="/map"
+                      className="focus-ring mt-2 inline-flex items-center gap-1 text-[12px] text-sea-ink-2 hover:text-sea-ink"
+                    >
+                      Fleet map <ArrowRight className="size-3" aria-hidden />
+                    </Link>
+                  ) : null}
+                </section>
+
+                <section aria-labelledby="override-title">
+                  <h2
+                    id="override-title"
+                    className="chart-label border-b border-sea-rule pb-2 text-sea-ink-2"
+                  >
+                    Correct the phase
+                  </h2>
+                  {legacyTerminal ? (
+                    <p className="py-3 text-[12.5px] text-sea-ink-3">
+                      This record holds a legacy status ({shipment.status}) retired from the active
+                      lifecycle, so it cannot be corrected here.
+                    </p>
+                  ) : !overrideOpen ? (
+                    <div className="flex items-center justify-between gap-3 py-3">
+                      <p className="text-[12.5px] leading-[1.45] text-sea-ink-3">
+                        For a wrong AIS reading or an accidental change. Logged as an operator entry
+                        and holds automation.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={openOverride}
+                        className={`${btnGhost} shrink-0`}
+                      >
+                        <RotateCcw className="size-3.5" aria-hidden />
+                        Override
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="animate-in space-y-3 py-3">
+                      <label className="block">
+                        <span className="label-xs mb-1 block">New phase</span>
+                        <select
+                          className={fieldClass}
+                          value={overrideStatus}
+                          onChange={(e) =>
+                            setOverrideStatus(e.target.value as ActiveShipmentStatus)
+                          }
+                        >
+                          {ACTIVE_STATUSES.map((st) => (
+                            <option key={st} value={st}>
+                              {st}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="block">
+                        <span className="label-xs mb-1 block">Reason</span>
+                        <textarea
+                          className={`${fieldClass} min-h-[60px] resize-y py-1.5`}
+                          placeholder="Why is this being changed manually?"
+                          value={overrideReason}
+                          onChange={(e) => setOverrideReason(e.target.value)}
+                        />
+                      </label>
+                      <div className="flex justify-end gap-1.5">
+                        <button
+                          type="button"
+                          className={btnGhost}
+                          onClick={() => {
+                            setOverrideOpen(false);
+                            setOverrideReason("");
+                          }}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          className={btnPrimary}
+                          disabled={override.isPending || overrideStatus === shipment.status}
+                          onClick={() => override.mutate()}
+                        >
+                          {override.isPending ? "Confirming…" : "Confirm change"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </section>
+              </aside>
+            </div>
+          ) : null}
+
+          {tab === "timeline" ? (
+            <div className="grid grid-cols-1 gap-x-12 gap-y-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
+              <ShipmentTimeline shipment={shipment} events={events} />
+              <StatusHistory events={events} />
+            </div>
+          ) : null}
+
+          {tab === "documents" ? <DocumentFiles shipmentId={id} documents={documents} /> : null}
+
+          {tab === "notes" ? <ShipmentNotes shipmentId={id} /> : null}
+
+          {tab === "alerts" ? (
+            <section aria-labelledby="signals-title">
+              <div className="flex flex-wrap items-end justify-between gap-2 border-b border-sea-ink pb-2">
+                <h2 id="signals-title" className="chart-label text-sea-ink">
+                  Signals
+                  <span className="telemetry ml-2 font-normal normal-case tracking-normal text-sea-ink-3">
+                    {shipmentAlerts.length} on this voyage, UTC
+                  </span>
+                </h2>
+                <span className="text-[12px] text-sea-ink-2">
+                  Current state:{" "}
+                  <span
+                    className={
+                      level === "alarm"
+                        ? "text-sea-red"
+                        : level
+                          ? "text-sea-amber-ink"
+                          : "text-sea-ink"
+                    }
+                  >
+                    {health.level}
+                  </span>
+                  {level ? `. ${health.action ?? "Review the voyage"}` : ""}
+                </span>
+              </div>
+              {shipmentAlerts.length === 0 ? (
+                <div className="py-5">
+                  <p className="text-[13px] font-medium text-sea-ink">No signals on this voyage</p>
+                  <p className="mt-1 max-w-[60ch] text-[12.5px] text-sea-ink-2">
+                    ETA revisions, departures and phase changes that need a look are raised here,
+                    most recent first.
+                  </p>
+                </div>
               ) : (
                 <ol>
-                  {statusEvents.map((e, i) => {
-                    const dotColor = ACCENT_DOT[accentForValue(e.to_value)];
+                  {shipmentAlerts.map((a) => {
+                    const severity = alertSeverity(a);
                     return (
-                      <li key={e.id} className="relative flex gap-3 pb-4 last:pb-0">
-                        {i < statusEvents.length - 1 ? (
-                          <span
-                            aria-hidden
-                            className="absolute left-[4px] top-3 h-full w-px bg-border"
-                          />
-                        ) : null}
-                        <span
-                          aria-hidden
-                          className={`mt-1 size-[9px] shrink-0 rounded-full ${dotColor} ${i === 0 ? "" : "opacity-45"}`}
-                        />
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-foreground">
-                            {e.to_value ?? e.event_type}
-                          </p>
-                          <p className="text-xs text-muted-foreground">{eventSourceLabel(e)}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {formatDayTime(e.occurred_at)}
-                          </p>
-                        </div>
+                      <li
+                        key={a.id}
+                        className="animate-in grid grid-cols-[88px_minmax(0,1fr)] gap-x-4 gap-y-1 border-b border-sea-rule-2 py-3 sm:grid-cols-[112px_104px_minmax(0,1fr)_auto]"
+                      >
+                        <span className="self-start pt-0.5">
+                          <SeverityBadge severity={severity} label={SEVERITY_LABEL[severity]} />
+                        </span>
+                        <time className="telemetry self-start pt-px text-[10.5px] uppercase text-sea-ink-2 sm:order-none">
+                          {utcDayTime(a.created_at, now)}
+                        </time>
+                        <span className="col-span-2 text-[13.5px] text-sea-ink sm:col-span-1">
+                          {a.message}
+                        </span>
+                        <span className="col-span-2 flex items-center gap-1.5 sm:col-span-1 sm:justify-end">
+                          {a.from_status ? <StatusPill status={a.from_status} /> : null}
+                          {a.from_status && a.to_status ? (
+                            <span className="text-[12px] text-sea-ink-4">→</span>
+                          ) : null}
+                          {a.to_status ? <StatusPill status={a.to_status} /> : null}
+                        </span>
                       </li>
                     );
                   })}
                 </ol>
               )}
             </section>
-          </div>
-
-          <div className="border-t border-border pt-6">
-            <button
-              type="button"
-              onClick={() => setEditOpen((v) => !v)}
-              className="flex w-full items-center justify-between text-left"
-            >
-              <span className="label-xs">Shipment Information</span>
-              <span className="inline-flex items-center gap-1 text-xs font-medium text-primary">
-                {editOpen ? "Hide" : "Edit details"}
-                <ChevronRight
-                  className={`size-3.5 transition-transform duration-200 ${editOpen ? "rotate-90" : ""}`}
-                />
-              </span>
-            </button>
-
-            {editOpen ? (
-              <form
-                className="panel mt-4 p-5"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  save.mutate();
-                }}
-              >
-                <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
-                  <Field label="Client">
-                    <input
-                      className={fieldClass}
-                      value={draft.client_name}
-                      onChange={(e) => setDraft({ ...draft, client_name: e.target.value })}
-                    />
-                  </Field>
-                  <Field label="Landed cost (USD)">
-                    <input
-                      className={fieldClass}
-                      type="number"
-                      step="0.01"
-                      value={draft.landed_cost ?? ""}
-                      onChange={(e) =>
-                        setDraft({
-                          ...draft,
-                          landed_cost: e.target.value === "" ? null : Number(e.target.value),
-                        })
-                      }
-                    />
-                  </Field>
-                  <PortAutocomplete
-                    label="Origin"
-                    value={draft.origin}
-                    portId={draft.origin_port_id}
-                    onChange={({ text, portId }) =>
-                      setDraft({ ...draft, origin: text, origin_port_id: portId })
-                    }
-                  />
-                  <PortAutocomplete
-                    label="Destination"
-                    value={draft.destination}
-                    portId={draft.destination_port_id}
-                    onChange={({ text, portId }) =>
-                      setDraft({ ...draft, destination: text, destination_port_id: portId })
-                    }
-                  />
-                  <Field label="Vessel">
-                    <input
-                      className={fieldClass}
-                      value={draft.vessel_name ?? ""}
-                      onChange={(e) => setDraft({ ...draft, vessel_name: e.target.value })}
-                    />
-                  </Field>
-                  <Field label="MMSI">
-                    <input
-                      className={fieldClass}
-                      value={draft.vessel_mmsi ?? ""}
-                      onChange={(e) => setDraft({ ...draft, vessel_mmsi: e.target.value })}
-                    />
-                  </Field>
-                  <Field label="Planned ETD">
-                    <input
-                      className={fieldClass}
-                      type="datetime-local"
-                      value={dates.planned_etd}
-                      onChange={(e) => setDates({ ...dates, planned_etd: e.target.value })}
-                    />
-                  </Field>
-                  <Field label="Planned ETA">
-                    <input
-                      className={fieldClass}
-                      type="datetime-local"
-                      value={dates.planned_eta}
-                      onChange={(e) => setDates({ ...dates, planned_eta: e.target.value })}
-                    />
-                  </Field>
-                  <Field label="Current ETA">
-                    <input
-                      className={fieldClass}
-                      type="datetime-local"
-                      value={dates.eta}
-                      onChange={(e) => setDates({ ...dates, eta: e.target.value })}
-                    />
-                  </Field>
-                  <Field label="Actual Departure">
-                    <input
-                      className={fieldClass}
-                      type="datetime-local"
-                      value={dates.actual_departure}
-                      onChange={(e) => setDates({ ...dates, actual_departure: e.target.value })}
-                    />
-                  </Field>
-                  <Field label="Actual Arrival">
-                    <input
-                      className={fieldClass}
-                      type="datetime-local"
-                      value={dates.actual_arrival}
-                      onChange={(e) => setDates({ ...dates, actual_arrival: e.target.value })}
-                    />
-                  </Field>
-                  <InfoField
-                    label="Last AIS Update"
-                    value={
-                      position
-                        ? relativeTime(position.position_timestamp ?? position.updated_at)
-                        : "No AIS data yet"
-                    }
-                  />
-                </div>
-
-                <div className="mt-4 flex items-center justify-end border-t border-border pt-3">
-                  <button className={btnPrimary} type="submit" disabled={save.isPending}>
-                    {save.isPending ? "Saving…" : "Save changes"}
-                  </button>
-                </div>
-              </form>
-            ) : null}
-          </div>
+          ) : null}
         </div>
-      ) : null}
-
-      {tab === "timeline" ? (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <ShipmentTimeline shipment={shipment} events={events} />
-          <StatusHistory events={events} />
-        </div>
-      ) : null}
-
-      {tab === "documents" ? <DocumentFiles shipmentId={id} documents={documents} /> : null}
-
-      {tab === "notes" ? <ShipmentNotes shipmentId={id} /> : null}
-
-      {tab === "alerts" ? (
-        <div className="panel divide-y divide-border">
-          {shipmentAlerts.length === 0 ? (
-            <p className="px-4 py-8 text-center text-sm text-muted-foreground">
-              No alerts recorded for this shipment.
-            </p>
-          ) : (
-            shipmentAlerts.map((a) => {
-              const severity = alertSeverity(a);
-              return (
-                <div key={a.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
-                  <SeverityBadge severity={severity} label={SEVERITY_LABEL[severity]} />
-                  <span className="flex-1 text-sm text-foreground">{a.message}</span>
-                  <span className="flex items-center gap-1.5">
-                    {a.from_status ? <StatusPill status={a.from_status} /> : null}
-                    {a.from_status && a.to_status ? (
-                      <span className="text-xs text-muted-foreground">→</span>
-                    ) : null}
-                    {a.to_status ? <StatusPill status={a.to_status} /> : null}
-                  </span>
-                  <span className="w-32 shrink-0 text-right text-xs text-muted-foreground">
-                    {formatDayTime(a.created_at)}
-                  </span>
-                </div>
-              );
-            })
-          )}
-        </div>
-      ) : null}
+      </div>
     </AppShell>
   );
 }
@@ -930,18 +1269,19 @@ function HeaderMenu({
     <div className="relative" ref={ref}>
       <button
         type="button"
-        className="focus-ring rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-surface hover:text-foreground"
+        className="focus-ring grid size-8 place-items-center rounded-[2px] border border-sea-rule bg-sea-surface text-sea-ink-2 transition-colors hover:bg-sea-paper-2 hover:text-sea-ink"
         aria-label="More actions"
+        aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
       >
         <MoreHorizontal className="size-4" />
       </button>
       {open ? (
-        <div className="panel-lifted animate-in absolute right-0 z-10 mt-1.5 w-48 overflow-hidden p-1">
+        <div className="panel-lifted animate-in absolute right-0 z-20 mt-1.5 w-52 overflow-hidden py-1">
           {next ? (
             <button
               type="button"
-              className="block w-full rounded-md px-2.5 py-1.5 text-left text-sm text-foreground transition-colors hover:bg-subtle disabled:opacity-50"
+              className="block w-full px-3 py-2 text-left text-[13px] text-sea-ink transition-colors hover:bg-sea-paper-2 disabled:opacity-50"
               disabled={advancing}
               onClick={() => {
                 onAdvance();
@@ -953,7 +1293,7 @@ function HeaderMenu({
           ) : null}
           <button
             type="button"
-            className="block w-full rounded-md px-2.5 py-1.5 text-left text-sm text-destructive transition-colors hover:bg-risk-soft"
+            className="block w-full border-t border-sea-rule-2 px-3 py-2 text-left text-[13px] text-sea-red transition-colors hover:bg-sea-red-soft"
             onClick={() => {
               setOpen(false);
               onDelete();
@@ -967,17 +1307,26 @@ function HeaderMenu({
   );
 }
 
-/** Label-over-value readout — the same visual language as the dashboard's
- * KPI strip, reused here so a shipment's vitals read the same way an
- * operator already reads the fleet's. */
-function HeaderStat({ label, value }: { label: string; value: ReactNode }) {
+/** One reading in the record header strip: condensed label, the value at
+ * reading size, and a quieter line of context under it. */
+function HeaderStat({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex min-w-0 flex-col gap-1.5">
-      <span className="label-xs">{label}</span>
-      <span className="truncate text-[17px] font-medium leading-[22px] tabular-nums text-foreground">
-        {value}
-      </span>
+    <div className="min-w-0 border-sea-rule-2 py-3 pr-4 [&:not(:first-child)]:pl-4 [&:not(:first-child)]:border-l max-sm:[&:nth-child(odd)]:border-l-0 max-sm:[&:nth-child(odd)]:pl-0 max-sm:[&:nth-child(n+3)]:border-t max-sm:[&:last-child]:col-span-2 sm:max-lg:[&:nth-child(3n+1)]:border-l-0 sm:max-lg:[&:nth-child(3n+1)]:pl-0 sm:max-lg:[&:nth-child(n+4)]:border-t">
+      <dt className="chart-label text-sea-ink-3">{label}</dt>
+      <dd className="mt-1 flex min-w-0 flex-col text-[15px] font-medium leading-[21px] text-sea-ink">
+        {children}
+      </dd>
     </div>
+  );
+}
+
+function HeaderSub({ children, mono = false }: { children: ReactNode; mono?: boolean }) {
+  return (
+    <span
+      className={`mt-0.5 block truncate font-normal text-sea-ink-3 ${mono ? "telemetry text-[10.5px] uppercase leading-[16px]" : "text-[12px] leading-[16px]"}`}
+    >
+      {children}
+    </span>
   );
 }
 
@@ -987,10 +1336,8 @@ function HeaderStat({ label, value }: { label: string; value: ReactNode }) {
 function ConsoleField({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
-      <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-nav-muted-foreground">
-        {label}
-      </p>
-      <p className="instrument mt-1 truncate text-base font-medium text-nav-foreground">{value}</p>
+      <p className="chart-label text-nav-muted-foreground">{label}</p>
+      <p className="telemetry mt-1 truncate text-[14px] text-nav-foreground">{value}</p>
     </div>
   );
 }
@@ -1002,15 +1349,13 @@ function ConsoleSpeed({ sog }: { sog: number | null }) {
   const pct = sog != null ? Math.max(0, Math.min(100, (sog / 28) * 100)) : 0;
   return (
     <div className="min-w-0">
-      <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-nav-muted-foreground">
-        SOG
+      <p className="chart-label text-nav-muted-foreground">SOG</p>
+      <p className="telemetry mt-1 truncate text-[14px] text-nav-foreground">
+        {sog != null ? `${sog.toFixed(1)} KN` : "None"}
       </p>
-      <p className="instrument mt-1 truncate text-base font-medium text-nav-foreground">
-        {sog != null ? `${sog.toFixed(1)} kn` : "—"}
-      </p>
-      <div className="mt-2 h-[3px] w-full overflow-hidden rounded-full bg-nav-border">
+      <div className="mt-2 h-[2px] w-full bg-nav-border">
         <div
-          className="h-full rounded-full bg-nav-accent transition-[width] duration-500"
+          className="h-full bg-nav-accent transition-[width] duration-500"
           style={{ width: `${pct}%` }}
         />
       </div>
@@ -1065,78 +1410,76 @@ function CompassRose({ cog }: { cog: number | null }) {
   );
 }
 
-
-/** The shipment's journey as a line, not a generic numbered progress bar:
- * a filled track behind everything already reached, a pulsing marker
- * exactly where the shipment is now, and hollow ticks for what's ahead —
- * position on a route, read at a glance. */
+/** The lifecycle as a measured passage rather than a stepper: three
+ * stretches (port, sea, port), each phase a division on the line, the
+ * phases reached drawn solid with the time they were reached (UTC, from
+ * the voyage log), the present phase marked, the rest ahead as hairline. */
 function LifecycleJourney({
   status,
   legacyTerminal,
   currentIndex,
+  reachedAt,
 }: {
   status: string;
   legacyTerminal: boolean;
   currentIndex: number;
+  reachedAt: (phase: string) => string | null;
 }) {
+  const groups: { label: string; phases: number[] }[] = [
+    { label: "Port of loading", phases: [0, 1] },
+    { label: "At sea", phases: [2, 3, 4] },
+    { label: "Port of discharge", phases: [5] },
+  ];
   return (
-    <div>
-      <ol className="flex items-start">
-        {ACTIVE_STATUSES.map((s, i) => {
-          const done = legacyTerminal || i < currentIndex;
-          const current = !legacyTerminal && i === currentIndex;
-          const isFirst = i === 0;
-          const isLast = i === ACTIVE_STATUSES.length - 1;
-          const c = ACCENT_RING[statusAccent(s)];
-          return (
-            <li key={s} className="flex flex-1 flex-col items-center">
-              <div className="flex w-full items-center">
-                <span
-                  className={`h-[2px] flex-1 ${isFirst ? "opacity-0" : done || current ? c.bg : "bg-border"}`}
-                />
-                <span
-                  className="relative grid shrink-0 place-items-center"
-                  style={{ width: 14, height: 14 }}
-                >
-                  {current ? (
+    <div className="pt-4">
+      <ol className="grid grid-cols-1 gap-y-4 sm:grid-cols-[2fr_3fr_1fr] sm:gap-x-2">
+        {groups.map((g) => (
+          <li key={g.label} className="min-w-0">
+            <span className="chart-label block truncate !text-[9.5px] text-sea-ink-4">
+              {g.label}
+            </span>
+            <ol
+              className="mt-2 grid"
+              style={{ gridTemplateColumns: `repeat(${g.phases.length}, minmax(0, 1fr))` }}
+            >
+              {g.phases.map((i) => {
+                const phase = ACTIVE_STATUSES[i]!;
+                const done = legacyTerminal || i < currentIndex;
+                const current = !legacyTerminal && i === currentIndex;
+                const arrived = phase === "Arrived" && (current || legacyTerminal);
+                const at = reachedAt(phase);
+                return (
+                  <li key={phase} className="min-w-0 pr-2">
                     <span
                       aria-hidden
-                      className={`live-pulse absolute size-3.5 rounded-full ${c.bg} opacity-20`}
+                      className={`block ${current || arrived ? "h-[5px]" : "h-[3px]"} ${
+                        arrived ? "bg-sea-green" : done || current ? "bg-sea-ink" : "bg-sea-rule"
+                      } ${done && !arrived ? "opacity-45" : ""}`}
                     />
-                  ) : null}
-                  <span
-                    aria-hidden
-                    className={`relative rounded-full ${
-                      current
-                        ? `size-2 ${c.bg}`
-                        : done
-                          ? `size-[7px] ${c.bg}`
-                          : "size-[7px] border-[1.5px] border-border bg-surface"
-                    }`}
-                  />
-                </span>
-                <span
-                  className={`h-[2px] flex-1 ${isLast ? "opacity-0" : done ? c.bg : "bg-border"}`}
-                />
-              </div>
-              <span
-                className={`mt-2 text-center text-xs leading-tight ${
-                  current
-                    ? `font-semibold ${c.text}`
-                    : done
-                      ? "text-foreground"
-                      : "text-muted-foreground"
-                }`}
-              >
-                {s}
-              </span>
-            </li>
-          );
-        })}
+                    <span
+                      className={`mt-2 block truncate text-[12.5px] leading-tight ${
+                        current
+                          ? "font-semibold text-sea-ink"
+                          : done
+                            ? "text-sea-ink-2"
+                            : "text-sea-ink-4"
+                      }`}
+                    >
+                      {phase === "Approaching Destination" ? "Approaching" : phase}
+                    </span>
+                    <span className="telemetry mt-0.5 block truncate text-[10px] uppercase text-sea-ink-3">
+                      {at ? utcDayTime(at) : current ? "Now" : ""}
+                    </span>
+                  </li>
+                );
+              })}
+            </ol>
+          </li>
+        ))}
       </ol>
       {legacyTerminal ? (
-        <p className="mt-3 text-xs text-muted-foreground">
-          This shipment holds a legacy status ({status}), retired from the active lifecycle.
+        <p className="mt-3 text-[12px] text-sea-ink-3">
+          This record holds a legacy status ({status}), retired from the active lifecycle.
         </p>
       ) : null}
     </div>
@@ -1147,7 +1490,7 @@ function InfoField({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <span className="label-xs mb-1 block">{label}</span>
-      <span className="text-sm text-foreground">{value}</span>
+      <span className="text-[13px] text-sea-ink-2">{value}</span>
     </div>
   );
 }
