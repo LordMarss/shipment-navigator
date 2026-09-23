@@ -5,81 +5,61 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * WhiteWind Logistics design system — v9: light blue throughout, one
- * deliberate dark exception.
+ * WhiteWind design system: "Chart & Ink".
  *
- * Nearly the whole product — sidebar, top bar, every page's header band,
- * tables, forms — is a considered light-blue-to-white system:
+ * One light working surface for the whole product, a cool fog ground with
+ * near-white tables on it, and one dark register: the bridge rail across
+ * the top (navigation, the watch clock, standing alarms) and, on the
+ * shipment page, the live AIS console. Nothing else inverts.
  *
- *   THE ATMOSPHERE — the sidebar, top bar and every page's header band.
- *   A pale, genuinely blue wash (`--atmosphere`), not white, not grey,
- *   carrying a barely-visible coordinate grid. Navigation and page
- *   identity live here, and — on the dashboard and shipment detail —
- *   the live operational summary too.
+ * COLOUR MEANS STATE, NEVER DECORATION.
+ *   ink        text, rules, primary actions. Buttons are ink, not blue.
+ *   move       bearing blue: a vessel under way, track made good. Nothing
+ *              that is not moving is ever drawn in this blue.
+ *   amber      caution: something to review.
+ *   red        alarm: something needs intervention now.
+ *   green      arrived, complete.
+ * Every colour signal is paired with a shape (diamond, triangle, AIS
+ * target, filled vs hollow) so no state relies on colour alone.
  *
- *   THE CHART — white paper. Tables, forms, records: the working
- *   surface, tuned for hours of reading rather than drama.
+ * TYPE. Archivo carries every word; its width axis gives the system its
+ * voice: condensed caps for chart labels and column heads, condensed
+ * figures for the few numbers that lead a screen, normal width for prose.
+ * Martian Mono, narrowed, is reserved for machine readings (IDs, MMSI,
+ * knots, T-counts, clock times), never for prose or labels.
  *
- *   THE CONSOLE — the one deliberate dark exception, reserved
- *   exclusively for genuinely live telemetry (a vessel's AIS reading).
- *   With dark used nowhere else, it reads as unmistakably intentional —
- *   "this one thing is live" — rather than a house style.
- *
- * Colour is one Ocean blue family, three roles: `--primary` (actions,
- * links, "underway," and every hover/hairline on it stays in-family),
- * `--primary-deep` (stronger emphasis — the active nav pill, the brand
- * mark, console accents — meaningfully lighter than a navy-black would
- * be), and `--atmosphere` (the pale wash above, doing double duty as
- * every hover/selected-state tint). Neutrals stay a true warm ink
- * rather than blue-tinted, so text never competes with the accent.
- * Green/amber/red remain exactly one signal per element.
- *
- * Two typefaces: IBM Plex Sans for every word on the page, Martian Mono
- * (`.instrument`) for any reading rather than prose — MMSI, SOG, COG,
- * timestamps, reference codes, KPI counts. Shape stays precise: a tight
- * control radius, a slightly looser container radius, shadow reserved
- * for things that actually float above the page.
+ * SHAPE. Sharp. Structure is drawn with rules, not boxes; the only radius
+ * is 2px on controls. Shadow only on things that float (menus, dialogs).
  */
 
 @theme inline {
-  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", "Menlo", monospace;
+  --font-sans: "Archivo", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "Martian Mono", ui-monospace, "SF Mono", "Menlo", monospace;
 
-  /* Type scale — deliberately small set of steps, each with its own
-   * paired line-height and tracking, used directly as text-xs…text-3xl
-   * instead of ad hoc text-[Npx] values scattered per component. */
-  --text-xs: 12px;
+  --text-xs: 11.5px;
   --text-xs--line-height: 16px;
   --text-sm: 13px;
-  --text-sm--line-height: 19px;
-  --text-base: 14.5px;
-  --text-base--line-height: 21px;
+  --text-sm--line-height: 18px;
+  --text-base: 14px;
+  --text-base--line-height: 20px;
   --text-lg: 16px;
   --text-lg--line-height: 22px;
-  --text-lg--letter-spacing: -0.006em;
   --text-xl: 19px;
   --text-xl--line-height: 25px;
-  --text-xl--letter-spacing: -0.008em;
   --text-2xl: 23px;
-  --text-2xl--line-height: 29px;
-  --text-2xl--letter-spacing: -0.008em;
+  --text-2xl--line-height: 28px;
+  --text-2xl--letter-spacing: -0.01em;
   --text-3xl: 30px;
-  --text-3xl--line-height: 36px;
-  --text-3xl--letter-spacing: -0.012em;
-  /* Reserved for command-centre readings — the fleet-status numbers and
-   * the shipment detail's headline metrics. No heading ever uses this
-   * size, so a number this large only ever means "this is the number
-   * that matters right now." */
+  --text-3xl--line-height: 34px;
+  --text-3xl--letter-spacing: -0.015em;
   --text-4xl: 40px;
-  --text-4xl--line-height: 42px;
+  --text-4xl--line-height: 40px;
   --text-4xl--letter-spacing: -0.02em;
 
-  /* Radius — precise and engineered, not soft. Controls are tighter than
-   * containers; the ratio is what makes curvature read as intentional. */
   --radius-sm: 2px;
   --radius-md: 2px;
-  --radius-lg: 3px;
-  --radius-xl: 3px;
+  --radius-lg: 2px;
+  --radius-xl: 2px;
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -130,11 +110,11 @@
   --color-nav-accent: var(--nav-accent);
   --color-nav-border: var(--nav-border);
 
-  /* WhiteWind maritime palette (dashboard + bridge chrome). See :root below. */
-  --font-telemetry: "IBM Plex Mono", ui-monospace, "SF Mono", "Menlo", monospace;
-  --font-chart: "IBM Plex Sans Condensed", "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-telemetry: var(--font-mono);
+  --font-chart: var(--font-sans);
   --color-sea-paper: var(--sea-paper);
   --color-sea-paper-2: var(--sea-paper-2);
+  --color-sea-surface: var(--sea-surface);
   --color-sea-shallows: var(--sea-shallows);
   --color-sea-shallows-2: var(--sea-shallows-2);
   --color-sea-ink: var(--sea-ink);
@@ -150,43 +130,75 @@
   --color-sea-console-ink-2: var(--sea-console-ink-2);
   --color-sea-move: var(--sea-move);
   --color-sea-move-bright: var(--sea-move-bright);
+  --color-sea-move-soft: var(--sea-move-soft);
   --color-sea-amber: var(--sea-amber);
   --color-sea-amber-ink: var(--sea-amber-ink);
+  --color-sea-amber-soft: var(--sea-amber-soft);
   --color-sea-red: var(--sea-red);
   --color-sea-red-bright: var(--sea-red-bright);
+  --color-sea-red-soft: var(--sea-red-soft);
   --color-sea-green: var(--sea-green);
   --color-sea-cursor: var(--sea-cursor);
 }
 
 :root {
-  /* Container radius — used directly by `.panel` / `.panel-lifted`. */
-  --radius: 3px;
+  --radius: 2px;
 
-  /* White paper canvas — brighter than the previous warm tan tone now
-   * that dark no longer dominates the top of the screen. */
+  /* ---------------------------------------------------------- palette --- */
+  /* Ground and surfaces: a cool, faintly blue-grey fog, never warm paper. */
+  --sea-paper: oklch(0.968 0.004 240);
+  --sea-paper-2: oklch(0.945 0.006 240);
+  --sea-surface: oklch(0.993 0.002 240);
+  /* Selection: the row or item under the cursor, a cool tint of the ground. */
+  --sea-shallows: oklch(0.935 0.012 240);
+  --sea-shallows-2: oklch(0.905 0.018 240);
+  /* Chart ink, from full strength to the faintest mark. ink-3 still passes
+   * 4.5:1 on the ground; ink-4 is for marks and dotted track only. */
+  --sea-ink: oklch(0.215 0.02 255);
+  --sea-ink-2: oklch(0.39 0.018 255);
+  --sea-ink-3: oklch(0.505 0.015 250);
+  --sea-ink-4: oklch(0.74 0.01 245);
+  --sea-rule: oklch(0.855 0.007 245);
+  --sea-rule-2: oklch(0.915 0.005 245);
+  /* The bridge register: the rail and the live AIS console. */
+  --sea-console: oklch(0.2 0.018 255);
+  --sea-console-2: oklch(0.255 0.02 255);
+  --sea-console-line: oklch(0.32 0.02 255);
+  --sea-console-ink: oklch(0.965 0.004 240);
+  --sea-console-ink-2: oklch(0.72 0.012 245);
+  /* Signals. */
+  --sea-move: oklch(0.5 0.135 250);
+  --sea-move-bright: oklch(0.74 0.115 242);
+  --sea-move-soft: oklch(0.94 0.025 245);
+  --sea-amber: oklch(0.78 0.15 74);
+  --sea-amber-ink: oklch(0.5 0.115 62);
+  --sea-amber-soft: oklch(0.96 0.035 82);
+  --sea-red: oklch(0.53 0.19 27);
+  --sea-red-bright: oklch(0.7 0.17 27);
+  --sea-red-soft: oklch(0.955 0.025 25);
+  --sea-green: oklch(0.54 0.09 162);
+  /* The cursor is ink: pointing at something is not a state. */
+  --sea-cursor: var(--sea-ink);
+  --sea-grid: oklch(0.945 0.006 240);
+
+  /* ------------------------------------------------- semantic aliases --- */
   --background: var(--sea-paper);
-  /* True ink — a neutral near-black, so text never competes with the
-   * accent for attention. */
   --foreground: var(--sea-ink);
-  --surface: oklch(0.985 0.005 92);
+  --surface: var(--sea-surface);
   --subtle: var(--sea-paper-2);
   --card: var(--surface);
   --card-foreground: var(--foreground);
   --popover: var(--surface);
   --popover-foreground: var(--foreground);
 
-  /* Ocean — one blue family, four roles. A lighter, more atmospheric mid
-   * blue than before for actions and links; a "deep" tone for stronger
-   * emphasis that stays a genuine blue rather than sliding to near-black
-   * navy; a pale wash reserved for the atmosphere band and hover/selected
-   * states, so those two things are visibly the same idea everywhere. */
-  --primary: var(--sea-move);
-  --primary-hover: oklch(0.44 0.1 242);
-  --primary-foreground: oklch(0.985 0.004 92);
-  --primary-deep: oklch(0.36 0.08 248);
+  /* Primary action is ink. Blue is reserved for movement. */
+  --primary: var(--sea-ink);
+  --primary-hover: oklch(0.31 0.022 255);
+  --primary-foreground: var(--sea-surface);
+  --primary-deep: var(--sea-ink);
 
-  --atmosphere: var(--sea-shallows);
-  --atmosphere-hover: var(--sea-shallows-2);
+  --atmosphere: var(--sea-paper-2);
+  --atmosphere-hover: var(--sea-shallows);
 
   --secondary: var(--sea-paper-2);
   --secondary-foreground: var(--foreground);
@@ -195,31 +207,33 @@
   --accent: var(--sea-paper-2);
   --accent-foreground: var(--foreground);
 
-  /* One true red — also used for destructive actions, no duplicate hue. */
   --risk: var(--sea-red);
-  --risk-soft: oklch(0.95 0.025 28);
+  --risk-soft: var(--sea-red-soft);
   --destructive: var(--risk);
-  --destructive-foreground: oklch(0.985 0.004 92);
+  --destructive-foreground: var(--sea-surface);
+  --positive: var(--sea-green);
+  --positive-soft: oklch(0.95 0.02 165);
+  --warning: var(--sea-amber-ink);
+  --warning-soft: var(--sea-amber-soft);
 
   --border: var(--sea-rule);
   --input: var(--sea-rule);
-  --ring: var(--primary);
+  --ring: var(--sea-move);
+  --tint-selected: var(--sea-shallows);
 
-  /* Green — kept well clear of cyan so it never reads as teal next to
-   * the blue accent. */
-  --positive: var(--sea-green);
-  --positive-soft: oklch(0.95 0.02 168);
-  /* Amber — brass-lamp warmth, slightly desaturated to stay calm. */
-  --warning: oklch(0.63 0.13 68);
-  --warning-soft: oklch(0.955 0.03 80);
+  --chart-1: var(--sea-move);
+  --chart-2: var(--sea-green);
+  --chart-3: var(--sea-amber);
+  --chart-4: var(--sea-red);
+  --chart-5: var(--sea-ink-3);
 
-  --tint-selected: var(--atmosphere-hover);
-
-  --chart-1: var(--primary);
-  --chart-2: var(--positive);
-  --chart-3: var(--warning);
-  --chart-4: var(--risk);
-  --chart-5: var(--muted-foreground);
+  --nav: var(--sea-console);
+  --nav-foreground: var(--sea-console-ink);
+  --nav-muted-foreground: var(--sea-console-ink-2);
+  --nav-active: var(--sea-console-2);
+  --nav-active-foreground: var(--sea-console-ink);
+  --nav-accent: var(--sea-move-bright);
+  --nav-border: var(--sea-console-line);
 
   --sidebar: var(--nav);
   --sidebar-foreground: var(--nav-foreground);
@@ -230,65 +244,10 @@
   --sidebar-border: var(--nav-border);
   --sidebar-ring: var(--ring);
 
-  /* The console's dark register — same hue as Ocean, tuned dark: a
-   * genuinely dark ground so lighter text has real headroom, and a
-   * distinct pale accent for a vessel's live AIS reading. `--nav-active`
-   * and `--nav-active-foreground` do double duty as the sidebar's solid
-   * active-item pill — a real, saturated colour block that reads
-   * intentionally regardless of what surface sits behind it. */
-  --nav: var(--sea-console);
-  --nav-foreground: var(--sea-console-ink);
-  --nav-muted-foreground: var(--sea-console-ink-2);
-  --nav-active: oklch(0.32 0.05 248);
-  --nav-active-foreground: oklch(0.98 0.004 240);
-  --nav-accent: var(--sea-move-bright);
-  --nav-border: var(--sea-console-line);
+  /* Layout: the rail's height, used by every sticky element below it. */
+  --rail-h: 48px;
 
-  /*
-   * WhiteWind maritime palette. Built from a nautical chart and a ship's
-   * bridge rather than from a SaaS accent colour:
-   *
-   *   BASE      chart paper, navy chart ink, slate and fog for hierarchy,
-   *             chart-line rules, pale "shallows" blue for lanes and hover
-   *   CONSOLE   the navy bridge console that carries navigation, the clock
-   *             and the alert counts
-   *   MOVEMENT  chart blue: a vessel under way, track made good
-   *   CAUTION   navigation amber: something to review
-   *   ALARM     signal red: an immediate problem
-   *   HEALTHY   muted marine green: arrived, complete
-   *   CURSOR    signal orange: the shipment you are pointing at, the
-   *             present moment. Never a status.
-   *
-   * Alarm / caution follow the bridge alert vocabulary; the AIS target
-   * symbol follows chart-display convention (filled = active, hollow =
-   * idle, struck through = lost).
-   */
-  --sea-paper: oklch(0.973 0.006 92);
-  --sea-paper-2: oklch(0.955 0.008 92);
-  --sea-shallows: oklch(0.945 0.018 222);
-  --sea-shallows-2: oklch(0.91 0.03 222);
-  --sea-ink: oklch(0.245 0.035 252);
-  --sea-ink-2: oklch(0.42 0.03 248);
-  --sea-ink-3: oklch(0.535 0.022 242);
-  --sea-ink-4: oklch(0.74 0.014 238);
-  --sea-rule: oklch(0.82 0.016 236);
-  --sea-rule-2: oklch(0.895 0.011 232);
-  --sea-grid: oklch(0.951 0.01 225);
-  --sea-console: oklch(0.215 0.042 250);
-  --sea-console-2: oklch(0.265 0.045 250);
-  --sea-console-line: oklch(0.33 0.04 250);
-  --sea-console-ink: oklch(0.95 0.008 240);
-  --sea-console-ink-2: oklch(0.74 0.022 240);
-  --sea-move: oklch(0.5 0.105 240);
-  --sea-move-bright: oklch(0.75 0.1 228);
-  --sea-amber: oklch(0.76 0.145 74);
-  --sea-amber-ink: oklch(0.53 0.11 64);
-  --sea-red: oklch(0.54 0.175 28);
-  --sea-red-bright: oklch(0.7 0.16 28);
-  --sea-green: oklch(0.56 0.075 168);
-  --sea-cursor: oklch(0.67 0.16 48);
-
-  /* Motion — a single snappy-start/soft-landing curve for hover/press. */
+  /* Motion: one decelerating curve, short durations. */
   --ease-premium: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -308,170 +267,125 @@
     font-family: var(--font-sans);
     font-size: 14px;
     line-height: 1.45;
-    font-feature-settings: "cv05", "ss01";
+    font-variation-settings: "wdth" 100;
   }
 
   h1,
   h2,
   h3 {
-    letter-spacing: -0.012em;
+    letter-spacing: -0.01em;
   }
 
   table {
     font-variant-numeric: tabular-nums;
   }
+
+  ::selection {
+    background: var(--sea-shallows-2);
+  }
 }
 
-/* Quiet surface: a hairline border and a faint lift off the canvas, no
- * shadow. Reserved for genuinely distinct objects — a table, a form, a
- * live widget — not a default wrapper for every block of content. */
+/* --------------------------------------------------------- utilities --- */
+
+/* A quiet surface with a hairline. Reserved for genuinely distinct objects
+ * (a form, a table on a page that needs one), never a default wrapper. */
 @utility panel {
   background-color: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
 }
 
-/* The only surface that gets real shadow — reserved for things that
- * actually float above the page: menus, dropdowns, modals. */
+/* The only surface with shadow: things that float above the page. */
 @utility panel-lifted {
   background-color: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   box-shadow:
-    0 4px 12px -4px color-mix(in oklab, var(--foreground) 10%, transparent),
-    0 16px 32px -12px color-mix(in oklab, var(--foreground) 16%, transparent);
+    0 2px 6px -2px color-mix(in oklab, var(--sea-ink) 12%, transparent),
+    0 18px 40px -16px color-mix(in oklab, var(--sea-ink) 28%, transparent);
 }
 
-/* Instrument type — the mono half of the two-register type system, for
- * precise readings rather than prose: MMSI, SOG, COG, coordinates,
- * reference codes, AIS timestamps, KPI counts. */
+/* Machine readings: MMSI, knots, IDs, clock times, T-counts. Narrowed so
+ * dense columns stay calm. */
+@utility telemetry {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-variation-settings: "wdth" 82;
+  letter-spacing: -0.01em;
+}
+
+/* Older name for the same register. */
 @utility instrument {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
+  font-variation-settings: "wdth" 82;
+  letter-spacing: -0.01em;
+}
+
+/* Condensed caps: column heads, section titles, chart annotations. */
+@utility chart-label {
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  line-height: 14px;
+  font-weight: 600;
+  font-variation-settings: "wdth" 72;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+@utility label-xs {
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  line-height: 14px;
+  font-weight: 600;
+  font-variation-settings: "wdth" 72;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--color-muted-foreground);
+}
+
+/* Condensed figures for the handful of numbers that lead a screen. */
+@utility figure {
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums lining-nums;
+  font-variation-settings: "wdth" 68;
+  font-weight: 500;
   letter-spacing: -0.02em;
 }
 
-/* The console — dark, live, navigational, reserved for genuinely live
- * telemetry (AIS) so it reads as a different kind of information than
- * the light surfaces around it — the one deliberate dark exception. */
+/* Condensed display face for page titles. */
+@utility display {
+  font-family: var(--font-sans);
+  font-variation-settings: "wdth" 82;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+/* The dark register, kept for the live AIS console on the shipment page. */
 @utility console {
   background-color: var(--color-nav);
-  background-image:
-    repeating-linear-gradient(
-      0deg,
-      color-mix(in oklab, var(--nav-foreground) 5%, transparent) 0px,
-      color-mix(in oklab, var(--nav-foreground) 5%, transparent) 1px,
-      transparent 1px,
-      transparent 28px
-    ),
-    repeating-linear-gradient(
-      90deg,
-      color-mix(in oklab, var(--nav-foreground) 5%, transparent) 0px,
-      color-mix(in oklab, var(--nav-foreground) 5%, transparent) 1px,
-      transparent 1px,
-      transparent 28px
-    );
   border: 1px solid var(--nav-border);
   border-radius: var(--radius);
   color: var(--color-nav-foreground);
 }
 
-/* The atmosphere — the pale blue wash for the sidebar, top bar and every
- * page's header band: the one considered light-blue surface. */
-@utility atmosphere {
-  background-color: var(--color-atmosphere);
-  color: var(--color-foreground);
-}
-
-/* The faint coordinate grid laid over the atmosphere in the top bar and
- * page header — kept off the sidebar so its solid nav items stay clean. */
-@utility atmosphere-grid {
-  background-image:
-    repeating-linear-gradient(
-      0deg,
-      color-mix(in oklab, var(--foreground) 4%, transparent) 0px,
-      color-mix(in oklab, var(--foreground) 4%, transparent) 1px,
-      transparent 1px,
-      transparent 28px
-    ),
-    repeating-linear-gradient(
-      90deg,
-      color-mix(in oklab, var(--foreground) 4%, transparent) 0px,
-      color-mix(in oklab, var(--foreground) 4%, transparent) 1px,
-      transparent 1px,
-      transparent 28px
-    );
-}
-
-/* Telemetry type — IBM Plex Mono, for machine readings on the operations
- * sheet (IDs, MMSI, knots, coordinates, time offsets). Narrower and quieter
- * than the product-wide `instrument` face, so dense columns stay calm. */
-@utility telemetry {
-  font-family: var(--font-telemetry);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0;
-}
-
-/* Condensed technical label, as printed on charts and console panels. */
-@utility chart-label {
-  font-family: var(--font-chart);
-  font-size: 10.5px;
-  font-weight: 500;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-}
-
-/* Chart paper with a sparse graticule, like the lat/long grid of a
- * nautical chart. Static background only; nothing animates. */
-@utility chart-paper {
-  background-color: var(--sea-paper);
-  background-image:
-    linear-gradient(to right, var(--sea-grid) 1px, transparent 1px),
-    linear-gradient(to bottom, var(--sea-grid) 1px, transparent 1px);
-  background-size: 200px 200px;
-  background-position: -1px -1px;
-}
-
-@utility label-xs {
-  font-family: var(--font-chart);
-  font-size: 10.5px;
-  font-weight: 500;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: var(--color-muted-foreground);
-}
-
 @utility focus-ring {
   &:focus-visible {
-    outline: none;
-    border-color: var(--color-ring);
-    box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-ring) 14%, transparent);
+    outline: 2px solid var(--color-ring);
+    outline-offset: 1px;
   }
 }
 
 @utility animate-in {
-  animation: lv-fade-in 160ms ease-out both;
+  animation: ww-fade-in 180ms var(--ease-premium) both;
 }
 
-/* Slow, restrained "live" pulse — for genuinely live data (fresh AIS),
- * never decorative. Opacity only, no motion, no color shift. */
+/* Slow opacity pulse, only for data that is genuinely live. */
 @utility live-pulse {
-  animation: lv-live-pulse 2.4s ease-in-out infinite;
+  animation: ww-live-pulse 2.4s ease-in-out infinite;
 }
 
-/* The signal ping — a radiating ring behind a solid dot, the interface's
- * one borrowed instrument-panel idiom (a live radar/sonar contact) for a
- * position that is genuinely live right now, not merely present. The dot
- * itself supplies the ring's colour via currentColor, so any text-color
- * utility recolors both at once. Reserved for actual live AIS reads —
- * never applied to a static or stale position.
- *
- * Deliberately does not set its own `position` — it shares the utilities
- * layer with Tailwind's positioning classes, and setting `position` here
- * risks winning or losing that cascade unpredictably depending on class
- * order. Callers already position the dot themselves (`relative` for an
- * inline dot, or nothing extra when the element is already `absolute`),
- * which this can safely build on instead. */
+/* A radiating ring behind a live contact. Callers position the dot. */
 @utility ping-live {
   &::after {
     content: "";
@@ -479,27 +393,16 @@
     inset: 0;
     border-radius: 9999px;
     background-color: currentColor;
-    animation: lv-ping 2.2s cubic-bezier(0, 0, 0.2, 1) infinite;
+    animation: ww-ping 2.2s cubic-bezier(0, 0, 0.2, 1) infinite;
   }
 }
 
-/* A hairline that fades at both ends rather than terminating hard —
- * used between adjacent readings in an instrument strip, so the
- * separation feels engineered rather than a plain ruled line. */
 @utility divider-fade {
   width: 1px;
   align-self: stretch;
-  background: linear-gradient(
-    to bottom,
-    transparent,
-    var(--color-border) 20%,
-    var(--color-border) 80%,
-    transparent
-  );
+  background: var(--color-border);
 }
 
-/* A quiet instrument chip — small readings that don't warrant a full
- * panel (a live vessel in a fleet rail, an inline telemetry glimpse). */
 @utility chip {
   display: inline-flex;
   align-items: center;
@@ -508,14 +411,20 @@
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
   background-color: var(--color-surface);
-  padding: 0.4rem 0.65rem;
+  padding: 0.35rem 0.6rem;
   font-size: 12px;
 }
 
-@keyframes lv-fade-in {
+/* A fresh reading arrives: a brief tint that fades, so a changed value is
+ * noticed without anything moving. */
+@utility fresh {
+  animation: ww-fresh 1.6s ease-out both;
+}
+
+@keyframes ww-fade-in {
   from {
     opacity: 0;
-    transform: translateY(2px);
+    transform: translateY(3px);
   }
   to {
     opacity: 1;
@@ -523,7 +432,7 @@
   }
 }
 
-@keyframes lv-live-pulse {
+@keyframes ww-live-pulse {
   0%,
   100% {
     opacity: 1;
@@ -533,7 +442,7 @@
   }
 }
 
-@keyframes lv-ping {
+@keyframes ww-ping {
   0% {
     transform: scale(1);
     opacity: 0.55;
@@ -545,8 +454,15 @@
   }
 }
 
-/* Live indicators and transitions collapse to static for anyone who has
- * asked the OS for reduced motion; the information (colour, label) stays. */
+@keyframes ww-fresh {
+  from {
+    background-color: var(--sea-move-soft);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -554,63 +470,6 @@
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
-}
-
-/*
- * Bridge chrome. When the shell runs with chrome="bridge" (the dashboard),
- * the sidebar and top bar re-point the shared tokens to the navy console
- * values, so the existing components restyle without forking them.
- * Floating panels opened from the chrome (menus, command palette) reset to
- * the normal light surface.
- */
-[data-chrome="bridge"] [data-chrome-surface] {
-  /* Theme aliases resolve at :root, so re-point them here as well. */
-  --color-atmosphere: var(--sea-console);
-  --color-atmosphere-hover: var(--sea-console-2);
-  --color-foreground: var(--sea-console-ink);
-  --color-muted-foreground: var(--sea-console-ink-2);
-  --color-border: var(--sea-console-line);
-  --color-surface: var(--sea-console-2);
-  --color-ring: var(--sea-move-bright);
-  --atmosphere: var(--sea-console);
-  --atmosphere-hover: var(--sea-console-2);
-  --foreground: var(--sea-console-ink);
-  --muted-foreground: var(--sea-console-ink-2);
-  --border: var(--sea-console-line);
-  --input: var(--sea-console-line);
-  --surface: var(--sea-console-2);
-  --subtle: var(--sea-console-2);
-  --primary: var(--sea-move-bright);
-  --primary-deep: var(--sea-move);
-  --primary-foreground: var(--sea-console);
-  --risk: var(--sea-red-bright);
-  --nav-active: oklch(0.32 0.05 248);
-  --nav-active-foreground: oklch(0.98 0.004 240);
-  --ring: var(--sea-move-bright);
-}
-
-[data-chrome="bridge"] [data-chrome-surface].atmosphere-grid {
-  background-image: none;
-}
-
-[data-chrome="bridge"] [data-chrome-surface] :is(.panel-lifted, [data-chrome-reset]) {
-  /* Text colour is inherited as a computed value from the console, so
-   * resetting the variables alone is not enough: set the ink directly. */
-  color: var(--sea-ink);
-  --color-foreground: var(--sea-ink);
-  --color-muted-foreground: var(--sea-ink-3);
-  --color-border: var(--sea-rule);
-  --color-surface: oklch(0.985 0.005 92);
-  --color-ring: var(--sea-move);
-  --foreground: var(--sea-ink);
-  --muted-foreground: var(--sea-ink-3);
-  --border: var(--sea-rule);
-  --input: var(--sea-rule);
-  --surface: oklch(0.985 0.005 92);
-  --subtle: var(--sea-paper-2);
-  --primary: var(--sea-move);
-  --primary-foreground: oklch(0.985 0.004 92);
-  --risk: var(--sea-red);
-  --ring: var(--sea-move);
 }

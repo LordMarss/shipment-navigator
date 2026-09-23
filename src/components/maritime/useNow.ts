@@ -29,3 +29,20 @@ export function useElementWidth<T extends HTMLElement>() {
   }, []);
   return [ref, width] as const;
 }
+
+/**
+ * Whether the viewport is at least `px` wide. False on the server and until
+ * mounted. For layouts that must add or remove structure (table columns)
+ * rather than restyle it, where a CSS-hidden element would still take space.
+ */
+export function useMinWidth(px: number) {
+  const [match, setMatch] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia(`(min-width: ${px}px)`);
+    const update = () => setMatch(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, [px]);
+  return match;
+}

@@ -59,7 +59,6 @@ function DocumentsPage() {
 
   return (
     <AppShell
-      eyebrow="Documents"
       title="Manifest control"
       description="Standard document completion per shipment, plus any additional files attached."
       wide
@@ -132,7 +131,7 @@ function DocumentsPage() {
                     <Link
                       to="/shipments/$id"
                       params={{ id: s.id }}
-                      className="focus-ring block truncate rounded-[1px] text-[14px] font-medium text-sea-ink hover:text-sea-move"
+                      className="focus-ring block truncate rounded-[1px] text-[14px] font-medium text-sea-ink underline-offset-2 hover:underline"
                     >
                       {s.client_name}
                     </Link>

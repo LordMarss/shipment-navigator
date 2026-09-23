@@ -55,7 +55,7 @@ export function VoyagePlot({
   const label = `${s.origin} to ${s.destination}. ${basis}.`;
 
   return (
-    <section aria-label="Voyage plot" className="border-b-2 border-sea-ink pb-5">
+    <section aria-label="Voyage plot" className="border-b border-sea-ink pb-5">
       <div className="grid grid-cols-2 gap-6">
         <div className="min-w-0">
           <p className="chart-label text-sea-ink-3">Origin</p>
@@ -109,7 +109,7 @@ export function VoyagePlot({
         ))}
         {pos != null && pos > 0 ? (
           <span
-            className={`absolute left-0 top-1/2 h-[2px] -translate-y-1/2 ${voyage.arrived ? "bg-sea-ink-3" : "bg-sea-move"}`}
+            className={`absolute left-0 top-1/2 h-[2px] -translate-y-1/2 ${voyage.arrived ? "bg-sea-ink-3" : moving ? "bg-sea-move" : "bg-sea-ink-2"}`}
             style={{ width: `${pos * 100}%` }}
           />
         ) : null}

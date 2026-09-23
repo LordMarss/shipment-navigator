@@ -5,9 +5,8 @@ import { useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { NewShipmentForm } from "@/components/NewShipmentForm";
 import { Almanac } from "@/components/dashboard/Almanac";
-import { BridgeStrip, type BridgeFacts } from "@/components/dashboard/BridgeStrip";
-import { Conditions, type ConditionItem } from "@/components/dashboard/Conditions";
 import { DeckLog } from "@/components/dashboard/DeckLog";
+import { SituationBar, type SituationFacts } from "@/components/dashboard/SituationBar";
 import { useNow } from "@/components/maritime/useNow";
 import { VoyageBoard, type Lens } from "@/components/maritime/VoyageBoard";
 import { useMonitoringConfig } from "@/hooks/useMonitoringConfig";
@@ -46,10 +45,11 @@ const DAY = 86_400_000;
 const FINISHED = new Set(["Arrived", "At Port", "Cleared Customs", "Delivered"]);
 
 /**
- * The operations sheet. One open, ruled surface in three bands of
- * priority: what needs a decision, what happens next, and the whole fleet
- * in motion, followed by the watch log. Hovering a shipment anywhere
- * (watch list, schedule, manifest) marks the same shipment everywhere else.
+ * Operations. The watch summary leads (what needs intervention, what is
+ * moving, arriving and changed); the passage board is the working canvas,
+ * grouped so the voyages that need a decision come first; the next
+ * movements and the deck log run beside it. Pointing at a voyage in the
+ * movements list marks the same voyage on the board.
  */
 function Dashboard() {
   const [open, setOpen] = useState(false);
@@ -72,7 +72,7 @@ function Dashboard() {
   });
   const { data: events = [], isLoading: eventsLoading } = useQuery({
     queryKey: ["events", "recent"],
-    queryFn: () => listAllEvents(6),
+    queryFn: () => listAllEvents(10),
   });
 
   const mmsis = useMemo(
@@ -98,29 +98,31 @@ function Dashboard() {
 
   const shipmentById = useMemo(() => new Map(shipments.map((s) => [s.id, s])), [shipments]);
 
-  // Same verdict as `kpis` (and the sidebar), itemised: the bridge strip's
-  // alarm count always equals the at-risk/delayed entries here.
-  const watch = useMemo<ConditionItem[]>(() => {
-    const alertCounts = new Map<string, number>();
-    for (const a of alerts) {
-      if (a.shipment_id) alertCounts.set(a.shipment_id, (alertCounts.get(a.shipment_id) ?? 0) + 1);
-    }
-    return shipments
-      .filter((s) => s.status !== "Delivered")
-      .map((shipment) => ({
-        shipment,
-        health: shipmentHealth(shipment, docsFor(documents, shipment.id), config),
-        alertCount: alertCounts.get(shipment.id) ?? 0,
-      }))
-      .filter(
-        ({ health }) =>
-          health.level === "At Risk" || health.level === "Delayed" || health.level === "Attention",
-      );
-  }, [shipments, documents, alerts, config]);
+  // Shipments whose ETA was revised in the last day: the "Changed" reading
+  // and the board lens behind it.
+  const changedIds = useMemo(() => {
+    const t = now ?? 0;
+    return new Set(
+      alerts
+        .filter(
+          (a) =>
+            a.shipment_id &&
+            a.message.toLowerCase().includes("eta changed") &&
+            new Date(a.created_at).getTime() >= t - DAY,
+        )
+        .map((a) => a.shipment_id!),
+    );
+  }, [alerts, now]);
 
-  const facts = useMemo<BridgeFacts>(() => {
+  const facts = useMemo<SituationFacts>(() => {
+    // Same verdict as `kpis` (and the rail's alarm count).
     const { atRisk, delayed } = kpis(shipments, documents, config);
     const alarm = atRisk + delayed;
+    const flagged = shipments.filter((s) => {
+      if (s.status === "Delivered") return false;
+      const level = shipmentHealth(s, docsFor(documents, s.id), config).level;
+      return level === "At Risk" || level === "Delayed" || level === "Attention";
+    }).length;
     // "Under way" is read from real AIS telemetry, not the status field.
     const underway = positions
       ? shipments.filter(
@@ -131,26 +133,20 @@ function Dashboard() {
       : 0;
     const open = shipments.filter((s) => !FINISHED.has(s.status));
     const t = now ?? 0;
+    const latest = [
+      ...events.map((e) => ({ at: e.occurred_at, shipmentId: e.shipment_id as string | null })),
+      ...alerts.map((a) => ({ at: a.created_at, shipmentId: a.shipment_id })),
+    ].sort((a, b) => b.at.localeCompare(a.at))[0];
     const upcoming = open
       .filter((s) => s.eta && !s.actual_arrival && new Date(s.eta).getTime() > t)
       .sort((a, b) => new Date(a.eta!).getTime() - new Date(b.eta!).getTime());
-    const etaRevised = new Set(
-      alerts
-        .filter(
-          (a) =>
-            a.shipment_id &&
-            a.message.toLowerCase().includes("eta changed") &&
-            new Date(a.created_at).getTime() >= t - DAY,
-        )
-        .map((a) => a.shipment_id),
-    );
     return {
       alarm,
-      caution: watch.length - alarm,
+      caution: flagged - alarm,
       underway,
       inPassage: open.filter((s) => Boolean(s.actual_departure) && !s.actual_arrival).length,
       arriving72h: upcoming.filter((s) => new Date(s.eta!).getTime() <= t + 3 * DAY).length,
-      etaRevised24h: etaRevised.size,
+      etaRevised24h: changedIds.size,
       docsOpen: open.filter((s) => {
         const d = docsFor(documents, s.id);
         return d.attached < d.total;
@@ -159,79 +155,80 @@ function Dashboard() {
         (s) => !s.actual_departure && s.planned_etd && new Date(s.planned_etd).getTime() < t,
       ).length,
       nextArrival: upcoming[0] ?? null,
+      latestChange: latest
+        ? {
+            at: new Date(latest.at).getTime(),
+            client: latest.shipmentId
+              ? (shipmentById.get(latest.shipmentId)?.client_name ?? null)
+              : null,
+          }
+        : null,
     };
-  }, [shipments, documents, alerts, positions, config, now, watch.length]);
+  }, [shipments, documents, positions, config, now, changedIds, events, alerts, shipmentById]);
 
-  const showConditionsOnBoard = () => {
-    setLens("attention");
-    document.getElementById("board")?.scrollIntoView({ block: "start" });
+  const chooseLens = (next: Lens) => {
+    setLens(next);
+    if (next !== "all")
+      document.getElementById("board")?.scrollIntoView({ block: "start", behavior: "smooth" });
   };
 
   return (
-    <AppShell title="Operations" bare chrome="bridge">
-      <BridgeStrip
+    <AppShell title="Operations" bare>
+      <SituationBar
         facts={facts}
         now={now}
         lastSync={lastSync}
         isLoading={isLoading}
+        lens={lens}
+        onLens={chooseLens}
         formOpen={open}
         onToggleForm={() => setOpen((v) => !v)}
       />
 
-      {/* The chart table: paper with a sparse graticule. */}
-      <div className="chart-paper min-h-[calc(100dvh-3.5rem)] text-sea-ink">
-        <div className="mx-auto w-full max-w-[1560px] px-5 pb-12 pt-7 sm:px-8 lg:px-10">
-          {open ? (
-            <div id="new-shipment" className="mb-9">
-              <NewShipmentForm onClose={() => setOpen(false)} />
-            </div>
-          ) : null}
-
-          {/* Conditions lead on narrow screens; on wide screens the board is
-           * the canvas and the watch column runs beside it. */}
-          <div className="grid gap-x-10 gap-y-10 xl:grid-cols-[minmax(0,1fr)_minmax(320px,368px)]">
-            <div className="xl:col-start-2 xl:row-start-1">
-              <Conditions
-                items={watch}
-                isLoading={isLoading}
-                focusId={focusId}
-                onFocus={setFocusId}
-                onShowAll={showConditionsOnBoard}
-              />
-            </div>
-
-            <div className="min-w-0 xl:col-start-1 xl:row-span-2 xl:row-start-1">
-              <VoyageBoard
-                shipments={shipments}
-                documents={documents}
-                alerts={alerts}
-                positions={positions}
-                isLoading={isLoading}
-                now={now}
-                focusId={focusId}
-                onFocus={setFocusId}
-                lens={lens}
-                onLensChange={setLens}
-              />
-            </div>
-
-            <div className="grid content-start gap-x-10 gap-y-10 md:grid-cols-2 xl:col-start-2 xl:row-start-2 xl:grid-cols-1">
-              <Almanac
-                shipments={shipments}
-                now={now}
-                isLoading={isLoading}
-                focusId={focusId}
-                onFocus={setFocusId}
-              />
-              <DeckLog
-                events={events}
-                alerts={alerts}
-                shipmentById={shipmentById}
-                isLoading={alertsLoading || eventsLoading}
-                now={now}
-              />
-            </div>
+      <div className="mx-auto w-full max-w-[1600px] px-4 pb-12 pt-6 sm:px-6 lg:px-8">
+        {open ? (
+          <div id="new-shipment" className="animate-in mb-8">
+            <NewShipmentForm onClose={() => setOpen(false)} />
           </div>
+        ) : null}
+
+        <div className="grid gap-x-10 gap-y-10 xl:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_352px]">
+          <div className="min-w-0">
+            <VoyageBoard
+              shipments={shipments}
+              documents={documents}
+              alerts={alerts}
+              positions={positions}
+              isLoading={isLoading}
+              now={now}
+              focusId={focusId}
+              onFocus={setFocusId}
+              lens={lens}
+              onLensChange={setLens}
+              showLenses={false}
+              changedIds={changedIds}
+            />
+          </div>
+
+          <aside
+            aria-label="Schedule and log"
+            className="grid content-start gap-x-10 gap-y-10 md:grid-cols-2 xl:grid-cols-1"
+          >
+            <Almanac
+              shipments={shipments}
+              now={now}
+              isLoading={isLoading}
+              focusId={focusId}
+              onFocus={setFocusId}
+            />
+            <DeckLog
+              events={events}
+              alerts={alerts}
+              shipmentById={shipmentById}
+              isLoading={alertsLoading || eventsLoading}
+              now={now}
+            />
+          </aside>
         </div>
       </div>
     </AppShell>

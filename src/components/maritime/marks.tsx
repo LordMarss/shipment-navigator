@@ -14,8 +14,8 @@ import { tCount, type ConditionLevel, type TargetState } from "@/components/mari
  *   ManifestMeter   one cell per required document
  *   TCount          signed time to or since an event, T−8d / T+2d
  *
- * Signal orange is reserved for the cursor: the shipment you are pointing
- * at, and the present moment. It never means a status.
+ * Colour only ever means state: bearing blue under way, amber caution,
+ * red alarm, green arrived. Pointing at something is drawn in ink.
  */
 
 /* ------------------------------------------------------------ AIS target --- */
@@ -42,7 +42,7 @@ export function AisTarget({
           ? "var(--sea-amber-ink)"
           : "var(--sea-ink-2)";
   const fill =
-    state === "active" ? (cursor ? "var(--sea-cursor)" : "var(--sea-move)") : "var(--sea-paper)";
+    state === "active" ? (cursor ? "var(--sea-cursor)" : "var(--sea-move)") : "var(--sea-surface)";
   return (
     <svg
       aria-hidden
@@ -97,7 +97,7 @@ export function ManifestMeter({ attached, total }: { attached: number; total: nu
         {Array.from({ length: total }).map((_, i) => (
           <span
             key={i}
-            className={`h-[8px] w-[5px] ${
+            className={`h-[9px] w-[4px] ${
               i < attached
                 ? complete
                   ? "bg-sea-green"
@@ -107,7 +107,7 @@ export function ManifestMeter({ attached, total }: { attached: number; total: nu
           />
         ))}
       </span>
-      <span className={`telemetry text-[11px] ${complete ? "text-sea-ink-3" : "text-sea-ink"}`}>
+      <span className={`telemetry text-[10.5px] ${complete ? "text-sea-ink-3" : "text-sea-ink"}`}>
         {attached}/{total}
       </span>
     </span>
@@ -129,7 +129,7 @@ export function TCount({
   const { label, past } = tCount(iso, now);
   return (
     <span
-      className={`telemetry text-[11px] ${past ? "font-medium text-sea-red" : "text-sea-ink-3"} ${className}`}
+      className={`telemetry text-[10.5px] ${past ? "font-medium text-sea-red" : "text-sea-ink-3"} ${className}`}
       title={past ? "Time since this date" : "Time until this date"}
     >
       {label}
@@ -162,9 +162,9 @@ export function ChartPanel({
     <section
       id={id}
       aria-labelledby={`${id}-title`}
-      className={`min-w-0 scroll-mt-28 ${className}`}
+      className={`min-w-0 scroll-mt-[calc(var(--rail-h)+16px)] ${className}`}
     >
-      <header className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2 border-b-2 border-sea-ink pb-2">
+      <header className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2 border-b border-sea-ink pb-2">
         <div className="flex min-w-0 items-baseline gap-3">
           <h2 id={`${id}-title`} className="chart-label !text-[11.5px] text-sea-ink">
             {title}

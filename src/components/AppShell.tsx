@@ -2,15 +2,11 @@ import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
-  Activity,
-  Anchor,
-  Bell,
   BarChart3,
-  ChevronDown,
   FileText,
   LayoutDashboard,
   Map,
-  Menu,
+  MoreHorizontal,
   Package,
   Search,
   Settings,
@@ -19,265 +15,315 @@ import {
   X,
 } from "lucide-react";
 
-import { isLegacyStatus, listAllDocuments, listAlerts, listShipments, shortId, type Shipment } from "@/lib/api";
+import { isLegacyStatus, listAllDocuments, listShipments, shortId, type Shipment } from "@/lib/api";
 import { useMonitoringConfig } from "@/hooks/useMonitoringConfig";
-import { kpis, relativeTime } from "@/lib/insights";
+import { kpis } from "@/lib/insights";
+import { utcClock } from "@/components/maritime/format";
+import { useNow } from "@/components/maritime/useNow";
 
-type NavItem = { to: string; label: string; icon: typeof LayoutDashboard };
+type NavItem = {
+  to: string;
+  label: string;
+  short?: string;
+  icon: typeof LayoutDashboard;
+  /** Active for this path and anything beneath it. */
+  match: (pathname: string) => boolean;
+};
 
-const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
-  { label: "Overview", items: [{ to: "/", label: "Dashboard", icon: LayoutDashboard }] },
-  {
-    label: "Shipments",
-    items: [
-      { to: "/shipments", label: "All Shipments", icon: Package },
-      { to: "/shipments/active", label: "Active", icon: Activity },
-      { to: "/shipments/completed", label: "Completed", icon: Anchor },
-    ],
-  },
-  {
-    label: "Fleet",
-    items: [
-      { to: "/map", label: "Fleet Map", icon: Map },
-      { to: "/vessels", label: "Vessels", icon: Ship },
-    ],
-  },
-  { label: "Documents", items: [{ to: "/documents", label: "Documents", icon: FileText }] },
-  {
-    label: "Intelligence",
-    items: [
-      { to: "/alerts", label: "Alerts", icon: Siren },
-      { to: "/analytics", label: "Analytics", icon: BarChart3 },
-    ],
-  },
-  { label: "", items: [{ to: "/settings", label: "Settings", icon: Settings }] },
+const NAV: NavItem[] = [
+  { to: "/", label: "Operations", short: "Ops", icon: LayoutDashboard, match: (p) => p === "/" },
+  { to: "/shipments", label: "Shipments", icon: Package, match: (p) => p.startsWith("/shipments") },
+  { to: "/map", label: "Fleet map", short: "Map", icon: Map, match: (p) => p === "/map" },
+  { to: "/vessels", label: "Vessels", icon: Ship, match: (p) => p === "/vessels" },
+  { to: "/documents", label: "Documents", icon: FileText, match: (p) => p === "/documents" },
+  { to: "/alerts", label: "Alerts", icon: Siren, match: (p) => p === "/alerts" },
+  { to: "/analytics", label: "Analytics", icon: BarChart3, match: (p) => p === "/analytics" },
 ];
 
+/** Phones and tablets: four destinations on the bottom bar, the rest under More. */
+const TAB_PATHS = ["/", "/shipments", "/map", "/alerts"];
+
+/**
+ * The application frame. One dark rail across the top carries identity,
+ * navigation, search, the watch clock and the standing alarm count; below
+ * it everything is the light working surface. On phones and tablets the
+ * navigation moves to a bottom bar within thumb reach.
+ */
 export function AppShell({
   title,
   description,
-  eyebrow,
   actions,
   headerExtra,
+  tabs,
   children,
   wide = false,
   bare = false,
-  chrome = "bridge",
 }: {
-  /** Usually plain text; a page needing a richer header (e.g. an inline back
-   *  button) may pass a small ReactNode instead. */
+  /** Usually plain text; a page needing a richer header may pass a node. */
   title: ReactNode;
   description?: string;
-  eyebrow?: string;
   actions?: ReactNode;
-  /** Optional content rendered inside the pale atmosphere band, below the
-   * title row — the page's live operational summary (KPI strip, cockpit
-   * stats) rather than the working content itself, which always lives on
-   * the white chart surface below. */
+  /** The page's live summary, set in the header under the title row. */
   headerExtra?: ReactNode;
+  /** Secondary navigation for the section, set flush on the header rule. */
+  tabs?: ReactNode;
   children: ReactNode;
   wide?: boolean;
-  /** The page draws its own header and layout on an open canvas (the
-   * dashboard): no atmosphere band, no width cap, no main padding. */
+  /** The page draws its own header and layout (the operations dashboard). */
   bare?: boolean;
-  /** "bridge" (default) renders the sidebar, top bar and page header as
-   * the navy bridge console; "default" keeps the light chrome. */
-  chrome?: "default" | "bridge";
 }) {
-  const [mobileNav, setMobileNav] = useState(false);
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
   const maxW = wide ? "max-w-[1600px]" : "max-w-[1160px]";
 
-  useEffect(() => {
-    setMobileNav(false);
-  }, [pathname]);
-
   return (
-    <div className="min-h-screen bg-background" data-chrome={chrome}>
-      <Sidebar open={mobileNav} onClose={() => setMobileNav(false)} />
+    <div className="min-h-dvh bg-background pb-[calc(56px+env(safe-area-inset-bottom))] lg:pb-0">
+      <a
+        href="#main"
+        className="sr-only z-50 bg-sea-surface px-3 py-2 text-sm focus:not-sr-only focus:fixed focus:left-2 focus:top-2"
+      >
+        Skip to content
+      </a>
+      <Rail />
 
-      <div className="lg:pl-[248px]">
-        <TopBar onMenu={() => setMobileNav(true)} />
-
-        {bare ? (
-          <main className="w-full">
+      {bare ? (
+        <main id="main" className="w-full">
+          {children}
+        </main>
+      ) : (
+        <>
+          <header className="border-b border-sea-rule">
+            <div
+              className={`mx-auto w-full px-4 pt-5 sm:px-6 lg:px-8 ${maxW} ${tabs ? "" : "pb-5"}`}
+            >
+              <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+                <div className="min-w-0">
+                  <h1 className="display text-[26px] leading-[30px] text-sea-ink">{title}</h1>
+                  {description ? (
+                    <p className="mt-1 text-[13px] text-sea-ink-3">{description}</p>
+                  ) : null}
+                </div>
+                {actions ? (
+                  <div className="flex flex-wrap items-center gap-2">{actions}</div>
+                ) : null}
+              </div>
+              {headerExtra ? <div className="mt-5">{headerExtra}</div> : null}
+              {tabs ? <div className="mt-4">{tabs}</div> : null}
+            </div>
+          </header>
+          <main id="main" className={`mx-auto w-full px-4 py-6 sm:px-6 lg:px-8 ${maxW}`}>
             <div className="animate-in">{children}</div>
           </main>
-        ) : (
-          <>
-            {/* The bridge band: page identity and, where a page has one, its
-             * live summary, set on the navy console continuous with the
-             * navigation. Tokens inside re-point to console values, so
-             * headerExtra content restyles without per-page changes. */}
-            <div
-              className="atmosphere border-b border-border"
-              {...(chrome === "bridge" ? { "data-chrome-surface": "" } : {})}
-            >
-              <div className={`mx-auto w-full px-5 pb-6 pt-6 sm:px-8 lg:px-10 ${maxW}`}>
-                <div className="flex flex-wrap items-end justify-between gap-4">
-                  <div className="min-w-0">
-                    {eyebrow ? <p className="label-xs mb-2">{eyebrow}</p> : null}
-                    <h1 className="text-[26px] font-medium leading-tight tracking-[-0.015em] text-foreground">
-                      {title}
-                    </h1>
-                    {description ? <p className="mt-1.5 text-[13.5px] text-muted-foreground">{description}</p> : null}
-                  </div>
-                  {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
-                </div>
-                {headerExtra ? <div className="mt-6">{headerExtra}</div> : null}
-              </div>
-            </div>
+        </>
+      )}
 
-            {/* The chart table: the working surface for every page. */}
-            <div className={chrome === "bridge" ? "chart-paper min-h-[calc(100dvh-3.5rem)]" : ""}>
-              <main className={`mx-auto w-full px-5 py-7 sm:px-8 lg:px-10 ${maxW}`}>
-                <div className="animate-in">{children}</div>
-              </main>
-            </div>
-          </>
-        )}
-      </div>
+      <BottomBar />
     </div>
   );
 }
 
-function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
+/* ------------------------------------------------------------- the rail --- */
+
+function useFleetCounts() {
   const config = useMonitoringConfig();
   const { data: shipments = [] } = useQuery({ queryKey: ["shipments"], queryFn: listShipments });
-  const { data: documents = [] } = useQuery({ queryKey: ["documents", "all"], queryFn: listAllDocuments });
-  const activeCount = shipments.filter((s) => !isLegacyStatus(s.status) && s.status !== "Arrived").length;
-  // Same definition as the dashboard's attention line (real risk state, via
-  // shipmentHealth) — never the raw alert-feed volume, so the two numbers
-  // never disagree about what "needs attention" means.
+  const { data: documents = [] } = useQuery({
+    queryKey: ["documents", "all"],
+    queryFn: listAllDocuments,
+  });
+  const active = shipments.filter(
+    (s) => !isLegacyStatus(s.status) && s.status !== "Arrived",
+  ).length;
+  // Same verdict as the dashboard's intervention count, so the two never disagree.
   const { atRisk, delayed } = kpis(shipments, documents, config);
-  const exceptions = atRisk + delayed;
-
-  const body = (
-    <div className="atmosphere flex h-full flex-col" data-chrome-surface>
-      <div className="flex h-16 shrink-0 items-center gap-2.5 border-b border-border px-5">
-        <span className="grid size-6 shrink-0 place-items-center rounded-md bg-primary-deep text-primary-foreground">
-          <Ship className="size-3.5" />
-        </span>
-        <span className="text-sm font-semibold tracking-[0.01em] text-foreground">WhiteWind</span>
-        <button
-          className="focus-ring ml-auto rounded-md p-1 text-muted-foreground lg:hidden"
-          onClick={onClose}
-          aria-label="Close navigation"
-        >
-          <X className="size-4" />
-        </button>
-      </div>
-
-      {/* Fleet pulse — the sidebar itself reports what's moving and what
-       * needs attention, so "visibility" starts before you click anything. */}
-      <div className="flex shrink-0 flex-col gap-1 border-b border-border px-5 py-3">
-        <Link
-          to="/shipments/active"
-          className="flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-primary" />
-          {activeCount} shipment{activeCount === 1 ? "" : "s"} active
-        </Link>
-        {exceptions > 0 ? (
-          <Link
-            to="/alerts"
-            className="flex items-center gap-1.5 text-xs text-risk transition-opacity hover:opacity-80"
-          >
-            <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-risk" />
-            {exceptions} need{exceptions === 1 ? "s" : ""} attention
-          </Link>
-        ) : null}
-      </div>
-
-      <nav className="flex-1 overflow-y-auto px-3 py-5">
-        {NAV_GROUPS.map((group, gi) => (
-          <div key={group.label || `g${gi}`} className={gi === 0 ? "" : "mt-6"}>
-            {group.label ? <p className="label-xs px-2.5 pb-2">{group.label}</p> : null}
-            <ul className="space-y-0.5">
-              {group.items.map((item) => {
-                const active = item.to === "/" ? pathname === "/" : pathname === item.to;
-                return (
-                  <li key={item.to} className="relative">
-                    {/* Current-position marker — a small filled dot rather
-                     * than a generic bar, echoing "you are here" on a
-                     * chart rather than a plain highlight. */}
-                    <span
-                      aria-hidden
-                      className={`absolute left-0 top-1/2 size-1 -translate-y-1/2 rounded-full transition-opacity duration-150 ${
-                        active ? "bg-primary opacity-100" : "opacity-0"
-                      }`}
-                    />
-                    <Link
-                      to={item.to}
-                      className={`flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors duration-150 ${
-                        active
-                          ? "bg-nav-active font-medium text-nav-active-foreground"
-                          : "text-muted-foreground hover:bg-atmosphere-hover hover:text-foreground"
-                      }`}
-                    >
-                      <item.icon className="size-4 shrink-0" />
-                      <span className="truncate">{item.label}</span>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ))}
-      </nav>
-
-      <div className="shrink-0 border-t border-border px-4 py-3.5">
-        <p className="text-xs font-medium text-foreground/90">Logistics Intelligence</p>
-        <p className="mt-0.5 text-xs text-muted-foreground">v1.0 · Operations workspace</p>
-      </div>
-    </div>
-  );
-
-  return (
-    <>
-          {/* Hard left edge by design — the one place in the interface that
-           * meets the screen edge, per the shell's exception to the radius
-           * system. */}
-          <aside className="fixed inset-y-0 left-0 z-30 hidden w-[248px] lg:block">{body}</aside>
-          {open ? (
-            <div className="fixed inset-0 z-40 lg:hidden">
-              <button
-                className="absolute inset-0 bg-foreground/30"
-                aria-label="Close navigation"
-                onClick={onClose}
-              />
-              <aside className="absolute inset-y-0 left-0 w-[248px] shadow-[0_0_32px_rgba(0,0,0,0.25)]">
-                {body}
-              </aside>
-            </div>
-          ) : null}
-    </>
-  );
+  return { active, alarms: atRisk + delayed, loaded: shipments.length > 0 };
 }
 
-function TopBar({ onMenu }: { onMenu: () => void }) {
+function Rail() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { active, alarms, loaded } = useFleetCounts();
+  const now = useNow(30_000);
+
   return (
-    <header className="atmosphere atmosphere-grid sticky top-0 z-20 border-b border-border" data-chrome-surface>
-      <div className="flex h-14 items-center gap-3 px-5 sm:px-6 lg:px-8">
-        <button
-          className="focus-ring rounded-md p-2 text-muted-foreground transition-colors hover:bg-surface lg:hidden"
-          onClick={onMenu}
-          aria-label="Open navigation"
+    <header className="sticky top-0 z-30 h-[var(--rail-h)] bg-sea-console text-sea-console-ink">
+      <div className="flex h-full items-stretch gap-4 px-4 sm:px-6 lg:gap-6 lg:px-8">
+        <Link
+          to="/"
+          className="focus-ring flex shrink-0 items-center gap-2.5"
+          aria-label="WhiteWind, operations"
         >
-          <Menu className="size-4" />
-        </button>
+          <Wordmark />
+        </Link>
 
-        <GlobalSearch />
+        <nav aria-label="Primary" className="hidden min-w-0 items-stretch lg:flex">
+          {NAV.map((item) => {
+            const on = item.match(pathname);
+            const count =
+              loaded && item.to === "/shipments"
+                ? { n: active, tone: "text-sea-console-ink-2" }
+                : loaded && item.to === "/alerts" && alarms > 0
+                  ? { n: alarms, tone: "text-sea-red-bright" }
+                  : null;
+            return (
+              <Link
+                key={item.to}
+                to={item.to}
+                aria-current={on ? "page" : undefined}
+                className={`focus-ring relative flex items-center gap-1.5 whitespace-nowrap px-3 text-[13px] transition-colors duration-150 ${
+                  on ? "text-sea-console-ink" : "text-sea-console-ink-2 hover:text-sea-console-ink"
+                }`}
+              >
+                {item.label}
+                {count ? (
+                  <span className={`telemetry text-[10.5px] ${count.tone}`}>
+                    {count.n}
+                    {item.to === "/alerts" ? <span className="sr-only"> in alarm</span> : null}
+                  </span>
+                ) : null}
+                <span
+                  aria-hidden
+                  className={`absolute inset-x-3 bottom-0 h-[2px] transition-opacity duration-150 ${
+                    on ? "bg-sea-console-ink opacity-100" : "opacity-0"
+                  }`}
+                />
+              </Link>
+            );
+          })}
+        </nav>
 
-        <div className="ml-auto flex items-center gap-1.5">
-          <NotificationsMenu />
+        <div className="ml-auto flex items-center gap-2 sm:gap-3">
+          <GlobalSearch />
+          {now != null ? (
+            <span
+              className="telemetry hidden whitespace-nowrap text-[12px] text-sea-console-ink-2 xl:block"
+              title="Coordinated Universal Time"
+            >
+              {utcClock(now)}
+              <span className="ml-1 text-[10px]">UTC</span>
+            </span>
+          ) : null}
+          {loaded && alarms > 0 ? (
+            <Link
+              to="/alerts"
+              className="focus-ring flex items-center gap-1.5 text-[12px] text-sea-red-bright lg:hidden"
+              aria-label={`${alarms} shipments in alarm`}
+            >
+              <span aria-hidden className="inline-block size-[7px] rotate-45 bg-sea-red-bright" />
+              <span className="telemetry">{alarms}</span>
+            </Link>
+          ) : null}
           <WorkspaceMenu />
         </div>
       </div>
     </header>
   );
 }
+
+/** Extended caps set against the condensed labels everywhere else: the
+ * one place the type system goes wide. */
+function Wordmark() {
+  return (
+    <span
+      className="text-[12.5px] font-bold uppercase tracking-[0.16em] text-sea-console-ink"
+      style={{ fontVariationSettings: '"wdth" 125' }}
+    >
+      White<span className="text-sea-console-ink-2">wind</span>
+    </span>
+  );
+}
+
+/* ------------------------------------------------------- the bottom bar --- */
+
+function BottomBar() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const [more, setMore] = useState(false);
+  const tabs = NAV.filter((n) => TAB_PATHS.includes(n.to));
+  const rest = NAV.filter((n) => !TAB_PATHS.includes(n.to));
+  const moreActive = rest.some((n) => n.match(pathname)) || pathname === "/settings";
+
+  useEffect(() => setMore(false), [pathname]);
+
+  return (
+    <>
+      {more ? (
+        <div className="fixed inset-0 z-40 lg:hidden">
+          <button
+            className="absolute inset-0 bg-sea-ink/30"
+            aria-label="Close menu"
+            onClick={() => setMore(false)}
+          />
+          <div className="animate-in absolute inset-x-0 bottom-[calc(56px+env(safe-area-inset-bottom))] border-t border-sea-rule bg-sea-surface">
+            <ul>
+              {[
+                ...rest,
+                { to: "/settings", label: "Settings", icon: Settings, match: () => false },
+              ].map((item) => (
+                <li key={item.to} className="border-b border-sea-rule-2 last:border-b-0">
+                  <Link
+                    to={item.to}
+                    className="focus-ring flex h-12 items-center gap-3 px-5 text-[15px] text-sea-ink"
+                  >
+                    <item.icon className="size-4 text-sea-ink-3" aria-hidden />
+                    {item.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      ) : null}
+      <nav
+        aria-label="Primary"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-sea-console-line bg-sea-console pb-[env(safe-area-inset-bottom)] lg:hidden"
+      >
+        <ul className="grid h-14 grid-cols-5">
+          {tabs.map((item) => {
+            const on = item.match(pathname);
+            return (
+              <li key={item.to}>
+                <Link
+                  to={item.to}
+                  aria-current={on ? "page" : undefined}
+                  className={`focus-ring relative flex h-full flex-col items-center justify-center gap-1 text-[11px] ${
+                    on ? "text-sea-console-ink" : "text-sea-console-ink-2"
+                  }`}
+                >
+                  <span
+                    aria-hidden
+                    className={`absolute inset-x-5 top-0 h-[2px] ${on ? "bg-sea-console-ink" : ""}`}
+                  />
+                  <item.icon className="size-[18px]" aria-hidden />
+                  {item.short ?? item.label}
+                </Link>
+              </li>
+            );
+          })}
+          <li>
+            <button
+              type="button"
+              onClick={() => setMore((v) => !v)}
+              aria-expanded={more}
+              className={`focus-ring relative flex h-full w-full flex-col items-center justify-center gap-1 text-[11px] ${
+                moreActive || more ? "text-sea-console-ink" : "text-sea-console-ink-2"
+              }`}
+            >
+              <span
+                aria-hidden
+                className={`absolute inset-x-5 top-0 h-[2px] ${moreActive ? "bg-sea-console-ink" : ""}`}
+              />
+              {more ? (
+                <X className="size-[18px]" aria-hidden />
+              ) : (
+                <MoreHorizontal className="size-[18px]" aria-hidden />
+              )}
+              More
+            </button>
+          </li>
+        </ul>
+      </nav>
+    </>
+  );
+}
+
+/* --------------------------------------------------------------- search --- */
 
 export function useDismiss<T extends HTMLElement = HTMLDivElement>(onClose: () => void) {
   const ref = useRef<T | null>(null);
@@ -291,9 +337,6 @@ export function useDismiss<T extends HTMLElement = HTMLDivElement>(onClose: () =
   return ref;
 }
 
-/** Slim trigger in the top bar; the actual search lives in a centered
- * command palette (⌘K), which feels like a real application affordance
- * rather than a generic top-bar input everyone has seen before. */
 function GlobalSearch() {
   const [open, setOpen] = useState(false);
 
@@ -310,18 +353,17 @@ function GlobalSearch() {
 
   return (
     <>
-          <button
-            type="button"
-            onClick={() => setOpen(true)}
-            className="focus-ring flex h-8 w-full min-w-0 max-w-[380px] items-center gap-2 rounded-md border border-border bg-surface px-2.5 text-sm text-muted-foreground transition-colors hover:border-primary/35"
-          >
-            <Search className="size-3.5 shrink-0" />
-            <span className="flex-1 truncate text-left">Search shipments, vessels, clients…</span>
-            <kbd className="instrument hidden shrink-0 items-center rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground sm:flex">
-              ⌘K
-            </kbd>
-          </button>
-          {open ? <CommandPalette onClose={() => setOpen(false)} /> : null}
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label="Search shipments"
+        className="focus-ring flex h-8 items-center gap-2 rounded-[2px] text-[12.5px] text-sea-console-ink-2 transition-colors hover:text-sea-console-ink sm:w-44 sm:border sm:border-sea-console-line sm:bg-sea-console-2/60 sm:px-2.5 xl:w-56"
+      >
+        <Search className="size-4 shrink-0 sm:size-3.5" aria-hidden />
+        <span className="hidden flex-1 truncate text-left sm:block">Search</span>
+        <kbd className="telemetry hidden text-[10px] sm:block">⌘K</kbd>
+      </button>
+      {open ? <CommandPalette onClose={() => setOpen(false)} /> : null}
     </>
   );
 }
@@ -341,7 +383,14 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
   const results = (
     term
       ? shipments.filter((s) =>
-          [s.client_name, s.origin, s.destination, s.vessel_name ?? "", s.vessel_mmsi ?? "", shortId(s.id)]
+          [
+            s.client_name,
+            s.origin,
+            s.destination,
+            s.vessel_name ?? "",
+            s.vessel_mmsi ?? "",
+            shortId(s.id),
+          ]
             .join(" ")
             .toLowerCase()
             .includes(term),
@@ -379,32 +428,32 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-foreground/20 px-4 pt-[14vh] backdrop-blur-[2px]"
-      data-chrome-reset
+      className="fixed inset-0 z-50 flex items-start justify-center bg-sea-ink/25 px-4 pt-[12vh] text-sea-ink"
       onClick={onClose}
     >
       <div
-        className="panel-lifted animate-in w-full max-w-lg overflow-hidden"
+        role="dialog"
+        aria-label="Search shipments"
+        className="panel-lifted animate-in w-full max-w-xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center gap-2.5 border-b border-border px-4 py-3">
-          <Search className="size-4 shrink-0 text-muted-foreground" />
+        <div className="flex items-center gap-2.5 border-b border-sea-rule px-4 py-3">
+          <Search className="size-4 shrink-0 text-sea-ink-3" aria-hidden />
           <input
             ref={inputRef}
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search shipments, clients, vessels, MMSI…"
-            className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+            placeholder="Client, port, vessel, MMSI or SHP number"
+            aria-label="Search"
+            className="w-full bg-transparent text-[15px] text-sea-ink outline-none placeholder:text-sea-ink-3"
           />
-          <kbd className="hidden shrink-0 rounded border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground sm:block">
-            ESC
-          </kbd>
+          <kbd className="telemetry hidden shrink-0 text-[10px] text-sea-ink-3 sm:block">ESC</kbd>
         </div>
-        <div className="max-h-[360px] overflow-y-auto p-1.5">
+        <div className="max-h-[380px] overflow-y-auto py-1">
           {shipments.length === 0 ? (
-            <p className="px-3 py-6 text-center text-sm text-muted-foreground">No shipments yet.</p>
+            <p className="px-4 py-6 text-center text-sm text-sea-ink-3">No shipments yet.</p>
           ) : results.length === 0 ? (
-            <p className="px-3 py-6 text-center text-sm text-muted-foreground">
+            <p className="px-4 py-6 text-center text-sm text-sea-ink-3">
               No shipments match “{q.trim()}”.
             </p>
           ) : (
@@ -413,64 +462,20 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
                 key={s.id}
                 onClick={() => go(s)}
                 onMouseEnter={() => setIndex(i)}
-                className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm transition-colors ${
-                  i === index ? "bg-subtle" : ""
+                className={`grid w-full grid-cols-[88px_minmax(0,1fr)_auto] items-baseline gap-3 px-4 py-2 text-left text-sm ${
+                  i === index ? "bg-sea-shallows" : ""
                 }`}
               >
-                <span className="font-mono text-xs text-muted-foreground">{shortId(s.id)}</span>
+                <span className="telemetry text-[11px] text-sea-ink-3">{shortId(s.id)}</span>
                 <span className="truncate font-medium">{s.client_name}</span>
-                <span className="ml-auto truncate text-xs text-muted-foreground">
-                  {s.vessel_name || `${s.origin} → ${s.destination}`}
+                <span className="truncate text-[12px] text-sea-ink-3">
+                  {s.origin} → {s.destination}
                 </span>
               </button>
             ))
           )}
         </div>
       </div>
-    </div>
-  );
-}
-
-function NotificationsMenu() {
-  const [open, setOpen] = useState(false);
-  const ref = useDismiss(() => setOpen(false));
-  const { data: alerts = [] } = useQuery({ queryKey: ["alerts"], queryFn: listAlerts });
-  const recent = alerts.slice(0, 6);
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        className="focus-ring relative rounded-md p-2 text-muted-foreground transition-colors hover:bg-surface hover:text-foreground"
-        onClick={() => setOpen((v) => !v)}
-        aria-label="Notifications"
-      >
-        <Bell className="size-4" />
-        {alerts.length > 0 ? (
-          <span className="absolute right-1.5 top-1.5 size-1.5 rounded-full bg-risk" />
-        ) : null}
-      </button>
-      {open ? (
-        <div className="panel-lifted animate-in absolute right-0 top-10 z-30 w-[320px] overflow-hidden">
-          <div className="flex items-center justify-between border-b border-border px-3.5 py-2.5">
-            <span className="text-sm font-semibold">Notifications</span>
-            <Link to="/alerts" className="text-xs font-medium text-primary hover:underline">
-              View all
-            </Link>
-          </div>
-          {recent.length === 0 ? (
-            <p className="px-3.5 py-4 text-xs text-muted-foreground">No activity yet.</p>
-          ) : (
-            <ul className="divide-y divide-border">
-              {recent.map((a) => (
-                <li key={a.id} className="px-3.5 py-2.5">
-                  <p className="text-xs leading-snug text-foreground">{a.message}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">{relativeTime(a.created_at)}</p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -482,37 +487,25 @@ function WorkspaceMenu() {
   return (
     <div ref={ref} className="relative">
       <button
-        className="focus-ring flex items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-surface"
+        className="focus-ring grid size-8 place-items-center rounded-[2px] border border-sea-console-line text-[10.5px] font-semibold tracking-[0.04em] text-sea-console-ink transition-colors hover:bg-sea-console-2"
         onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-label="Workspace menu, StimTech Solutions"
       >
-        <span className="grid size-6 place-items-center rounded-md bg-primary text-[10px] font-semibold text-primary-foreground">
-          ST
-        </span>
-        <span className="hidden leading-tight sm:block">
-          <span className="block text-xs font-medium text-foreground">StimTech Solutions</span>
-          <span className="block text-xs text-muted-foreground">Operations</span>
-        </span>
-        <ChevronDown className="size-3.5 text-muted-foreground" />
+        ST
       </button>
       {open ? (
-        <div className="panel-lifted animate-in absolute right-0 top-10 z-30 w-[220px] overflow-hidden p-1">
-          <div className="px-2.5 py-2">
-            <p className="text-xs font-medium">StimTech Solutions</p>
-            <p className="text-xs text-muted-foreground">Single-user workspace</p>
+        <div className="panel-lifted animate-in absolute right-0 top-10 z-40 w-[232px] overflow-hidden text-sea-ink">
+          <div className="border-b border-sea-rule px-3.5 py-3">
+            <p className="text-[13px] font-medium">StimTech Solutions</p>
+            <p className="text-[12px] text-sea-ink-3">Operations workspace</p>
           </div>
           <Link
             to="/settings"
-            className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm transition-colors hover:bg-subtle"
+            className="flex items-center gap-2 px-3.5 py-2.5 text-[13px] transition-colors hover:bg-sea-paper-2"
             onClick={() => setOpen(false)}
           >
-            <Settings className="size-3.5 text-muted-foreground" /> Settings
-          </Link>
-          <Link
-            to="/analytics"
-            className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm transition-colors hover:bg-subtle"
-            onClick={() => setOpen(false)}
-          >
-            <BarChart3 className="size-3.5 text-muted-foreground" /> Analytics
+            <Settings className="size-3.5 text-sea-ink-3" aria-hidden /> Settings
           </Link>
         </div>
       ) : null}
@@ -520,76 +513,81 @@ function WorkspaceMenu() {
   );
 }
 
+/* -------------------------------------------------------------- shared --- */
+
 export function Skeleton({ className = "" }: { className?: string }) {
-  return <div className={`animate-pulse rounded-md bg-subtle ${className}`} />;
+  return <div className={`animate-pulse bg-sea-paper-2 ${className}`} />;
 }
 
 export function EmptyState({
   title,
   description,
   action,
-  icon: Icon,
 }: {
   title: string;
   description?: string;
   action?: ReactNode;
-  icon?: typeof LayoutDashboard;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center px-6 py-14 text-center">
-      {Icon ? (
-        <span className="mb-3 grid size-9 place-items-center rounded-full bg-subtle text-muted-foreground">
-          <Icon className="size-[17px]" />
-        </span>
+    <div className="px-1 py-12">
+      <p className="text-[14px] font-medium text-sea-ink">{title}</p>
+      {description ? (
+        <p className="mt-1 max-w-[52ch] text-[13px] text-sea-ink-2">{description}</p>
       ) : null}
-      <p className="text-sm font-medium text-foreground">{title}</p>
-      {description ? <p className="mt-1 max-w-sm text-xs text-muted-foreground">{description}</p> : null}
       {action ? <div className="mt-4">{action}</div> : null}
     </div>
   );
 }
 
 /**
- * A labelled reading, quiet by default — the single shared visual language
- * for "a KPI" used by the dashboard's header summary, Analytics and the
- * fleet map, so the same concept never has to be re-invented per page.
- * The value is always instrument mono: a count is a reading, not prose.
+ * Section tabs set on the header rule (the shipment book's All / Active /
+ * Completed). A route link per tab, so each view has its own URL.
  */
-export function Stat({
-  label,
-  value,
-  tone,
+export function HeaderTabs({
+  items,
 }: {
-  label: string;
-  value: ReactNode;
-  tone?: "risk";
+  items: { to: string; label: string; count?: number | undefined }[];
 }) {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
   return (
-    <div className="flex flex-col gap-1.5">
-      <span className="label-xs">{label}</span>
-      <span className="instrument inline-flex items-center gap-2 text-2xl font-semibold text-foreground">
-        {tone === "risk" ? <span aria-hidden className="size-[7px] rounded-full bg-risk" /> : null}
-        {value}
-      </span>
-    </div>
+    <nav aria-label="Section" className="-mb-px flex gap-6 overflow-x-auto">
+      {items.map((t) => {
+        const on = pathname === t.to || pathname === `${t.to}/`;
+        return (
+          <Link
+            key={t.to}
+            to={t.to}
+            aria-current={on ? "page" : undefined}
+            className={`focus-ring flex shrink-0 items-center gap-2 border-b-2 pb-2.5 text-[13px] transition-colors ${
+              on
+                ? "border-sea-ink font-medium text-sea-ink"
+                : "border-transparent text-sea-ink-3 hover:text-sea-ink"
+            }`}
+          >
+            {t.label}
+            {t.count != null ? (
+              <span className="telemetry text-[10.5px] text-sea-ink-3">{t.count}</span>
+            ) : null}
+          </Link>
+        );
+      })}
+    </nav>
   );
 }
 
 export const btnPrimary =
-  "focus-ring inline-flex h-9 items-center gap-1.5 rounded-md border border-primary bg-primary px-3.5 text-sm font-medium text-primary-foreground transition-colors duration-150 hover:bg-primary-hover active:scale-[0.98] disabled:opacity-45";
+  "focus-ring inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-[2px] border border-primary bg-primary px-3 text-[13px] font-medium text-primary-foreground transition-colors duration-150 hover:bg-primary-hover active:translate-y-px disabled:opacity-45";
 
 export const btnGhost =
-  "focus-ring inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-surface px-3.5 text-sm font-medium text-foreground transition-colors duration-150 hover:bg-subtle active:scale-[0.98] disabled:opacity-45";
+  "focus-ring inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-[2px] border border-sea-rule bg-sea-surface px-3 text-[13px] font-medium text-sea-ink transition-colors duration-150 hover:border-sea-ink-4 hover:bg-sea-paper-2 active:translate-y-px disabled:opacity-45";
 
 export const btnDanger =
-  "focus-ring inline-flex h-9 items-center gap-1.5 rounded-md border border-destructive/30 bg-surface px-3.5 text-sm font-medium text-destructive transition-colors duration-150 hover:bg-risk-soft active:scale-[0.98]";
+  "focus-ring inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-[2px] border border-sea-red/35 bg-sea-surface px-3 text-[13px] font-medium text-sea-red transition-colors duration-150 hover:bg-sea-red-soft active:translate-y-px";
 
 const fieldBase =
-  "focus-ring h-9 rounded-md border border-input bg-surface px-2.5 text-sm text-foreground transition-colors placeholder:text-muted-foreground";
+  "focus-ring h-8 rounded-[2px] border border-sea-rule bg-sea-surface px-2.5 text-[13px] text-sea-ink transition-colors placeholder:text-sea-ink-3 hover:border-sea-ink-4";
 
 export const fieldClass = `${fieldBase} w-full`;
 
-/** A field sized to its content (e.g. a filter select in a toolbar). A
- * separate class rather than `${fieldClass} w-auto`, because two width
- * utilities on one element resolve by stylesheet order, not class order. */
+/** A field sized to its content (e.g. a filter select in a toolbar). */
 export const fieldInlineClass = `${fieldBase} w-auto`;

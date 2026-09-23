@@ -974,7 +974,9 @@ function HeaderStat({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
       <span className="label-xs">{label}</span>
-      <span className="instrument truncate text-lg font-medium text-foreground">{value}</span>
+      <span className="truncate text-[17px] font-medium leading-[22px] tabular-nums text-foreground">
+        {value}
+      </span>
     </div>
   );
 }
@@ -993,8 +995,8 @@ function ConsoleField({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** Speed over ground as an instrument, not just a number — a bounded,
- * glowing gauge (0–28kn, the range that covers virtually every cargo
+/** Speed over ground as an instrument, not just a number: a bounded
+ * gauge (0–28kn, the range that covers virtually every cargo
  * vessel) makes "fast" or "slow" legible at a glance. */
 function ConsoleSpeed({ sog }: { sog: number | null }) {
   const pct = sog != null ? Math.max(0, Math.min(100, (sog / 28) * 100)) : 0;
@@ -1008,7 +1010,7 @@ function ConsoleSpeed({ sog }: { sog: number | null }) {
       </p>
       <div className="mt-2 h-[3px] w-full overflow-hidden rounded-full bg-nav-border">
         <div
-          className="h-full rounded-full bg-nav-accent shadow-[0_0_6px_0_var(--nav-accent)] transition-[width] duration-500"
+          className="h-full rounded-full bg-nav-accent transition-[width] duration-500"
           style={{ width: `${pct}%` }}
         />
       </div>

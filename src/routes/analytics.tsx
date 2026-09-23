@@ -64,7 +64,6 @@ function AnalyticsPage() {
 
   return (
     <AppShell
-      eyebrow="Intelligence"
       title="Analytics"
       description="Derived entirely from the shipments and documents stored in your workspace."
       wide

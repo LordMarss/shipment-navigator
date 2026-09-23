@@ -74,7 +74,7 @@ export function NewShipmentForm({ onClose }: { onClose: () => void }) {
         </p>
       </div>
 
-      <Section index="01" title="Shipment" hint="Who the shipment is for and where it moves.">
+      <Section title="Shipment" hint="Who the shipment is for and where it moves.">
         <Field label="Client">
           <input
             className={fieldClass}
@@ -102,7 +102,7 @@ export function NewShipmentForm({ onClose }: { onClose: () => void }) {
         />
       </Section>
 
-      <Section index="02" title="Vessel" hint="An MMSI enables live tracking on the fleet map.">
+      <Section title="Vessel" hint="An MMSI enables live tracking on the fleet map.">
         <Field label="Vessel name">
           <input
             className={fieldClass}
@@ -161,7 +161,7 @@ export function NewShipmentForm({ onClose }: { onClose: () => void }) {
         ) : null}
       </Section>
 
-      <Section index="03" title="Commercial" hint="Used for the landed cost totals on the dashboard.">
+      <Section title="Commercial" hint="Used for the landed cost totals on the dashboard.">
         <Field label="Landed cost (USD)">
           <input
             className={fieldClass}
@@ -186,22 +186,11 @@ export function NewShipmentForm({ onClose }: { onClose: () => void }) {
   );
 }
 
-function Section({
-  index,
-  title,
-  hint,
-  children,
-}: {
-  index: string;
-  title: string;
-  hint: string;
-  children: ReactNode;
-}) {
+function Section({ title, hint, children }: { title: string; hint: string; children: ReactNode }) {
   return (
     <div className="grid grid-cols-1 gap-4 border-b border-border px-5 py-5 lg:grid-cols-[180px_1fr]">
       <div>
         <p className="flex items-baseline gap-2">
-          <span className="font-mono text-xs text-muted-foreground">{index}</span>
           <span className="text-sm font-semibold">{title}</span>
         </p>
         <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>

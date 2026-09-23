@@ -7,6 +7,7 @@ import { NewShipmentForm } from "@/components/NewShipmentForm";
 import { VoyageBoard } from "@/components/maritime/VoyageBoard";
 import { useFleet } from "@/components/maritime/useFleet";
 import { useNow } from "@/components/maritime/useNow";
+import { ShipmentBookTabs } from "@/components/maritime/ShipmentBookTabs";
 
 export const Route = createFileRoute("/shipments/")({
   head: () => ({
@@ -34,10 +35,9 @@ function AllShipments() {
 
   return (
     <AppShell
-      eyebrow="Shipments"
-      title="Shipment book"
-      description={`${shipments.length} voyage${shipments.length === 1 ? "" : "s"} on record`}
+      title="Shipments"
       wide
+      tabs={<ShipmentBookTabs />}
       actions={
         <button className={btnPrimary} onClick={() => setOpen((v) => !v)} aria-expanded={open}>
           <Plus className="size-3.5" />
@@ -51,7 +51,7 @@ function AllShipments() {
         </div>
       ) : null}
       <VoyageBoard
-        title="All voyages"
+        title="Passage board"
         shipments={shipments}
         documents={documents}
         alerts={alerts}

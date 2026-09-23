@@ -97,12 +97,12 @@ function FleetMap() {
       }
     >
       <div className="grid grid-cols-1 gap-x-10 gap-y-8 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="min-w-0 overflow-hidden border border-border bg-surface">
+        <div className="min-w-0 self-start overflow-hidden border border-border bg-surface lg:sticky lg:top-[calc(var(--rail-h)+16px)]">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-2.5">
             <span className="label-xs inline-flex items-center gap-2 text-foreground">
               {tracked ? (
                 <span
-                  className="inline-flex size-1.5 shrink-0 rounded-full bg-primary live-pulse"
+                  className="inline-flex size-1.5 shrink-0 rounded-full bg-sea-move live-pulse"
                   aria-hidden
                 />
               ) : null}
@@ -161,7 +161,7 @@ function FleetMap() {
                         <Link
                           to="/shipments/$id"
                           params={{ id: s.id }}
-                          className="focus-ring block truncate rounded-[1px] text-[13.5px] font-medium text-sea-ink hover:text-sea-move"
+                          className="focus-ring block truncate rounded-[1px] text-[13.5px] font-medium text-sea-ink underline-offset-2 hover:underline"
                         >
                           {s.client_name}
                           <span className="telemetry ml-2 text-[11px] font-normal text-sea-ink-3">

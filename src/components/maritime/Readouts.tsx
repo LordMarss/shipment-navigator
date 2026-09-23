@@ -11,7 +11,7 @@ export type ReadoutItem = {
 const TONE: Record<NonNullable<ReadoutItem["tone"]>, string> = {
   alarm: "text-risk",
   caution: "text-warning",
-  move: "text-primary",
+  move: "text-sea-move",
   quiet: "text-muted-foreground",
 };
 
@@ -36,12 +36,12 @@ export function Readouts({ items, loading = false }: { items: ReadoutItem[]; loa
             {item.label}
           </dt>
           <dd
-            className={`telemetry mt-1.5 text-[20px] leading-none ${
+            className={`figure mt-1 text-[30px] leading-[32px] ${
               item.tone ? TONE[item.tone] : "text-foreground"
             }`}
           >
             {loading ? (
-              <span className="inline-block h-5 w-8 animate-pulse bg-surface" />
+              <span className="inline-block h-7 w-10 animate-pulse bg-sea-paper-2" />
             ) : (
               item.value
             )}

@@ -74,7 +74,6 @@ function VesselsPage() {
 
   return (
     <AppShell
-      eyebrow="Fleet"
       title="Vessel register"
       description="Vessels resolved from the MMSI recorded on your shipments."
       wide
@@ -181,7 +180,7 @@ function VesselsPage() {
                             params={{ id: s.id }}
                             className="focus-ring group grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-4 rounded-[1px] text-[12.5px] hover:bg-sea-shallows/60 md:grid-cols-[84px_minmax(0,1fr)_auto_auto]"
                           >
-                            <span className="telemetry text-[11px] text-sea-move group-hover:underline max-md:hidden">
+                            <span className="telemetry text-[11px] text-sea-ink-2 underline-offset-2 group-hover:underline max-md:hidden">
                               {shortId(s.id)}
                             </span>
                             <span className="truncate text-sea-ink">

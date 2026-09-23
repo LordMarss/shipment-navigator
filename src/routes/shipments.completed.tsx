@@ -4,6 +4,7 @@ import { AppShell } from "@/components/AppShell";
 import { VoyageBoard } from "@/components/maritime/VoyageBoard";
 import { useFleet } from "@/components/maritime/useFleet";
 import { useNow } from "@/components/maritime/useNow";
+import { ShipmentBookTabs } from "@/components/maritime/ShipmentBookTabs";
 import type { Shipment } from "@/lib/api";
 
 export const Route = createFileRoute("/shipments/completed")({
@@ -28,14 +29,9 @@ function CompletedShipments() {
   const { shipments, documents, alerts, positions, isLoading } = useFleet(isDone);
 
   return (
-    <AppShell
-      eyebrow="Shipments"
-      title="Completed voyages"
-      description="Delivered shipments and their final record."
-      wide
-    >
+    <AppShell title="Shipments" wide tabs={<ShipmentBookTabs />}>
       <VoyageBoard
-        title="Completed"
+        title="Passage board"
         shipments={shipments}
         documents={documents}
         alerts={alerts}

@@ -47,7 +47,6 @@ function AlertsPage() {
 
   return (
     <AppShell
-      eyebrow="Intelligence"
       title="Alert log"
       description="Status changes and alerts, entered as they happen."
       headerExtra={

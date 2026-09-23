@@ -4,6 +4,7 @@ import { AppShell } from "@/components/AppShell";
 import { VoyageBoard } from "@/components/maritime/VoyageBoard";
 import { useFleet } from "@/components/maritime/useFleet";
 import { useNow } from "@/components/maritime/useNow";
+import { ShipmentBookTabs } from "@/components/maritime/ShipmentBookTabs";
 import type { Shipment } from "@/lib/api";
 
 export const Route = createFileRoute("/shipments/active")({
@@ -29,14 +30,9 @@ function ActiveShipments() {
   const { shipments, documents, alerts, positions, isLoading } = useFleet(isActive);
 
   return (
-    <AppShell
-      eyebrow="Shipments"
-      title="Active voyages"
-      description="Shipments that have not yet been delivered."
-      wide
-    >
+    <AppShell title="Shipments" wide tabs={<ShipmentBookTabs />}>
       <VoyageBoard
-        title="Active"
+        title="Passage board"
         shipments={shipments}
         documents={documents}
         alerts={alerts}

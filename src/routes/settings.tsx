@@ -40,7 +40,6 @@ function SettingsPage() {
 
   return (
     <AppShell
-      eyebrow="Workspace"
       title="Settings"
       description="Configuration for this single-user operations workspace."
     >
