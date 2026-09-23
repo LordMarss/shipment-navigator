@@ -81,6 +81,12 @@ export const Route = createFileRoute("/shipments/$id")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
+  // The open tab lives in the URL, so a link can land on a voyage's
+  // documents or log, and back/forward restore it.
+  validateSearch: (search: Record<string, unknown>): { tab?: TabKey } =>
+    TABS.some((t) => t.key === search["tab"]) && search["tab"] !== "overview"
+      ? { tab: search["tab"] as TabKey }
+      : {},
   component: ShipmentDetail,
 });
 
@@ -141,7 +147,15 @@ function ShipmentDetail() {
   const queryClient = useQueryClient();
   const config = useMonitoringConfig();
   const now = useNow();
-  const [tab, setTab] = useState<TabKey>("overview");
+  const tab: TabKey = Route.useSearch().tab ?? "overview";
+  const setTab = (next: TabKey) =>
+    navigate({
+      to: "/shipments/$id",
+      params: { id },
+      search: next === "overview" ? {} : { tab: next },
+      replace: true,
+      resetScroll: false,
+    });
 
   const { data: shipment, isLoading } = useQuery({
     queryKey: ["shipment", id],
@@ -966,9 +980,9 @@ function ShipmentDetail() {
                           [
                             "Ports linked",
                             shipment.origin_port_id && shipment.destination_port_id
-                              ? "Both, measured by position"
+                              ? "Both ports"
                               : shipment.origin_port_id || shipment.destination_port_id
-                                ? "One of two"
+                                ? "One port of two"
                                 : "Neither, schedule only",
                           ],
                         ] as [string, string | null][]

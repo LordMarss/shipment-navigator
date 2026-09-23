@@ -14,12 +14,12 @@ import {
 export const Route = createFileRoute("/settings")({
   head: () => ({
     meta: [
-      { title: "Settings — StimTech Solutions" },
+      { title: "Settings - StimTech Solutions" },
       {
         name: "description",
         content: "Workspace configuration: document standards, upload limits and data summary.",
       },
-      { property: "og:title", content: "Settings — StimTech Solutions" },
+      { property: "og:title", content: "Settings - StimTech Solutions" },
       {
         property: "og:description",
         content: "Workspace configuration for your logistics operations.",
@@ -56,7 +56,7 @@ function SettingsPage() {
           <h2 className="label-xs mb-1">Document policy</h2>
           <Row label="Max file size" value={formatBytes(MAX_FILE_BYTES)} />
           <Row label="Accepted types" value="PDF, JPG, PNG" />
-          <Row label="Storage access" value="Private — signed links only" />
+          <Row label="Storage access" value="Private, signed links only" />
           <Row label="Raw accept list" value={ACCEPTED_FILE_TYPES} />
         </section>
 

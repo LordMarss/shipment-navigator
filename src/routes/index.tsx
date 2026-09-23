@@ -1,20 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
-import { Plus } from "lucide-react";
+import { useMemo, useState, type ReactNode } from "react";
+import { Plus, X } from "lucide-react";
 
-import { AppShell, btnPrimary } from "@/components/AppShell";
+import { AppShell, btnGhost, btnPrimary } from "@/components/AppShell";
 import { NewShipmentForm } from "@/components/NewShipmentForm";
 import { Almanac } from "@/components/dashboard/Almanac";
 import { DeckLog } from "@/components/dashboard/DeckLog";
-import {
-  SituationBar,
-  type FleetTick,
-  type SituationFacts,
-} from "@/components/dashboard/SituationBar";
+import { AtSea } from "@/components/dashboard/AtSea";
+import { AttentionQueue } from "@/components/dashboard/AttentionQueue";
+import { utcClock } from "@/components/maritime/format";
 import { useNow } from "@/components/maritime/useNow";
 import { VoyageBoard, type Lens } from "@/components/maritime/VoyageBoard";
-import { useMonitoringConfig } from "@/hooks/useMonitoringConfig";
 import {
   listAllDocuments,
   listAllEvents,
@@ -22,8 +19,6 @@ import {
   listShipments,
   listVesselPositionsByMmsi,
 } from "@/lib/api";
-import { deriveVesselCondition } from "@/lib/aisAutomation";
-import { docsFor, kpis, shipmentHealth } from "@/lib/lifecycle";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -60,7 +55,6 @@ function Dashboard() {
   const [open, setOpen] = useState(false);
   const [focusId, setFocusId] = useState<string | null>(null);
   const [lens, setLens] = useState<Lens>("all");
-  const config = useMonitoringConfig();
   const now = useNow();
 
   const { data: shipments = [], isLoading } = useQuery({
@@ -93,14 +87,6 @@ function Dashboard() {
     refetchInterval: 45_000,
   });
 
-  // The automated status pipeline runs server-side on a schedule; this only
-  // reports when it last ran.
-  const lastSync = shipments
-    .map((s) => s.last_synced_at)
-    .filter((v): v is string => Boolean(v))
-    .sort()
-    .pop();
-
   const shipmentById = useMemo(() => new Map(shipments.map((s) => [s.id, s])), [shipments]);
 
   // Shipments whose ETA was revised in the last day: the "Changed" reading
@@ -119,172 +105,171 @@ function Dashboard() {
     );
   }, [alerts, now]);
 
-  const facts = useMemo<SituationFacts>(() => {
-    // Same verdict as `kpis` (and the rail's alarm count).
-    const { atRisk, delayed } = kpis(shipments, documents, config);
-    const alarm = atRisk + delayed;
-    const flagged = shipments.filter((s) => {
-      if (s.status === "Delivered") return false;
-      const level = shipmentHealth(s, docsFor(documents, s.id), config).level;
-      return level === "At Risk" || level === "Delayed" || level === "Attention";
-    }).length;
-    // "Under way" is read from real AIS telemetry, not the status field, and
-    // only for voyages that have sailed: a booked voyage's vessel may be
-    // moving on another passage.
-    const underway = positions
-      ? shipments.filter(
-          (s) =>
-            s.vessel_mmsi &&
-            s.actual_departure &&
-            !s.actual_arrival &&
-            deriveVesselCondition(s, positions.get(s.vessel_mmsi) ?? null).kind === "underway",
-        ).length
-      : 0;
-    const open = shipments.filter((s) => !FINISHED.has(s.status));
+  // The network in one line: where every voyage is.
+  const network = useMemo(() => {
     const t = now ?? 0;
-    const latest = [
-      ...events.map((e) => ({ at: e.occurred_at, shipmentId: e.shipment_id as string | null })),
-      ...alerts.map((a) => ({ at: a.created_at, shipmentId: a.shipment_id })),
-    ].sort((a, b) => b.at.localeCompare(a.at))[0];
-    const upcoming = open
-      .filter((s) => s.eta && !s.actual_arrival && new Date(s.eta).getTime() > t)
-      .sort((a, b) => new Date(a.eta!).getTime() - new Date(b.eta!).getTime());
-    return {
-      alarm,
-      caution: flagged - alarm,
-      underway,
-      inPassage: open.filter((s) => Boolean(s.actual_departure) && !s.actual_arrival).length,
-      arriving72h: upcoming.filter((s) => new Date(s.eta!).getTime() <= t + 3 * DAY).length,
-      etaRevised24h: changedIds.size,
-      docsOpen: open.filter((s) => {
-        const d = docsFor(documents, s.id);
-        return d.attached < d.total;
-      }).length,
-      overdueDepartures: open.filter(
-        (s) => !s.actual_departure && s.planned_etd && new Date(s.planned_etd).getTime() < t,
-      ).length,
-      nextArrival: upcoming[0] ?? null,
-      latestChange: latest
-        ? {
-            at: new Date(latest.at).getTime(),
-            client: latest.shipmentId
-              ? (shipmentById.get(latest.shipmentId)?.client_name ?? null)
-              : null,
-          }
-        : null,
-    };
-  }, [shipments, documents, positions, config, now, changedIds, events, alerts, shipmentById]);
+    let alongside = 0;
+    let atSea = 0;
+    let arrived = 0;
+    let arriving72h = 0;
+    for (const s of shipments) {
+      if (s.actual_arrival || FINISHED.has(s.status)) arrived += 1;
+      else if (s.actual_departure) atSea += 1;
+      else alongside += 1;
+      if (!s.actual_arrival && !FINISHED.has(s.status) && s.eta) {
+        const eta = new Date(s.eta).getTime();
+        if (eta > t && eta <= t + 3 * DAY) arriving72h += 1;
+      }
+    }
+    return { alongside, atSea, arrived, arriving72h };
+  }, [shipments, now]);
 
-  const fleet = useMemo<FleetTick[]>(() => {
-    const t = now ?? 0;
-    return shipments.map((s) => {
-      const level = shipmentHealth(s, docsFor(documents, s.id), config).level;
-      const arrived = Boolean(s.actual_arrival) || FINISHED.has(s.status);
-      const sailed = Boolean(s.actual_departure) && !arrived;
-      const dep = s.actual_departure ? new Date(s.actual_departure).getTime() : null;
-      const eta = s.eta ? new Date(s.eta).getTime() : null;
-      return {
-        id: s.id,
-        client: s.client_name,
-        stretch: arrived ? 2 : sailed ? 1 : 0,
-        level:
-          level === "At Risk" || level === "Delayed"
-            ? "alarm"
-            : level === "Attention"
-              ? "caution"
-              : null,
-        moving: Boolean(
-          sailed &&
-          s.vessel_mmsi &&
-          positions &&
-          deriveVesselCondition(s, positions.get(s.vessel_mmsi) ?? null).kind === "underway",
-        ),
-        order: arrived
-          ? -(eta ?? 0)
-          : sailed && dep && eta && eta > dep
-            ? -((t - dep) / (eta - dep))
-            : s.planned_etd
-              ? new Date(s.planned_etd).getTime()
-              : Number.MAX_SAFE_INTEGER,
-      };
-    });
-  }, [shipments, documents, config, positions, now]);
-
-  const chooseLens = (next: Lens) => {
+  const showOnBoard = (next: Lens) => {
     setLens(next);
-    if (next !== "all")
-      document.getElementById("board")?.scrollIntoView({ block: "start", behavior: "smooth" });
+    document.getElementById("board")?.scrollIntoView({ block: "start", behavior: "smooth" });
   };
 
   return (
-    <AppShell title="Operations" bare>
-      <SituationBar
-        facts={facts}
-        now={now}
-        lastSync={lastSync}
-        isLoading={isLoading}
-        lens={lens}
-        onLens={chooseLens}
-        formOpen={open}
-        onToggleForm={() => setOpen((v) => !v)}
-        fleet={fleet}
-        focusId={focusId}
-        onFocus={setFocusId}
-      />
+    <AppShell title="Dashboard" bare>
+      <div className="mx-auto w-full max-w-[1480px] px-4 pb-16 sm:px-6 lg:px-8">
+        {/* The watch line: when, where the network stands, the one action */}
+        <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4 border-b border-sea-rule pb-5 pt-6">
+          <div className="min-w-0">
+            <h1 className="display text-[26px] leading-[30px] text-sea-ink">Dashboard</h1>
+            <p className="mt-1.5 flex flex-wrap items-baseline gap-x-5 gap-y-1 text-[12.5px] text-sea-ink-3">
+              {now != null ? (
+                <span className="telemetry text-[11.5px] text-sea-ink-2">
+                  {utcDate(now)}, {utcClock(now)} UTC
+                </span>
+              ) : (
+                <span className="inline-block h-3 w-36 animate-pulse bg-sea-paper-2" />
+              )}
+              {!isLoading && shipments.length > 0 ? (
+                <span>
+                  {shipments.length} voyages: {network.alongside} alongside, {network.atSea} at sea,{" "}
+                  {network.arrived} arrived
+                </span>
+              ) : null}
+              {!isLoading && network.arriving72h > 0 ? (
+                <LensLink onClick={() => showOnBoard("arriving")}>
+                  {network.arriving72h} arriving within 72h
+                </LensLink>
+              ) : null}
+              {!isLoading && changedIds.size > 0 ? (
+                <LensLink onClick={() => showOnBoard("changed")}>
+                  {changedIds.size} ETA revised in 24h
+                </LensLink>
+              ) : null}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            aria-expanded={open}
+            className={open ? btnGhost : btnPrimary}
+          >
+            {open ? (
+              <X className="size-3.5" aria-hidden />
+            ) : (
+              <Plus className="size-3.5" aria-hidden />
+            )}
+            {open ? "Close form" : "New shipment"}
+          </button>
+        </header>
 
-      <div className="mx-auto w-full max-w-[1600px] px-4 pb-12 pt-6 sm:px-6 lg:px-8">
         {open ? (
-          <div id="new-shipment" className="animate-in mb-8">
+          <div id="new-shipment" className="animate-in mt-8">
             <NewShipmentForm onClose={() => setOpen(false)} />
           </div>
         ) : null}
 
-        <div className="grid gap-x-10 gap-y-10 xl:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_352px]">
-          <div className="min-w-0">
-            <VoyageBoard
-              shipments={shipments}
-              documents={documents}
-              alerts={alerts}
-              positions={positions}
-              isLoading={isLoading}
-              now={now}
-              focusId={focusId}
-              onFocus={setFocusId}
-              lens={lens}
-              onLensChange={setLens}
-              showLenses={false}
-              changedIds={changedIds}
-              emptyTitle="No voyages on the board"
-              emptyDescription="Create a shipment with its ports, vessel MMSI and planned dates. Its passage is plotted here and followed on AIS from departure."
-              emptyAction={
-                <button className={btnPrimary} onClick={() => setOpen(true)}>
-                  <Plus className="size-3.5" aria-hidden /> New shipment
-                </button>
-              }
-            />
-          </div>
+        {/* Primary: what needs a decision. Secondary: what is moving. */}
+        <div className="mt-8 grid gap-x-12 gap-y-12 xl:grid-cols-[minmax(0,1fr)_340px] 2xl:grid-cols-[minmax(0,1fr)_380px]">
+          <AttentionQueue
+            shipments={shipments}
+            documents={documents}
+            positions={positions}
+            now={now}
+            isLoading={isLoading}
+            onFocus={setFocusId}
+            onShowAll={() => showOnBoard("attention")}
+          />
+          <AtSea
+            shipments={shipments}
+            positions={positions}
+            now={now}
+            isLoading={isLoading}
+            focusId={focusId}
+            onFocus={setFocusId}
+            onShowAll={() => showOnBoard("underway")}
+          />
+        </div>
 
-          <aside
-            aria-label="Schedule and log"
-            className="grid content-start gap-x-10 gap-y-10 md:grid-cols-2 xl:grid-cols-1"
-          >
-            <Almanac
-              shipments={shipments}
-              now={now}
-              isLoading={isLoading}
-              focusId={focusId}
-              onFocus={setFocusId}
-            />
-            <DeckLog
-              events={events}
-              alerts={alerts}
-              shipmentById={shipmentById}
-              isLoading={alertsLoading || eventsLoading}
-              now={now}
-            />
-          </aside>
+        {/* Tertiary: what comes next, and what has just changed */}
+        <div className="mt-14 grid gap-x-12 gap-y-12 lg:grid-cols-2">
+          <Almanac
+            shipments={shipments}
+            now={now}
+            isLoading={isLoading}
+            focusId={focusId}
+            onFocus={setFocusId}
+          />
+          <DeckLog
+            events={events}
+            alerts={alerts}
+            shipmentById={shipmentById}
+            isLoading={alertsLoading || eventsLoading}
+            now={now}
+          />
+        </div>
+
+        {/* Supporting: the whole book, for investigation */}
+        <div className="mt-16">
+          <VoyageBoard
+            title="All voyages"
+            shipments={shipments}
+            documents={documents}
+            alerts={alerts}
+            positions={positions}
+            isLoading={isLoading}
+            now={now}
+            focusId={focusId}
+            onFocus={setFocusId}
+            lens={lens}
+            onLensChange={setLens}
+            changedIds={changedIds}
+            emptyTitle="No voyages on the board"
+            emptyDescription="Create a shipment with its ports, vessel MMSI and planned dates. Its passage is plotted here and followed on AIS from departure."
+            emptyAction={
+              <button className={btnPrimary} onClick={() => setOpen(true)}>
+                <Plus className="size-3.5" aria-hidden /> New shipment
+              </button>
+            }
+          />
         </div>
       </div>
     </AppShell>
+  );
+}
+
+const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** "Wed 23 Sep" in UTC, matching the clock beside it. */
+function utcDate(t: number) {
+  const d = new Date(t);
+  return `${DAYS[d.getUTCDay()]} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
+}
+
+/** A figure in the watch line that filters the board below to itself. */
+function LensLink({ onClick, children }: { onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="focus-ring text-sea-ink-2 underline decoration-sea-ink-4 underline-offset-[3px] transition-colors hover:text-sea-ink hover:decoration-sea-ink"
+    >
+      {children}
+    </button>
   );
 }

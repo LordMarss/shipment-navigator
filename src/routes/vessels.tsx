@@ -74,7 +74,7 @@ function VesselsPage() {
 
   return (
     <AppShell
-      title="Vessel register"
+      title="Fleet"
       description="Vessels resolved from the MMSI recorded on your shipments."
       wide
       headerExtra={

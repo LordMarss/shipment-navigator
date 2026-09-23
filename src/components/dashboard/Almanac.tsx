@@ -75,7 +75,7 @@ export function Almanac({
   }, [shipments, now]);
 
   return (
-    <ChartPanel id="almanac" title="Movements" meta={`next ${WINDOW_DAYS} days`}>
+    <ChartPanel id="almanac" title="Next movements" meta={`${WINDOW_DAYS} days, local time`}>
       {isLoading || model == null ? (
         <div className="space-y-3 py-3">
           <Skeleton className="h-4 w-full" />

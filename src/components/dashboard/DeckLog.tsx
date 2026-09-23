@@ -74,7 +74,7 @@ export function DeckLog({
     .slice(0, MAX_ENTRIES);
 
   return (
-    <ChartPanel id="log" title="Deck log" meta="latest entries">
+    <ChartPanel id="log" title="Recent changes" meta="deck log">
       {isLoading ? (
         <div className="space-y-3 py-3">
           <Skeleton className="h-4 w-full" />

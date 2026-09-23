@@ -25,7 +25,7 @@ import {
   type Severity,
 } from "@/lib/lifecycle";
 import { useMonitoringConfig } from "@/hooks/useMonitoringConfig";
-import { useMinWidth } from "@/components/maritime/useNow";
+import { useElementWidth, useMinWidth } from "@/components/maritime/useNow";
 import {
   AisTarget,
   Bearing,
@@ -60,6 +60,7 @@ const LENSES: { key: Lens; label: string }[] = [
   { key: "attention", label: "Intervention" },
   { key: "underway", label: "Under way" },
   { key: "arriving", label: "Arriving 72h" },
+  { key: "changed", label: "ETA revised 24h" },
 ];
 export const LENS_LABEL: Record<Lens, string> = {
   all: "All voyages",
@@ -204,10 +205,16 @@ export function VoyageBoard({
   const tableRef = useRef<HTMLTableElement | null>(null);
   // Columns that only fit on wider screens are added, not CSS-hidden: a
   // hidden <col> in a fixed-layout table still takes a share of the width.
+  // The table/strip switch follows the viewport (CSS md:); the optional
+  // columns follow the board's own width, which the sidebar and the page
+  // layout decide, not the window.
   const md = useMinWidth(768);
-  const lg = useMinWidth(1024);
-  const xl = useMinWidth(1280);
-  const cols = { docs: xl, cost: showLandedCost && lg, phase: lg };
+  const [boardRef, boardWidth] = useElementWidth<HTMLElement>();
+  const cols = {
+    phase: boardWidth >= 860,
+    docs: boardWidth >= 1040,
+    cost: showLandedCost && boardWidth >= 1180,
+  };
 
   const alertsByShipment = useMemo(() => {
     const map = new Map<string, { severity: Severity; count: number }>();
@@ -422,6 +429,7 @@ export function VoyageBoard({
 
   return (
     <section
+      ref={boardRef}
       id="board"
       aria-labelledby="board-title"
       className="min-w-0 scroll-mt-[calc(var(--rail-h)+12px)]"
@@ -434,7 +442,7 @@ export function VoyageBoard({
           </h2>
           {showLenses ? (
             <div role="group" aria-label="Show" className="flex max-w-full gap-4 overflow-x-auto">
-              {LENSES.map((l) => {
+              {LENSES.filter((l) => l.key !== "changed" || changedIds).map((l) => {
                 const on = lens === l.key;
                 return (
                   <button

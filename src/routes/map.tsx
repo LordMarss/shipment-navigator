@@ -1,11 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { AppShell, btnGhost, btnPrimary, fieldClass } from "@/components/AppShell";
 import { StatusPill } from "@/components/StatusPill";
 import { targetOf } from "@/components/maritime/format";
+import { PositionChart, type ChartTarget } from "@/components/maritime/PositionChart";
 import { AisTarget, ChartPanel } from "@/components/maritime/marks";
 import { Readouts } from "@/components/maritime/Readouts";
 import { useFleet } from "@/components/maritime/useFleet";
@@ -46,6 +47,9 @@ function FleetMap() {
   const queryClient = useQueryClient();
   const [tracked, setTracked] = useState<Shipment | null>(null);
   const [mmsiDraft, setMmsiDraft] = useState<Record<string, string>>({});
+  // The position plot is drawn from our own AIS fixes; the MarineTraffic
+  // embed is offered alongside it, since it can refuse to load in a frame.
+  const [view, setView] = useState<"plot" | "live">("plot");
 
   const now = useNow();
   const { shipments, positions, isLoading } = useFleet();
@@ -60,6 +64,33 @@ function FleetMap() {
   const underway = active.filter(
     (s) => s.actual_departure && !s.actual_arrival && targetFor(s).state === "active",
   ).length;
+  const chartTargets = useMemo<ChartTarget[]>(() => {
+    const byMmsi = new Map<string, ChartTarget>();
+    for (const s of active) {
+      if (!s.vessel_mmsi) continue;
+      const position = positions?.get(s.vessel_mmsi);
+      if (!position) continue;
+      const existing = byMmsi.get(s.vessel_mmsi);
+      if (existing) {
+        existing.voyages += 1;
+        continue;
+      }
+      const t = targetFor(s);
+      byMmsi.set(s.vessel_mmsi, {
+        mmsi: s.vessel_mmsi,
+        name: s.vessel_name || position.vessel_name || `MMSI ${s.vessel_mmsi}`,
+        lat: position.latitude,
+        lon: position.longitude,
+        cog: position.cog,
+        state: t.state,
+        stopped: t.stopped,
+        age: t.age,
+        voyages: 1,
+      });
+    }
+    return [...byMmsi.values()];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active.map((s) => s.id).join(), positions, now]);
   const trackedByAis = active.filter((s) => s.vessel_mmsi).length;
   const inTransitCount = active.filter((s) => s.status === "In Transit").length;
 
@@ -75,7 +106,7 @@ function FleetMap() {
 
   return (
     <AppShell
-      title="Fleet Map"
+      title="Map"
       description="Live AIS traffic. Track the vessel carrying any active shipment."
       actions={
         tracked ? (
@@ -102,33 +133,73 @@ function FleetMap() {
     >
       <div className="grid grid-cols-1 gap-x-10 gap-y-8 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="min-w-0 self-start overflow-hidden border border-border bg-surface lg:sticky lg:top-[calc(var(--rail-h)+16px)]">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-2.5">
-            <span className="label-xs inline-flex items-center gap-2 text-foreground">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-sea-rule px-4 py-2">
+            <span className="chart-label inline-flex min-w-0 items-center gap-2 text-sea-ink">
               {tracked ? (
                 <span
                   className="inline-flex size-1.5 shrink-0 rounded-full bg-sea-move live-pulse"
                   aria-hidden
                 />
               ) : null}
-              {tracked
-                ? `Tracking ${shortId(tracked.id)} · ${tracked.vessel_name || "vessel"} (MMSI ${tracked.vessel_mmsi})`
-                : "Global traffic · Pacific Coast / North America lanes"}
+              <span className="truncate">
+                {tracked
+                  ? `Tracking ${tracked.vessel_name || "vessel"}, MMSI ${tracked.vessel_mmsi}`
+                  : view === "plot"
+                    ? "Last AIS fixes"
+                    : "Live traffic, Pacific and North America lanes"}
+              </span>
             </span>
-            {tracked ? <StatusPill status={tracked.status} /> : null}
+            <div
+              role="group"
+              aria-label="Map source"
+              className="flex h-7 items-stretch rounded-[2px] border border-sea-rule text-[12px]"
+            >
+              {(
+                [
+                  ["plot", "Position plot"],
+                  ["live", "MarineTraffic"],
+                ] as const
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  aria-pressed={view === key}
+                  onClick={() => setView(key)}
+                  className={`focus-ring whitespace-nowrap px-2.5 transition-colors ${
+                    view === key
+                      ? "bg-sea-ink text-sea-surface"
+                      : "text-sea-ink-2 hover:bg-sea-paper-2 hover:text-sea-ink"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
-          <iframe
-            key={tracked?.id ?? "global"}
-            title={
-              tracked ? `Live position for MMSI ${tracked.vessel_mmsi}` : "Live vessel traffic"
-            }
-            src={tracked?.vessel_mmsi ? vesselEmbed(tracked.vessel_mmsi) : GLOBAL_EMBED}
-            className="h-[420px] w-full border-0 lg:h-[560px]"
-            loading="lazy"
-          />
-          <p className="border-t border-border px-4 py-2.5 text-xs text-muted-foreground">
-            {tracked
-              ? "If the vessel does not appear on the map: No current position data for this vessel."
-              : "Vessel positions are supplied by the public MarineTraffic live map."}
+          {view === "plot" ? (
+            <PositionChart
+              targets={chartTargets}
+              selected={tracked?.vessel_mmsi ?? null}
+              onSelect={(mmsi) => {
+                const s = active.find((x) => x.vessel_mmsi === mmsi) ?? null;
+                setTracked(tracked?.vessel_mmsi === mmsi ? null : s);
+              }}
+            />
+          ) : (
+            <iframe
+              key={tracked?.id ?? "global"}
+              title={
+                tracked ? `Live position for MMSI ${tracked.vessel_mmsi}` : "Live vessel traffic"
+              }
+              src={tracked?.vessel_mmsi ? vesselEmbed(tracked.vessel_mmsi) : GLOBAL_EMBED}
+              className="h-[420px] w-full border-0 lg:h-[560px]"
+              loading="lazy"
+            />
+          )}
+          <p className="border-t border-sea-rule px-4 py-2.5 text-[12px] text-sea-ink-3">
+            {view === "plot"
+              ? "Positions from the AIS feed, plotted by latitude and longitude. Select a vessel to track it."
+              : "Supplied by the public MarineTraffic map, which may decline to load inside another site. Switch to the position plot if it stays blank."}
           </p>
         </div>
 

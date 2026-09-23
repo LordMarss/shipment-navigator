@@ -4,13 +4,27 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* The sidebar is expanded: chosen by the operator, or left on "auto" at
+ * 1280px and wider. The shell root carries data-side (see AppShell). */
+@custom-variant side-open {
+  [data-side="open"] & {
+    @slot;
+  }
+  @media (min-width: 1280px) {
+    [data-side="auto"] & {
+      @slot;
+    }
+  }
+}
+
 /*
  * WhiteWind design system: "Chart & Ink".
  *
  * One light working surface for the whole product, a cool fog ground with
- * near-white tables on it, and one dark register: the bridge rail across
- * the top (navigation, the watch clock, standing alarms) and, on the
- * shipment page, the live AIS console. Nothing else inverts.
+ * near-white tables on it. The sidebar is a half-step darker fog, so the
+ * workspace reads as the lit surface and navigation recedes. One dark
+ * register remains: the live AIS console on the shipment page. Nothing
+ * else inverts.
  *
  * COLOUR MEANS STATE, NEVER DECORATION.
  *   ink        text, rules, primary actions. Buttons are ink, not blue.
@@ -244,11 +258,19 @@
   --sidebar-border: var(--nav-border);
   --sidebar-ring: var(--ring);
 
-  /* Layout: the rail's height, used by every sticky element below it. */
+  /* Layout: the height of the top bar on phones and tablets, used by every
+   * sticky element below it. On desktop navigation is the sidebar, so
+   * sticky elements pin to the top of the viewport. */
   --rail-h: 48px;
 
   /* Motion: one decelerating curve, short durations. */
   --ease-premium: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --rail-h: 0px;
+  }
 }
 
 @layer base {

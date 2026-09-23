@@ -47,7 +47,7 @@ function AlertsPage() {
 
   return (
     <AppShell
-      title="Alert log"
+      title="Alerts"
       description="Status changes and alerts, entered as they happen."
       headerExtra={
         <Readouts

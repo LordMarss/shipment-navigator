@@ -43,7 +43,9 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
-        <h1 className="text-lg font-semibold tracking-tight text-foreground">This page didn't load</h1>
+        <h1 className="text-lg font-semibold tracking-tight text-foreground">
+          This page didn't load
+        </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Something went wrong. You can retry or head back to the dashboard.
         </p>
@@ -71,7 +73,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "StimTech Solutions — Shipment Tracking" },
+      { title: "StimTech Solutions - Shipment Tracking" },
       {
         name: "description",
         content:
@@ -86,8 +88,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
         rel: "stylesheet",
-        href:
-          "https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..700&family=Martian+Mono:wdth,wght@75..112.5,400..600&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..700&family=Martian+Mono:wdth,wght@75..112.5,400..600&display=swap",
       },
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
     ],

@@ -155,9 +155,14 @@ function AnalyticsPage() {
             </div>
             <ul className="mt-6 grid grid-cols-2 gap-x-8 border-t border-sea-rule-2 pt-3 sm:grid-cols-3">
               {phases.map(({ st, count }) => (
-                <li key={st} className="flex items-baseline justify-between py-1 text-[12.5px]">
-                  <StatusPill status={st} />
-                  <span className="telemetry text-[12px] text-sea-ink-2">{count}</span>
+                <li
+                  key={st}
+                  className="flex min-w-0 items-baseline justify-between gap-3 py-1 text-[12.5px]"
+                >
+                  <span className="min-w-0 truncate">
+                    <StatusPill status={st} />
+                  </span>
+                  <span className="telemetry shrink-0 text-[12px] text-sea-ink-2">{count}</span>
                 </li>
               ))}
             </ul>

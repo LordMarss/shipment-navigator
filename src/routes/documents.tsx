@@ -59,7 +59,7 @@ function DocumentsPage() {
 
   return (
     <AppShell
-      title="Manifest control"
+      title="Documents"
       description="Standard document completion per shipment, plus any additional files attached."
       wide
       headerExtra={
