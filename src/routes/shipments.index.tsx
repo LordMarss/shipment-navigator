@@ -51,7 +51,7 @@ function AllShipments() {
         </div>
       ) : null}
       <VoyageBoard
-        title="Passage board"
+        title="Shipment board"
         shipments={shipments}
         documents={documents}
         alerts={alerts}

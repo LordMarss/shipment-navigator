@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ArrowLeft, ArrowRight, ChevronRight, MoreHorizontal, RotateCcw } from "lucide-react";
+import { ArrowLeft, ArrowRight, ChevronRight, MoreHorizontal } from "lucide-react";
 import { toast } from "sonner";
 
 import { AppShell, btnGhost, btnPrimary, fieldClass } from "@/components/AppShell";
@@ -31,7 +31,6 @@ import {
   ACTIVE_STATUSES,
   advanceStatus,
   deleteShipment,
-  formatEta,
   getPortById,
   getShipment,
   getVesselPositionForShipment,
@@ -460,7 +459,7 @@ function ShipmentDetail() {
             {shipment.client_name}
           </h1>
 
-          <dl className="panel mt-5 grid grid-cols-2 overflow-hidden px-4 sm:grid-cols-3 sm:px-5 lg:grid-cols-[1.1fr_1.1fr_1.2fr_1.1fr_0.9fr]">
+          <dl className="mt-5 grid grid-cols-2 border-y border-sea-rule sm:grid-cols-3 lg:grid-cols-[1.1fr_1.1fr_1.2fr_1.1fr_0.9fr]">
             <HeaderStat label="Phase">
               <span className="flex items-center gap-2.5">
                 <PhaseLadder status={shipment.status} size="md" />
@@ -571,7 +570,7 @@ function ShipmentDetail() {
           {level || automationHold ? (
             <div
               role="status"
-              className={`panel animate-in mt-3 flex flex-col gap-3 !border-l-[3px] py-3 pl-4 pr-4 sm:flex-row sm:items-center sm:justify-between sm:pl-5 ${
+              className={`panel animate-in mt-4 flex flex-col gap-3 !border-l-[3px] py-3 pl-4 pr-4 sm:flex-row sm:items-center sm:justify-between sm:pl-5 ${
                 level === "alarm" ? "!border-l-sea-red" : "!border-l-sea-amber"
               }`}
             >
@@ -625,7 +624,7 @@ function ShipmentDetail() {
         </header>
 
         {/* ------------------------------------------------------- the passage */}
-        <div className="panel mt-3 px-4 pb-4 pt-4 sm:px-5">
+        <div className="panel mt-4 px-4 pb-4 pt-4 sm:px-5">
           <VoyagePlot
             shipment={shipment}
             position={position ?? null}
@@ -700,7 +699,7 @@ function ShipmentDetail() {
                     id="lifecycle-title"
                     className="panel-title -mx-4 border-b border-sea-rule px-4 py-3.5 sm:-mx-5 sm:px-5"
                   >
-                    Lifecycle
+                    Lifecycle and monitoring
                   </h2>
                   <LifecycleJourney
                     status={shipment.status}
@@ -708,28 +707,16 @@ function ShipmentDetail() {
                     currentIndex={currentIndex}
                     reachedAt={reachedAt}
                   />
-                </section>
-
-                <section
-                  aria-labelledby="watch-title"
-                  className="panel min-w-0 px-4 pb-3 sm:px-5 [&_li:last-child]:border-b-0"
-                >
-                  <h2
-                    id="watch-title"
-                    className="panel-title -mx-4 border-b border-sea-rule px-4 py-3.5 sm:-mx-5 sm:px-5"
-                  >
-                    Monitoring
-                  </h2>
-                  <dl className="divide-y divide-sea-rule-2">
+                  <dl className="-mx-4 mt-4 divide-y divide-sea-rule-2 border-t border-sea-rule px-4 sm:-mx-5 sm:px-5">
                     <div className="grid grid-cols-[112px_minmax(0,1fr)] gap-4 py-2.5">
-                      <dt className="chart-label pt-0.5 text-sea-ink-3">Watch</dt>
+                      <dt className="pt-px text-[12px] font-medium text-sea-ink-3">Monitoring</dt>
                       <dd className="text-[13px] text-sea-ink">
                         <span className="font-medium">{monitoring.state}</span>
                         <span className="text-sea-ink-2">. {monitoring.reason}</span>
                       </dd>
                     </div>
                     <div className="grid grid-cols-[112px_minmax(0,1fr)] gap-4 py-2.5">
-                      <dt className="chart-label pt-0.5 text-sea-ink-3">Automation</dt>
+                      <dt className="pt-px text-[12px] font-medium text-sea-ink-3">Automation</dt>
                       <dd className="text-[13px] text-sea-ink">
                         {automationHold ? (
                           <span className="font-medium text-sea-amber-ink">
@@ -1131,7 +1118,6 @@ function ShipmentDetail() {
                         onClick={openOverride}
                         className={`${btnGhost} shrink-0`}
                       >
-                        <RotateCcw className="size-3.5" aria-hidden />
                         Override
                       </button>
                     </div>

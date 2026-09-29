@@ -9,7 +9,6 @@ import { Almanac } from "@/components/dashboard/Almanac";
 import { DeckLog } from "@/components/dashboard/DeckLog";
 import { AtSea } from "@/components/dashboard/AtSea";
 import { AttentionQueue } from "@/components/dashboard/AttentionQueue";
-import { utcClock } from "@/components/maritime/format";
 import { useNow } from "@/components/maritime/useNow";
 import { VoyageBoard, type Lens } from "@/components/maritime/VoyageBoard";
 import {
@@ -138,9 +137,7 @@ function Dashboard() {
             <h1 className="display text-[28px] leading-[32px] text-sea-ink">Dashboard</h1>
             <p className="mt-2 flex flex-wrap items-baseline gap-x-5 gap-y-1 text-[13px] text-sea-ink-3">
               {now != null ? (
-                <span className="telemetry text-[11.5px] uppercase text-sea-ink-2">
-                  {utcDate(now)} {utcClock(now)} UTC
-                </span>
+                <span className="text-sea-ink-2">{utcDate(now)}</span>
               ) : (
                 <span className="inline-block h-3 w-36 animate-pulse rounded-sm bg-sea-paper-2" />
               )}
@@ -182,7 +179,9 @@ function Dashboard() {
           </div>
         ) : null}
 
-        {/* One grid, one gutter. Row one: the decisions and their context. */}
+        {/* Rhythm: tight within a row, comfortable between operations and
+         * the book, generous before context. Row one: the decisions and
+         * the network they sit in. */}
         <div className="grid gap-5 xl:grid-cols-12">
           <div className="min-w-0 xl:col-span-8">
             <AttentionQueue
@@ -206,49 +205,49 @@ function Dashboard() {
               onShowAll={() => showOnBoard("underway")}
             />
           </div>
+        </div>
 
-          {/* Row two: the whole book */}
-          <div className="min-w-0 xl:col-span-12">
-            <VoyageBoard
-              title="Shipment board"
-              shipments={shipments}
-              documents={documents}
-              alerts={alerts}
-              positions={positions}
-              isLoading={isLoading}
-              now={now}
-              focusId={focusId}
-              onFocus={setFocusId}
-              lens={lens}
-              onLensChange={setLens}
-              changedIds={changedIds}
-              emptyTitle="No voyages on the board"
-              emptyDescription="Create a shipment with its ports, vessel MMSI and planned dates. Its passage is plotted here and followed on AIS from departure."
-              emptyAction={
-                <button className={btnPrimary} onClick={() => setOpen(true)}>
-                  <Plus className="size-3.5" aria-hidden /> New shipment
-                </button>
-              }
-            />
-          </div>
+        {/* The whole book */}
+        <div className="mt-8 min-w-0">
+          <VoyageBoard
+            title="Shipment board"
+            shipments={shipments}
+            documents={documents}
+            alerts={alerts}
+            positions={positions}
+            isLoading={isLoading}
+            now={now}
+            focusId={focusId}
+            onFocus={setFocusId}
+            lens={lens}
+            onLensChange={setLens}
+            changedIds={changedIds}
+            emptyTitle="No voyages on the board"
+            emptyDescription="Create a shipment with its ports, vessel MMSI and planned dates. Its passage is plotted here and followed on AIS from departure."
+            emptyAction={
+              <button className={btnPrimary} onClick={() => setOpen(true)}>
+                <Plus className="size-3.5" aria-hidden /> New shipment
+              </button>
+            }
+          />
+        </div>
 
-          {/* Row three: what comes next, and what has just changed */}
-          <div className="min-w-0 lg:grid lg:grid-cols-2 lg:items-start lg:gap-5 xl:col-span-12 max-lg:space-y-5">
-            <Almanac
-              shipments={shipments}
-              now={now}
-              isLoading={isLoading}
-              focusId={focusId}
-              onFocus={setFocusId}
-            />
-            <DeckLog
-              events={events}
-              alerts={alerts}
-              shipmentById={shipmentById}
-              isLoading={alertsLoading || eventsLoading}
-              now={now}
-            />
-          </div>
+        {/* Context: what comes next, and what has just changed */}
+        <div className="mt-14 grid min-w-0 items-start gap-x-12 gap-y-10 lg:grid-cols-2">
+          <Almanac
+            shipments={shipments}
+            now={now}
+            isLoading={isLoading}
+            focusId={focusId}
+            onFocus={setFocusId}
+          />
+          <DeckLog
+            events={events}
+            alerts={alerts}
+            shipmentById={shipmentById}
+            isLoading={alertsLoading || eventsLoading}
+            now={now}
+          />
         </div>
       </div>
     </AppShell>

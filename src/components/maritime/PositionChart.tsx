@@ -184,11 +184,12 @@ export function PositionChart({
               x={labelRight ? tx + 22 : tx - 22}
               y={ty - 2}
               textAnchor={labelRight ? "start" : "end"}
-              fontSize="17"
-              fontWeight={on ? 600 : 500}
+              fontSize="15"
+              letterSpacing="0.5"
+              fontWeight={on ? 700 : 600}
               fill="var(--sea-ink)"
             >
-              {t.name}
+              {t.name.toUpperCase()}
             </text>
             <text
               x={labelRight ? tx + 22 : tx - 22}

@@ -73,11 +73,7 @@ function AlertsPage() {
         />
       }
     >
-      <ChartPanel
-        id="alert-log"
-        title="Entries"
-        meta={isLoading ? null : `${alerts.length} logged`}
-      >
+      <ChartPanel id="alert-log" title="Entries" meta="newest first, local time">
         {isLoading ? (
           <div className="space-y-3 py-4">
             {[0, 1, 2, 3].map((i) => (

@@ -163,7 +163,7 @@ export function VoyageBoard({
   onLensChange,
   showLenses = true,
   changedIds,
-  title = "Passage board",
+  title = "Shipment board",
   showLandedCost = false,
   emptyTitle = "No voyages on the board",
   emptyDescription = "Create a shipment and its passage will be plotted here.",
@@ -198,6 +198,7 @@ export function VoyageBoard({
   const { query, setQuery, status, setStatus, client, setClient, clients, sort, toggleSort, rows } =
     useShipmentFilters(shipments);
   const [groupBy, setGroupBy] = useState<GroupBy>("state");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [openArrived, setOpenArrived] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -471,7 +472,7 @@ export function VoyageBoard({
                   {l.label}
                   <span
                     className={`telemetry rounded-[4px] px-1 text-[10px] leading-[16px] ${
-                      on ? "bg-ww-blue-soft text-ww-blue" : "bg-sea-paper text-sea-ink-3"
+                      on ? "bg-ww-blue-soft text-ww-blue" : "text-sea-ink-3"
                     }`}
                   >
                     {isLoading ? "" : counts[l.key]}
@@ -500,8 +501,8 @@ export function VoyageBoard({
       <div
         className={`flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-sea-rule bg-sea-paper/55 px-4 py-2.5 sm:px-5 ${noData ? "hidden" : ""}`}
       >
-        <div className="grid w-full grid-cols-2 gap-1.5 sm:flex sm:w-auto sm:items-center">
-          <label className="relative col-span-2 block sm:w-56">
+        <div className="grid w-full grid-cols-[minmax(0,1fr)_auto] gap-1.5 sm:flex sm:w-auto sm:items-center">
+          <label className="relative block sm:w-56">
             <span className="sr-only">Search shipments</span>
             <Search
               aria-hidden
@@ -524,8 +525,26 @@ export function VoyageBoard({
               /
             </kbd>
           </label>
+          {/* Phones: the filters wait behind one control */}
+          <button
+            type="button"
+            onClick={() => setFiltersOpen((v) => !v)}
+            aria-expanded={filtersOpen}
+            className={`focus-ring flex h-8 items-center gap-1.5 rounded-md border px-3 text-[12.5px] font-medium sm:hidden ${
+              filtersOpen || status !== "all" || client !== "all"
+                ? "border-ww-blue-line bg-ww-blue-soft text-ww-blue"
+                : "border-sea-rule bg-sea-surface text-sea-ink-2"
+            }`}
+          >
+            Filters
+            {Number(status !== "all") + Number(client !== "all") > 0 ? (
+              <span className="telemetry text-[10.5px]">
+                {Number(status !== "all") + Number(client !== "all")}
+              </span>
+            ) : null}
+          </button>
           <select
-            className={`${field} sm:w-auto`}
+            className={`${field} col-span-2 sm:w-auto ${filtersOpen ? "" : "max-sm:hidden"}`}
             aria-label="Filter by phase"
             value={status}
             onChange={(e) => setStatus(e.target.value as ShipmentStatus | "all")}
@@ -538,7 +557,7 @@ export function VoyageBoard({
             ))}
           </select>
           <select
-            className={`${field} sm:w-auto sm:max-w-[11rem]`}
+            className={`${field} col-span-2 sm:w-auto sm:max-w-[11rem] ${filtersOpen ? "" : "max-sm:hidden"}`}
             aria-label="Filter by client"
             value={client}
             onChange={(e) => setClient(e.target.value)}
@@ -553,7 +572,7 @@ export function VoyageBoard({
           <div
             role="group"
             aria-label="Group rows by"
-            className="col-span-2 flex h-8 items-stretch rounded-md border border-sea-rule bg-sea-surface text-[12.5px] sm:col-span-1"
+            className={`col-span-2 flex h-8 items-stretch rounded-md border border-sea-rule bg-sea-surface text-[12.5px] sm:col-span-1 ${filtersOpen ? "" : "max-sm:hidden"}`}
           >
             {(
               [
@@ -568,7 +587,7 @@ export function VoyageBoard({
                 onClick={() => setGroupBy(key)}
                 className={`focus-ring flex-1 whitespace-nowrap px-2.5 transition-colors sm:flex-none ${
                   groupBy === key
-                    ? "bg-ww-blue text-sea-surface"
+                    ? "bg-ww-blue-soft font-medium text-ww-blue shadow-[inset_0_0_0_1px_var(--ww-blue-line)]"
                     : "text-sea-ink-2 hover:bg-sea-paper-2 hover:text-sea-ink"
                 }`}
               >
@@ -811,7 +830,7 @@ function PassageScale() {
 
 function Legend({ keys }: { keys: boolean }) {
   return (
-    <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-b-lg border-t border-sea-rule bg-sea-paper/45 px-4 py-2.5 text-[11.5px] text-sea-ink-3 sm:px-5">
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-sea-rule-2 px-4 py-2.5 text-[11px] text-sea-ink-3 sm:px-5">
       <span className="inline-flex items-center gap-1.5">
         <span aria-hidden className="h-[2px] w-4 bg-sea-move" /> Under way on AIS
       </span>
@@ -855,23 +874,20 @@ function GroupHead({
           className={`size-3.5 translate-y-[2px] text-sea-ink-3 transition-transform duration-150 ${collapsed ? "" : "rotate-90"}`}
         />
       ) : null}
-      <span
-        className={`text-[12.5px] font-semibold ${section.tone === "alarm" ? "text-sea-red" : "text-sea-ink"}`}
-      >
+      {section.tone === "alarm" ? (
+        <span className="self-center">
+          <ConditionMark level="alarm" size={7} />
+        </span>
+      ) : null}
+      <span className="text-[12.5px] font-semibold text-sea-ink" title={section.order}>
         {section.label}
       </span>
-      <span
-        className={`telemetry rounded-[4px] px-1 text-[10px] leading-[16px] ${section.tone === "alarm" ? "bg-sea-red-soft text-sea-red" : "bg-sea-surface text-sea-ink-2 ring-1 ring-sea-rule-2"}`}
-      >
-        {section.rows.length}
-      </span>
+      <span className="telemetry text-[11px] text-sea-ink-3">{section.rows.length}</span>
       {section.summary ? (
-        <span className="text-[12px] text-sea-ink-2">{section.summary}</span>
+        <span className="text-[12px] text-sea-ink-3">{section.summary}</span>
       ) : null}
-      {section.order ? (
-        <span className="text-[11.5px] text-sea-ink-4">
-          {collapsed ? "shown on request" : section.order}
-        </span>
+      {section.collapsible && collapsed ? (
+        <span className="text-[11.5px] text-sea-ink-4">shown on request</span>
       ) : null}
     </span>
   );
@@ -880,7 +896,7 @@ function GroupHead({
       <th
         scope="colgroup"
         colSpan={colSpan}
-        className="bg-sea-paper/60 px-0 py-2 text-left font-normal"
+        className="bg-sea-paper/40 px-0 py-2 text-left font-normal"
       >
         {section.collapsible ? (
           <button
@@ -910,11 +926,7 @@ function CompactGroupHead({
 }) {
   const inner = (
     <>
-      <span
-        className={`truncate text-[12.5px] font-semibold ${section.tone === "alarm" ? "text-sea-red" : "text-sea-ink"}`}
-      >
-        {section.label}
-      </span>
+      <span className="truncate text-[12.5px] font-semibold text-sea-ink">{section.label}</span>
       <span className="telemetry text-[10.5px] text-sea-ink-2">{section.rows.length}</span>
       {section.summary ? (
         <span className="truncate text-[11.5px] text-sea-ink-3">{section.summary}</span>

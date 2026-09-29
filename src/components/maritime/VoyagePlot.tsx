@@ -1,14 +1,6 @@
 import type { Shipment, VesselPosition } from "@/lib/api";
 import type { VesselCondition } from "@/lib/aisAutomation";
-import {
-  formatCoordinates,
-  slipLabel,
-  targetOf,
-  tCount,
-  utcClock,
-  utcDayTime,
-  voyageOf,
-} from "@/components/maritime/format";
+import { targetOf, tCount, utcClock, utcDayTime, voyageOf } from "@/components/maritime/format";
 import { AisTarget, Bearing } from "@/components/maritime/marks";
 
 const KM_PER_NM = 1.852;
@@ -50,10 +42,6 @@ export function VoyagePlot({
     new Date(s.planned_etd).getTime() < now;
   const eta = s.eta && now != null ? tCount(s.eta, now) : null;
   const arrivalOverdue = Boolean(eta?.past) && !voyage.arrived;
-  const slip =
-    s.planned_eta && s.eta
-      ? Math.round((new Date(s.eta).getTime() - new Date(s.planned_eta).getTime()) / 3_600_000)
-      : 0;
 
   const basis = voyage.arrived
     ? "Passage complete"
@@ -109,19 +97,7 @@ export function VoyagePlot({
                 Arrived{s.actual_arrival ? ` ${utcDayTime(s.actual_arrival, now)} UTC` : ""}
               </span>
             ) : s.eta ? (
-              <>
-                ETA {utcDayTime(s.eta, now)} UTC
-                {eta ? (
-                  <span className={eta.past ? "ml-2 font-medium text-sea-red" : "ml-2"}>
-                    {eta.label}
-                  </span>
-                ) : null}
-                {Math.abs(slip) >= 1 ? (
-                  <span className={`ml-2 ${slip > 0 ? "text-sea-amber-ink" : ""}`}>
-                    {slipLabel(slip)} vs plan
-                  </span>
-                ) : null}
-              </>
+              <>ETA {utcDayTime(s.eta, now)} UTC</>
             ) : (
               <span className="text-sea-amber-ink">ETA not set</span>
             )}
@@ -238,18 +214,9 @@ export function VoyagePlot({
         </div>
       </div>
 
-      {/* Basis and fix */}
-      <div className="mt-2.5 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 text-[12px]">
-        <span className="text-sea-ink-2">{basis}</span>
-        {position && target.state !== "none" ? (
-          <span className="telemetry text-[10.5px] uppercase text-sea-ink-3">
-            {formatCoordinates(position.latitude, position.longitude)}
-            <span className={`ml-2 ${target.state === "lost" ? "text-sea-amber-ink" : ""}`}>
-              Fix {target.age} ago{target.state === "lost" ? ", stale" : ""}
-            </span>
-          </span>
-        ) : null}
-      </div>
+      {/* The basis of the plot. Position and fix age are read in the
+       * record header and the live console, not repeated here. */}
+      <p className="mt-2.5 text-[12px] text-sea-ink-3">{basis}</p>
     </section>
   );
 }

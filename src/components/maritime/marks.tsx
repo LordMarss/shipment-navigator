@@ -325,6 +325,7 @@ export function ChartPanel({
   children,
   className = "",
   flush = false,
+  quiet = false,
 }: {
   id: string;
   title: string;
@@ -334,7 +335,29 @@ export function ChartPanel({
   className?: string;
   /** The body runs to the panel edges (a table that draws its own gutters). */
   flush?: boolean;
+  /** Context rather than operations: no surface, a title over a hairline,
+   * so it recedes beside the panels that hold live work. */
+  quiet?: boolean;
 }) {
+  if (quiet)
+    return (
+      <section
+        id={id}
+        aria-labelledby={`${id}-title`}
+        className={`min-w-0 scroll-mt-[calc(var(--rail-h)+16px)] ${className}`}
+      >
+        <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-sea-rule pb-2.5">
+          <div className="flex min-w-0 items-baseline gap-2.5">
+            <h2 id={`${id}-title`} className="text-[13.5px] font-semibold text-sea-ink">
+              {title}
+            </h2>
+            {meta ? <span className="truncate text-[12px] text-sea-ink-3">{meta}</span> : null}
+          </div>
+          {tools ? <div className="min-w-0 max-w-full">{tools}</div> : null}
+        </header>
+        {children}
+      </section>
+    );
   return (
     <section
       id={id}

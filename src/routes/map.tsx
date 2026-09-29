@@ -133,8 +133,8 @@ function FleetMap() {
     >
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="panel min-w-0 self-start overflow-hidden lg:sticky lg:top-[calc(var(--rail-h)+16px)]">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-sea-rule px-4 py-2">
-            <span className="chart-label inline-flex min-w-0 items-center gap-2 text-sea-ink">
+          <div className="flex min-h-[52px] flex-wrap items-center justify-between gap-2 border-b border-sea-rule px-4 py-2 sm:px-5">
+            <span className="panel-title inline-flex min-w-0 items-center gap-2">
               {tracked ? (
                 <span
                   className="inline-flex size-1.5 shrink-0 rounded-full bg-sea-move live-pulse"
@@ -167,7 +167,7 @@ function FleetMap() {
                   onClick={() => setView(key)}
                   className={`focus-ring whitespace-nowrap px-2.5 transition-colors ${
                     view === key
-                      ? "bg-ww-blue text-sea-surface"
+                      ? "bg-ww-blue-soft font-medium text-ww-blue shadow-[inset_0_0_0_1px_var(--ww-blue-line)]"
                       : "text-sea-ink-2 hover:bg-sea-paper-2 hover:text-sea-ink"
                   }`}
                 >
@@ -203,11 +203,7 @@ function FleetMap() {
           </p>
         </div>
 
-        <ChartPanel
-          id="targets"
-          title="Targets"
-          meta={isLoading ? null : `${active.length} active`}
-        >
+        <ChartPanel id="targets" title="Targets" meta="active voyages">
           {isLoading ? (
             <p className="px-4 py-6 text-center text-sm text-muted-foreground">Loading…</p>
           ) : active.length === 0 ? (

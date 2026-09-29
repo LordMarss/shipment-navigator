@@ -91,7 +91,7 @@ export function AtSea({
         </h2>
         {!isLoading && passages.length > 0 ? (
           <p className="flex items-center gap-1.5 text-[12px] text-sea-ink-2">
-            <Bearing deg={45} size={9} className={underway ? "text-sea-move" : "text-sea-ink-4"} />
+            {underway ? <Bearing deg={45} size={9} className="text-sea-move" /> : null}
             <span className={`telemetry text-[11px] ${underway ? "text-sea-move" : ""}`}>
               {underway}
             </span>
@@ -126,19 +126,15 @@ export function AtSea({
                     ))
                 )}
               </div>
-              <dl className="mt-2.5 grid grid-cols-3 gap-2">
+              <dl className="mt-2.5 flex flex-wrap gap-x-5 gap-y-1 text-[12px]">
                 {stages.map((st) => (
-                  <div key={st.key} className="min-w-0">
-                    <dt className="flex items-center gap-1.5 text-[11.5px] text-sea-ink-3">
-                      <span
-                        aria-hidden
-                        className={`inline-block h-[6px] w-2.5 rounded-full ${st.bar}`}
-                      />
-                      {st.label}
-                    </dt>
-                    <dd className="figure mt-0.5 text-[22px] leading-[24px] text-sea-ink">
-                      {st.n}
-                    </dd>
+                  <div key={st.key} className="flex items-center gap-1.5">
+                    <span
+                      aria-hidden
+                      className={`inline-block h-[6px] w-2.5 rounded-full ${st.bar}`}
+                    />
+                    <dt className="text-sea-ink-3">{st.label}</dt>
+                    <dd className="telemetry text-[11.5px] font-medium text-sea-ink">{st.n}</dd>
                   </div>
                 ))}
               </dl>

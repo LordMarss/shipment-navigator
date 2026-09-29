@@ -78,11 +78,7 @@ function DocumentsPage() {
         />
       }
     >
-      <ChartPanel
-        id="manifests"
-        title="Manifests"
-        meta={isLoading ? null : `${shipments.length} shipments`}
-      >
+      <ChartPanel id="manifests" title="Manifests" meta="standard set per shipment">
         {isLoading ? (
           <div className="space-y-3 py-4">
             {[0, 1, 2].map((i) => (

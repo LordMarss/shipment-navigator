@@ -365,7 +365,7 @@
   padding: 0 5px;
   border-radius: 4px;
   background-color: var(--ww-blue-soft);
-  color: var(--ww-blue);
+  color: oklch(0.44 0.085 256);
   font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 500;

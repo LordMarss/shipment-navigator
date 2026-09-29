@@ -174,24 +174,20 @@ function QueueRow({ item, onFocus }: { item: Item; onFocus: (id: string | null) 
         onBlur={() => onFocus(null)}
         className="focus-ring group relative grid grid-cols-[12px_minmax(0,1fr)_auto] gap-x-3 gap-y-1.5 px-4 py-3.5 transition-colors duration-150 hover:bg-sea-shallows sm:px-5 md:grid-cols-[12px_minmax(0,1fr)_minmax(0,1.35fr)_76px_92px] md:items-start md:gap-x-5"
       >
-        <span
-          aria-hidden
-          className={`absolute inset-y-0 left-0 w-[3px] ${alarm ? "bg-sea-red" : "bg-sea-amber"}`}
-        />
         <span className="pt-[5px]">
           <ConditionMark level={level} size={9} />
         </span>
 
         {/* Who and where */}
         <span className="min-w-0">
-          <span className="flex min-w-0 items-center gap-2">
-            <span className="truncate text-[14.5px] font-medium leading-[20px] text-sea-ink">
-              {s.client_name}
-            </span>
-            <span className="ref-tag shrink-0">{shortId(s.id)}</span>
+          <span className="block truncate text-[14.5px] font-medium leading-[20px] text-sea-ink">
+            {s.client_name}
           </span>
-          <span className="mt-1 block truncate text-[12px] leading-[16px] text-sea-ink-3">
-            {s.origin} <span className="text-sea-ink-4">→</span> {s.destination}
+          <span className="mt-1 flex min-w-0 items-center gap-2 text-[12px] leading-[18px] text-sea-ink-3">
+            <span className="ref-tag shrink-0">{shortId(s.id)}</span>
+            <span className="truncate">
+              {s.origin} <span className="text-sea-ink-4">→</span> {s.destination}
+            </span>
           </span>
         </span>
 
@@ -202,9 +198,7 @@ function QueueRow({ item, onFocus }: { item: Item; onFocus: (id: string | null) 
               <span className="chart-label block !text-[9.5px] text-sea-ink-3">
                 {reading.label}
               </span>
-              <span
-                className={`telemetry block text-[13px] font-medium leading-[18px] ${alarm ? "text-sea-red" : "text-sea-amber-ink"}`}
-              >
+              <span className="telemetry block text-[13px] font-medium leading-[18px] text-sea-ink">
                 {reading.value}
               </span>
             </>
@@ -228,7 +222,7 @@ function QueueRow({ item, onFocus }: { item: Item; onFocus: (id: string | null) 
           </span>
         </span>
 
-        <span className="col-span-2 col-start-2 flex items-center gap-1.5 text-[12.5px] font-medium text-ww-blue md:col-span-1 md:col-start-5 md:row-start-1 md:justify-end md:pt-0.5">
+        <span className="col-span-2 col-start-2 flex items-center gap-1.5 text-[12.5px] font-medium text-sea-ink-3 transition-colors duration-150 group-hover:text-ww-blue group-focus-visible:text-ww-blue md:col-span-1 md:col-start-5 md:row-start-1 md:justify-end md:pt-0.5">
           {alarm ? "Investigate" : "Review"}
           <ArrowRight
             className="size-3.5 transition-transform duration-150 group-hover:translate-x-0.5"

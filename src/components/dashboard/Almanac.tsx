@@ -75,7 +75,7 @@ export function Almanac({
   }, [shipments, now]);
 
   return (
-    <ChartPanel id="almanac" title="Next movements" meta={`${WINDOW_DAYS} days, local time`}>
+    <ChartPanel quiet id="almanac" title="Next movements" meta={`${WINDOW_DAYS} days, local time`}>
       {isLoading || model == null ? (
         <div className="space-y-3 py-3">
           <Skeleton className="h-4 w-full" />
@@ -193,7 +193,7 @@ function DayRow({
                 }`}
               >
                 <span
-                  className={`telemetry text-[11px] ${overdue ? "text-sea-red" : "text-sea-ink-2"}`}
+                  className={`telemetry text-[11px] ${overdue ? "font-medium text-sea-ink" : "text-sea-ink-2"}`}
                 >
                   {overdue ? tCount(new Date(m.at).toISOString(), now).label : clock(m.at)}
                 </span>

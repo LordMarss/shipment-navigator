@@ -93,11 +93,7 @@ function VesselsPage() {
         />
       }
     >
-      <ChartPanel
-        id="register"
-        title="Register"
-        meta={isLoading ? null : `${vessels.length} vessels`}
-      >
+      <ChartPanel id="register" title="Register" meta="by MMSI, with the voyages each carries">
         {isLoading ? (
           <div className="space-y-3 py-4">
             {[0, 1, 2].map((i) => (

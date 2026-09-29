@@ -270,7 +270,7 @@ function Sidebar({ mode }: { mode: SideMode }) {
       </div>
 
       <nav aria-label="Primary" className="min-h-0 flex-1 overflow-y-auto px-3 pb-4 pt-4">
-        <p className="mb-1.5 hidden px-2.5 text-[10.5px] font-medium uppercase tracking-[0.08em] text-ww-navy-ink-2/80 side-open:block">
+        <p className="mb-1.5 hidden px-2.5 text-[10.5px] font-medium uppercase tracking-[0.08em] text-ww-navy-ink-2/70 side-open:block">
           Operations
         </p>
         <ul className="space-y-0.5">
@@ -283,8 +283,8 @@ function Sidebar({ mode }: { mode: SideMode }) {
             />
           ))}
         </ul>
-        <div aria-hidden className="mx-2.5 my-4 h-px bg-ww-navy-line" />
-        <p className="mb-1.5 hidden px-2.5 text-[10.5px] font-medium uppercase tracking-[0.08em] text-ww-navy-ink-2/80 side-open:block">
+        <div aria-hidden className="mx-2.5 my-4 h-px bg-ww-navy-line side-open:hidden" />
+        <p className="mb-1.5 mt-7 hidden px-2.5 text-[10.5px] font-medium uppercase tracking-[0.08em] text-ww-navy-ink-2/70 side-open:block">
           Records
         </p>
         <ul className="space-y-0.5">
@@ -332,7 +332,7 @@ function SideLink({
         to={item.to}
         aria-current={on ? "page" : undefined}
         title={item.label}
-        className={`focus-ring group relative flex h-9 items-center justify-center gap-3 rounded-md px-2.5 text-[13.5px] transition-colors duration-150 side-open:justify-start ${
+        className={`focus-ring group relative flex h-[34px] items-center justify-center gap-3 rounded-md px-2.5 text-[13.5px] transition-colors duration-150 side-open:justify-start ${
           on
             ? "bg-ww-navy-3 font-medium text-white"
             : "text-ww-navy-ink-2 hover:bg-ww-navy-2 hover:text-ww-navy-ink"
@@ -449,36 +449,27 @@ function TopBar() {
           <BrandMark />
         </Link>
 
-        {/* Trail */}
-        <nav aria-label="You are here" className="flex min-w-0 items-center gap-2 text-[13px]">
-          <span className="hidden shrink-0 text-sea-ink-3 sm:inline">WhiteWind</span>
-          <span aria-hidden className="hidden text-sea-ink-4 sm:inline">
-            /
-          </span>
-          {section ? (
-            record ? (
-              <Link
-                to={section.to}
-                className="focus-ring shrink-0 rounded-sm text-sea-ink-3 transition-colors hover:text-ww-blue"
-              >
-                {section.label}
-              </Link>
-            ) : (
-              <span className="truncate font-medium text-sea-ink">{section.label}</span>
-            )
-          ) : null}
-          {record ? (
-            <>
-              <span aria-hidden className="text-sea-ink-4">
-                /
-              </span>
-              <span className="truncate font-medium text-sea-ink">{record}</span>
-            </>
-          ) : null}
-        </nav>
+        {/* Where you are, only once there is somewhere to go back to; a
+         * top-level page names itself in its title, so search leads. */}
+        {record && section ? (
+          <nav aria-label="You are here" className="flex min-w-0 items-center gap-2 text-[13px]">
+            <Link
+              to={section.to}
+              className="focus-ring shrink-0 rounded-sm text-sea-ink-3 transition-colors hover:text-ww-blue"
+            >
+              {section.label}
+            </Link>
+            <span aria-hidden className="text-sea-ink-4">
+              /
+            </span>
+            <span className="truncate font-medium text-sea-ink">{record}</span>
+          </nav>
+        ) : (
+          <GlobalSearch />
+        )}
 
         <div className="ml-auto flex items-center gap-2 sm:gap-4">
-          <GlobalSearch />
+          {record && section ? <GlobalSearch /> : null}
 
           {/* The watch */}
           <div className="hidden items-center gap-4 border-l border-sea-rule pl-4 md:flex">

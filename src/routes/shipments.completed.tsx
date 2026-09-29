@@ -31,7 +31,7 @@ function CompletedShipments() {
   return (
     <AppShell title="Shipments" wide tabs={<ShipmentBookTabs />}>
       <VoyageBoard
-        title="Passage board"
+        title="Shipment board"
         shipments={shipments}
         documents={documents}
         alerts={alerts}
